@@ -440,9 +440,18 @@ end
 AceM2L2DB = {}
 AceM2L2CharDB = {}
 
-dofile("ACEM2L2.lua")
-dofile("XPTooltip.lua")
-dofile("Bindings.lua")
+local function LoadAddonFromToc()
+  local toc = assert(io.open("AceM2L2.toc", "r"))
+  for line in toc:lines() do
+    line = line:gsub("\r$", "")
+    if line ~= "" and not line:match("^#") and line:match("%.lua$") then
+      dofile((line:gsub("\\", "/")))
+    end
+  end
+  toc:close()
+end
+
+LoadAddonFromToc()
 
 AceM2L2:OnInitialize()
 
@@ -750,6 +759,7 @@ assert(legacy.calibrationVersion == 2, "calibration version was not bumped")
 legacy.calibration.zones["12"] = { ratio = 1.6, samples = 10 }
 module:ResetCalibration()
 assert(next(legacy.calibration.zones) == nil, "recalibrate did not clear ratios")
+assert(legacy.calibrationVersion == 2, "recalibrate did not preserve calibration version")
 
 -- Name-only duplicates from early chat kills merge into the NPC entry.
 local mergeDB = AceM2L2CharDB.xpTooltip
@@ -972,6 +982,17 @@ assert((tonumber(deleteDB.session.kills) or 0) == unknownBase.sessionKills, "Unk
 assert((tonumber(deleteDB.session.xp) or 0) == unknownBase.sessionXP, "Unknown delete did not restore session XP")
 assert((tonumber(deleteDB.totals.uniqueMobs) or 0) == unknownBase.unique, "Unknown delete did not restore unique mob count")
 
+-- Command and settings fallback regressions.
+assert(pcall(function() module:HandleCommand("kills Defias") end), "filtered kills command failed")
+local savedSettings = AceM2L2DB.profile.xpTooltip
+AceM2L2DB.profile.xpTooltip = nil
+module.settings = nil
+local recoveredSettings = module:GetSettings()
+assert(type(recoveredSettings) == "table", "GetSettings fallback did not return a table")
+assert(recoveredSettings.theme == "aether", "GetSettings fallback lost the default theme")
+AceM2L2DB.profile.xpTooltip = savedSettings
+module.settings = savedSettings
+
 -- Midnight auto-disable.
 WOW_PROJECT_ID = 1
 module:Refresh()
@@ -981,5 +1002,18 @@ assert(module:GetStatusText():find("auto-disabled", 1, true), "missing auto-disa
 WOW_PROJECT_ID = 18
 module:Refresh()
 assert(module:IsActive(), "module should re-activate on Forever")
+
+assert(pcall(function() AceM2L2:HandleSlashCommand("window 7") end), "window size command failed")
+assert(AceM2L2DB.profile.rollingXPWindow == 7, "window size command did not apply")
+assert(pcall(function() AceM2L2:HandleSlashCommand("window") end), "window open command failed")
+
+local minimapSettings = module:GetSettings()
+local savedMinimapSettings = minimapSettings.minimap
+minimapSettings.minimap = nil
+assert(pcall(function() module:InitializeMinimap() end), "minimap fallback failed")
+minimapSettings.minimap = savedMinimapSettings
+
+-- The core reset command must be safe after the split.
+assert(pcall(function() AceM2L2:HandleSlashCommand("reset") end), "core reset command failed")
 
 print("XPTooltip smoke test passed")

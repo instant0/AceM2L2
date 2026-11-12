@@ -16,9 +16,9 @@ project structure, tracking model, development workflow, and release packaging.
 
 AceM2L2 has two layers:
 
-1. **Core addon** (`ACEM2L2.lua`) — XP-to-level and reputation-to-next-rank
-   messages for both Midnight and Forever.
-2. **Kill History module** (`XPTooltip.lua`) — Forever-only per-character kill
+1. **Core addon** (`ACEM2L2.lua` bootstrap plus `Core/`) — XP-to-level and
+   reputation-to-next-rank messages for both Midnight and Forever.
+2. **Kill History module** (`KillHistory/`) — Forever-only per-character kill
    tracking, tooltip estimates, a 3D mob browser, and the Kill History window.
 
 The Kill History module auto-disables outside Forever or when required client
@@ -206,8 +206,10 @@ name matches. Destructive resets require `confirm`.
 
 ```text
 AceM2L2.toc          Addon metadata and load order
-ACEM2L2.lua          Core addon: settings, XP/rep parsing, commands
-XPTooltip.lua        Kill History module and UI
+ACEM2L2.lua          AceAddon bootstrap and binding metadata
+Core/                Defaults, utilities, settings, XP, reputation, options, commands, events
+KillHistory/         Module, data, formula, calibration, tracking, tooltip, commands, events
+KillHistory/UI/      Theme, widgets, list, detail, overview, window, minimap
 Bindings.lua         Keybind and addon-compartment entry points
 Bindings.xml         Ctrl+Shift+X binding definition
 embeds.xml           Embedded library load order
@@ -240,7 +242,7 @@ Development-only documents under `dev/` are ignored by Git (see `.gitignore`).
 From the repository root:
 
 ```bash
-luac -p ACEM2L2.lua XPTooltip.lua Bindings.lua
+luac -p ACEM2L2.lua Bindings.lua Core/*.lua KillHistory/*.lua KillHistory/UI/*.lua
 lua tests/xptooltip_smoke.lua
 xmllint --noout embeds.xml Bindings.xml
 python3 tests/check_layout.py
@@ -282,7 +284,8 @@ The release zip has a single top-level `AceM2L2/` directory containing:
 
 - `AceM2L2.toc`
 - `ACEM2L2.lua`
-- `XPTooltip.lua`
+- `Core/`
+- `KillHistory/`
 - `Bindings.lua`
 - `Bindings.xml`
 - `embeds.xml`
@@ -303,7 +306,7 @@ import zipfile
 
 out = "/mnt/r/AceM2L2-1.11.3.zip"
 root_files = [
-    "AceM2L2.toc", "ACEM2L2.lua", "XPTooltip.lua",
+    "AceM2L2.toc", "ACEM2L2.lua",
     "Bindings.lua", "Bindings.xml", "embeds.xml",
     "README.txt", "LICENSE",
 ]
@@ -311,11 +314,12 @@ root_files = [
 with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
     for name in root_files:
         z.write(name, f"AceM2L2/{name}")
-    for dirpath, dirnames, filenames in os.walk("Libs"):
-        dirnames[:] = sorted(d for d in dirnames if d != "tests")
-        for name in sorted(filenames):
-            path = os.path.join(dirpath, name)
-            z.write(path, os.path.join("AceM2L2", path))
+    for tree in ("Core", "KillHistory", "Libs"):
+        for dirpath, dirnames, filenames in os.walk(tree):
+            dirnames[:] = sorted(d for d in dirnames if d != "tests")
+            for name in sorted(filenames):
+                path = os.path.join(dirpath, name)
+                z.write(path, os.path.join("AceM2L2", path))
 EOF
 ```
 
