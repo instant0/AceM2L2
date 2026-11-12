@@ -9,7 +9,7 @@ and provides a detailed **Kill History** browser for the Forever 1.60.1 client.
 - **Clients:** Midnight 12.1.x and Forever 1.60.1
 - **License:** GNU GPL v3
 
-The player-facing guide is [`Readme.txt`](Readme.txt). This document covers the
+The player-facing guide is [`README.txt`](README.txt). This document covers the
 project structure, tracking model, development workflow, and release packaging.
 
 ## Overview
@@ -212,12 +212,12 @@ Bindings.lua         Keybind and addon-compartment entry points
 Bindings.xml         Ctrl+Shift+X binding definition
 embeds.xml           Embedded library load order
 Libs/                LibStub, CallbackHandler, Ace3, LibDataBroker, LibDBIcon
-tests/               Offline Lua smoke tests
-Readme.txt           Player-facing readme
+tests/               Offline Lua smoke tests and exact-case layout checker
+README.txt           Player-facing readme
 README.md            Project/developer readme (this file)
 dev/IN_GAME_VERIFICATION.md  Live-client verification checklist
 dev/UPGRADE_PLAN.md  Release notes and upgrade history
-TASKS.md             Implementation and release task log
+dev/TASKS.md        Implementation and release task log (ignored by Git)
 dev/BLUE_UI_REDESIGN_PLAN.md  Aether Blue design notes
 dev/FILENAME_COMPLIANCE_AND_REFACTOR_PLAN.md  Naming audit and Lua split plan
 dev/UI_EXECUTION_PLAN.md / dev/UI_POLISH_PLAN.md / dev/XPTTOOLTIP_PLAN.md  Planning docs
@@ -243,11 +243,24 @@ From the repository root:
 luac -p ACEM2L2.lua XPTooltip.lua Bindings.lua
 lua tests/xptooltip_smoke.lua
 xmllint --noout embeds.xml Bindings.xml
+python3 tests/check_layout.py
 ```
 
 The smoke test is not a WoW client. It catches Lua errors, nil-method calls,
 formula regressions, group handling, UI behavior, theme switching, minimap
 registration, duplicate merging, and delete accounting.
+
+`tests/check_layout.py` validates the shipping layout:
+
+- every non-comment line in `AceM2L2.toc` resolves to an existing file,
+- every `<Script file="...">` and `<Include file="...">` in referenced XML
+  resolves with exact filename case,
+- every root-level Lua file is loaded by the TOC,
+- `Bindings.xml` is loaded when it exists,
+- the checkout folder name matches the TOC basename.
+
+It prints a warning for a local checkout named `acem2l2` because the release
+archive must contain `AceM2L2/`. Use `--strict-root` in release/CI checks.
 
 ### Live checks
 
@@ -273,35 +286,47 @@ The release zip has a single top-level `AceM2L2/` directory containing:
 - `Bindings.lua`
 - `Bindings.xml`
 - `embeds.xml`
-- `Readme.txt`
+- `README.txt`
 - `LICENSE`
 - the required folders under `Libs/`
 
-`Libs/LibStub/tests/` is excluded from release archives. Developer docs and the
-offline test file are also not packaged.
+`Libs/LibStub/tests/` is excluded from release archives. Developer docs, the
+offline tests, `dev/`, `dist/`, and the exact-case checker are not packaged.
 
-A typical build uses a staging directory and Python's `zipfile` module:
+Build the release zip directly from the workspace. No staging folder copy is
+needed:
 
 ```bash
 python3 - <<'EOF'
-import os, zipfile
-root = 'build'
-out = 'AceM2L2-1.11.3.zip'
-with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
-    for dirpath, _, filenames in os.walk(os.path.join(root, 'AceM2L2')):
-        rel = os.path.relpath(dirpath, root)
+import os
+import zipfile
+
+out = "/mnt/r/AceM2L2-1.11.3.zip"
+root_files = [
+    "AceM2L2.toc", "ACEM2L2.lua", "XPTooltip.lua",
+    "Bindings.lua", "Bindings.xml", "embeds.xml",
+    "README.txt", "LICENSE",
+]
+
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+    for name in root_files:
+        z.write(name, f"AceM2L2/{name}")
+    for dirpath, dirnames, filenames in os.walk("Libs"):
+        dirnames[:] = sorted(d for d in dirnames if d != "tests")
         for name in sorted(filenames):
-            z.write(os.path.join(dirpath, name), os.path.join(rel, name))
+            path = os.path.join(dirpath, name)
+            z.write(path, os.path.join("AceM2L2", path))
 EOF
 ```
 
-Current release artifacts:
+Only these release artifacts are kept:
 
 ```text
-AceM2L2-1.11.3.zip
+dist/AceM2L2-1.11.3.zip
 /mnt/r/AceM2L2-1.11.3.zip
-/mnt/r/AceM2L2-1.11.3/AceM2L2/
 ```
+
+No unzipped `/mnt/r/AceM2L2-1.11.3/` folder copy is maintained.
 
 ## Known Limitations
 
