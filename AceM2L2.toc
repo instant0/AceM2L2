@@ -1,0 +1,17 @@
+## Interface: 120105, 16001
+## Title: Ace Mobs 2 Level 2 |cff7fff7f-Ace3-|r
+## Notes: Mob XP, kills-to-level, reputation, and kill history.
+## Author: faslkjd56
+## Category: Quests & Leveling
+## X-Category: Quests & Leveling
+## Version: 1.11.3
+## SavedVariables: AceM2L2DB
+## SavedVariablesPerCharacter: AceM2L2CharDB
+## AddonCompartmentFunc: AceM2L2_OnCompartmentClick
+## OptionalDeps: Ace3
+
+embeds.xml
+ACEM2L2.lua
+XPTooltip.lua
+Bindings.lua
+Bindings.xml

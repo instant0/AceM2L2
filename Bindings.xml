@@ -1,0 +1,5 @@
+<Bindings>
+    <Binding name="ACEM2L2_XPTOOLTIP" category="BINDING_HEADER_ACEM2L2" defaultKey="CTRL-SHIFT-X">
+        AceM2L2_ToggleXPTooltip()
+    </Binding>
+</Bindings>
