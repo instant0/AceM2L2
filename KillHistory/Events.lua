@@ -329,6 +329,21 @@ function XPTooltip:Prune()
     end
   end
   db.totals.uniqueMobs = actual
+  if type(self.NormalizeAccounting) == "function" then
+    self:NormalizeAccounting()
+  end
+  if type(self.NormalizeDungeon) == "function" then
+    self:NormalizeDungeon()
+  end
+  if type(self.NormalizeGoal) == "function" then
+    db.goal = self:NormalizeGoal(db.goal)
+  end
+  if type(self.NormalizeEconomy) == "function" then
+    self:NormalizeEconomy()
+  end
+  if type(self.NormalizeLevelHistory) == "function" then
+    self:NormalizeLevelHistory()
+  end
   self:TrimLevelHistory()
   self:NormalizeRates()
   if type(self.NormalizeDeaths) == "function" then

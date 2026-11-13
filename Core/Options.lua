@@ -150,7 +150,7 @@ function AceM2L2:CreateOptionsPanel()
     "ACEM2L2_XP_EVERY",
     1,
     1,
-    20,
+    1000,
     1,
     function() return self:GetNumberSetting("xpEveryNKills", 1, 1, 1000, true) end,
     function(value) self.db.xpEveryNKills = SanitizeInteger(value, 1, 1, 1000) end,
@@ -162,7 +162,7 @@ function AceM2L2:CreateOptionsPanel()
     "ACEM2L2_REP_EVERY",
     1,
     1,
-    20,
+    1000,
     1,
     function() return self:GetNumberSetting("repEveryNGains", 1, 1, 1000, true) end,
     function(value) self.db.repEveryNGains = SanitizeInteger(value, 1, 1, 1000) end,
@@ -174,7 +174,7 @@ function AceM2L2:CreateOptionsPanel()
     "ACEM2L2_XP_WINDOW",
     5,
     1,
-    20,
+    100,
     1,
     function() return self:GetNumberSetting("rollingXPWindow", 5, 1, 100, true) end,
     function(value) self.db.rollingXPWindow = SanitizeInteger(value, 5, 1, 100) end,
@@ -198,10 +198,10 @@ function AceM2L2:CreateOptionsPanel()
     "ACEM2L2_XP_MIN",
     0,
     0,
-    100,
+    1000,
     1,
-    function() return self:GetNumberSetting("xpMinKillsRemaining", 0, 0, nil, true) end,
-    function(value) self.db.xpMinKillsRemaining = SanitizeInteger(value, 0, 0, 1000000) end,
+    function() return self:GetNumberSetting("xpMinKillsRemaining", 0, 0, 1000, true) end,
+    function(value) self.db.xpMinKillsRemaining = SanitizeInteger(value, 0, 0, 1000) end,
     "Do not print the XP estimate below this remaining kill count."
   )
 
@@ -212,15 +212,15 @@ function AceM2L2:CreateOptionsPanel()
     0,
     50000,
     50,
-    function() return self:GetNumberSetting("repMinRemaining", 0, 0, nil, true) end,
-    function(value) self.db.repMinRemaining = SanitizeInteger(value, 0, 0, 100000000) end,
+    function() return self:GetNumberSetting("repMinRemaining", 0, 0, 50000, true) end,
+    function(value) self.db.repMinRemaining = SanitizeInteger(value, 0, 0, 50000) end,
     "Do not print the reputation estimate below this remaining value."
   )
 
-  addHeader("Kill History")
+  addHeader("Kill Story")
 
   addCheckbox(
-    "Enable Kill History",
+    "Enable Kill Story",
     "ACEM2L2_XPTOOLTIP_ENABLED",
     true,
     function() return self.db.xpTooltip.enabled end,
@@ -231,7 +231,16 @@ function AceM2L2:CreateOptionsPanel()
         pcall(module.SetUserEnabled, module, self.db.xpTooltip.enabled)
       end
     end,
-    "Track kills and show Kill History tooltip lines."
+    "Track kills and show Kill Story tooltip lines."
+  )
+
+  addCheckbox(
+    "Enable UI sounds",
+    "ACEM2L2_XPTOOLTIP_SOUND",
+    true,
+    function() return self.db.xpTooltip.sound end,
+    function(value) self.db.xpTooltip.sound = SanitizeBoolean(value, true) end,
+    "Play UI sounds when the Kill Story window opens and closes."
   )
 
   addCheckbox(
@@ -255,6 +264,28 @@ function AceM2L2:CreateOptionsPanel()
     "Show the AceM2L2 launcher icon around the minimap."
   )
 
+  addCheckbox(
+    "Lock minimap icon",
+    "ACEM2L2_XPTOOLTIP_MINIMAP_LOCK",
+    false,
+    function()
+      local minimap = self.db.xpTooltip.minimap
+      return type(minimap) == "table" and minimap.lock == true or false
+    end,
+    function(value)
+      if type(self.db.xpTooltip.minimap) ~= "table" then
+        self.db.xpTooltip.minimap = { hide = false, minimapPos = 200, lock = false }
+      end
+      self.db.xpTooltip.minimap.lock = SanitizeBoolean(value, false)
+      local module = self:GetXPTooltipModule()
+      if module then
+        pcall(module.InitializeMinimap, module)
+        pcall(module.UpdateMinimapVisibility, module)
+      end
+    end,
+    "Prevent the minimap icon from being dragged."
+  )
+
   addHeader("Diagnostics")
 
   addCheckbox(
@@ -263,7 +294,7 @@ function AceM2L2:CreateOptionsPanel()
     false,
     function() return self.db.xpTooltip.debug end,
     function(value) self.db.xpTooltip.debug = SanitizeBoolean(value, false) end,
-    "Print Kill History XP and kill-identification diagnostics to chat."
+    "Print Kill Story XP and kill-identification diagnostics to chat."
   )
 
   local function addTooltipOptions()
@@ -405,7 +436,7 @@ function AceM2L2:CreateOptionsPanel()
               pcall(module.UpdateTabs, module)
             end
           end,
-          "Show the Heatmap tab in the Kill History window. Heatmap data is always recorded."
+          "Show the Heatmap tab in the Kill Story window. Heatmap data is always recorded."
         )
       end
 

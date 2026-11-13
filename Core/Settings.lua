@@ -1,6 +1,6 @@
 --[[---------------------------------------------------------------------------------
   Core/Settings.lua
-  Profile and Kill History settings sanitization.
+  Profile and Kill Story settings sanitization.
 ------------------------------------------------------------------------------------]]
 
 local AceM2L2 = AceM2L2
@@ -23,9 +23,9 @@ function AceM2L2:SanitizeProfile()
   profile.useRollingXP = SanitizeBoolean(profile.useRollingXP, true)
   profile.debug = SanitizeBoolean(profile.debug, false)
   profile.xpEveryNKills = SanitizeInteger(profile.xpEveryNKills, 1, 1, 1000)
-  profile.xpMinKillsRemaining = SanitizeInteger(profile.xpMinKillsRemaining, 0, 0, 1000000)
+  profile.xpMinKillsRemaining = SanitizeInteger(profile.xpMinKillsRemaining, 0, 0, 1000)
   profile.repEveryNGains = SanitizeInteger(profile.repEveryNGains, 1, 1, 1000)
-  profile.repMinRemaining = SanitizeInteger(profile.repMinRemaining, 0, 0, 100000000)
+  profile.repMinRemaining = SanitizeInteger(profile.repMinRemaining, 0, 0, 50000)
   profile.rollingXPWindow = SanitizeInteger(profile.rollingXPWindow, 5, 1, 100)
   profile.precision = SanitizeInteger(profile.precision, 2, 0, 4)
   self:SanitizeXPTooltipSettings()

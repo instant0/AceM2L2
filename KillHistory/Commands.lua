@@ -29,7 +29,7 @@ local Epoch = Util.Epoch
 function XPTooltip:PrintStatus()
   local compatible, reason, hasProcessor, hasHook = self:CheckCompatibility()
   local profile = self:GetClientProfile()
-  AceM2L2:SafePrint("Kill History: " .. self:GetStatusText())
+  AceM2L2:SafePrint("Kill Story: " .. self:GetStatusText())
   AceM2L2:SafePrint("  Client=" .. (profile and profile.id or "unknown")
     .. ", Project=" .. tostring(self:GetProjectID())
     .. ", Mode=" .. (profile and profile:GetStatusLabel() or "unavailable"))
@@ -80,7 +80,7 @@ function XPTooltip:PrintProbe()
   local db = self.char
   local economy = db and type(db.economy) == "table" and db.economy or {}
   local profile = self:GetClientProfile()
-  AceM2L2:SafePrint("Kill History probe:")
+  AceM2L2:SafePrint("Kill Story probe:")
   ProbeValue("projectID", self:GetProjectID())
   ProbeValue("interface", AceM2L2:GetInterfaceVersion())
   ProbeValue("profile", profile and profile.id or "unknown")
@@ -200,7 +200,7 @@ function XPTooltip:PrintKills(filter)
   end)
 
   if #list == 0 then
-    AceM2L2:SafePrint("Kill History: no kills recorded yet.")
+    AceM2L2:SafePrint("Kill Story: no kills recorded yet.")
     return
   end
 
@@ -236,7 +236,7 @@ end
 
 function XPTooltip:PrintQuests()
   if not self:Supports("hasPerMobXP") then
-    AceM2L2:SafePrint("Kill History: quest XP tracking is unavailable on this client.")
+    AceM2L2:SafePrint("Kill Story: quest XP tracking is unavailable on this client.")
     return
   end
   local db = self.char
@@ -250,7 +250,7 @@ function XPTooltip:PrintQuests()
     end
   end
   if #list == 0 then
-    AceM2L2:SafePrint("Kill History: no quest XP recorded yet.")
+    AceM2L2:SafePrint("Kill Story: no quest XP recorded yet.")
     return
   end
   table.sort(list, function(a, b)
@@ -291,7 +291,7 @@ function XPTooltip:PrintHistory(filter)
     end
   end
   if #list == 0 then
-    AceM2L2:SafePrint("Kill History: no level history recorded yet.")
+    AceM2L2:SafePrint("Kill Story: no level history recorded yet.")
     return
   end
   local supportsXP = self:Supports("hasPerMobXP")
@@ -345,11 +345,11 @@ function XPTooltip:PrintSplits()
   end
 
   if #eligible == 0 then
-    AceM2L2:SafePrint("Kill History: no level splits recorded yet.")
+    AceM2L2:SafePrint("Kill Story: no level splits recorded yet.")
     return
   end
 
-  AceM2L2:SafePrint("Kill History level splits:")
+  AceM2L2:SafePrint("Kill Story level splits:")
   local shown = 0
   for index = #eligible, 1, -1 do
     if shown >= 10 then
@@ -408,11 +408,11 @@ function XPTooltip:PrintEconomy()
   local supportsLoot = self:Supports("hasLootValue")
   local supportsMoney = self:Supports("hasMoney")
   if not supportsLoot and not supportsMoney then
-    AceM2L2:SafePrint("Kill History: economy tracking is unavailable on this client.")
+    AceM2L2:SafePrint("Kill Story: economy tracking is unavailable on this client.")
     return
   end
   local economy = type(db.economy) == "table" and db.economy or {}
-  AceM2L2:SafePrint("Kill History economy:")
+  AceM2L2:SafePrint("Kill Story economy:")
   if supportsLoot then
     if self.lootEventAvailable then
       AceM2L2:SafePrint("  Session loot: " .. FormatMoney(economy.sessionLootValue)
@@ -455,7 +455,7 @@ function XPTooltip:PrintAreas()
   end
   table.sort(list, function(a, b) return a.kills > b.kills end)
   if #list == 0 then
-    AceM2L2:SafePrint("Kill History: no area data yet.")
+    AceM2L2:SafePrint("Kill Story: no area data yet.")
     return
   end
   AceM2L2:SafePrint("Kills by area:")
@@ -482,7 +482,7 @@ function XPTooltip:PrintLevels()
   end
   table.sort(list, function(a, b) return a.level < b.level end)
   if #list == 0 then
-    AceM2L2:SafePrint("Kill History: no level data yet.")
+    AceM2L2:SafePrint("Kill Story: no level data yet.")
     return
   end
   AceM2L2:SafePrint("Kills by player level:")
@@ -497,7 +497,7 @@ function XPTooltip:PrintSession()
   if not db or not db.session then
     return
   end
-  AceM2L2:SafePrint("Kill History session:")
+  AceM2L2:SafePrint("Kill Story session:")
   AceM2L2:SafePrint("  Kills: " .. FormatNumber(db.session.kills or 0))
   if self:Supports("hasPerMobXP") then
     AceM2L2:SafePrint("  XP: " .. FormatNumber(db.session.xp or 0))
@@ -507,7 +507,7 @@ end
 
 function XPTooltip:PrintDungeon()
   if not self:Supports("hasInstanceInfo") then
-    AceM2L2:SafePrint("Kill History: dungeon detection is unavailable on this client.")
+    AceM2L2:SafePrint("Kill Story: dungeon detection is unavailable on this client.")
     return
   end
   local db = self.char
@@ -519,10 +519,10 @@ function XPTooltip:PrintDungeon()
   local kills = tonumber(dungeon.kills) or 0
   local xp = tonumber(dungeon.xp) or 0
   if kills <= 0 and (not supportsXP or xp <= 0) then
-    AceM2L2:SafePrint("Kill History: no dungeon activity recorded yet.")
+    AceM2L2:SafePrint("Kill Story: no dungeon activity recorded yet.")
     return
   end
-  AceM2L2:SafePrint("Kill History dungeon:")
+  AceM2L2:SafePrint("Kill Story dungeon:")
   AceM2L2:SafePrint("  Kills: " .. FormatNumber(kills)
     .. " (" .. FormatNumber(dungeon.sessionKills or 0) .. " this session)")
   if supportsXP then
@@ -555,12 +555,12 @@ function XPTooltip:PrintGoal(rest)
     local goal = type(db.goal) == "table" and db.goal or {}
     local targetLevel = tonumber(goal.targetLevel) or 0
     if targetLevel <= 0 then
-      AceM2L2:SafePrint("Kill History: no leveling goal set. Use /acem2l2 xpt goal set <level>.")
+      AceM2L2:SafePrint("Kill Story: no leveling goal set. Use /acem2l2 xpt goal set <level>.")
       return
     end
     local currentLevel = self:GetPlayerLevel() or 0
     local levelsToGo = max(0, targetLevel - currentLevel)
-    AceM2L2:SafePrint("Kill History leveling goal:")
+    AceM2L2:SafePrint("Kill Story leveling goal:")
     AceM2L2:SafePrint("  Target level: " .. FormatNumber(targetLevel))
     AceM2L2:SafePrint("  Current level: " .. FormatNumber(currentLevel))
     if levelsToGo <= 0 then
@@ -583,7 +583,7 @@ function XPTooltip:PrintGoal(rest)
 
   if action == "clear" then
     db.goal = { targetLevel = 0, targetXP = 0, createdAt = 0 }
-    AceM2L2:SafePrint("Kill History: leveling goal cleared.")
+    AceM2L2:SafePrint("Kill Story: leveling goal cleared.")
     return
   end
 
@@ -596,7 +596,7 @@ function XPTooltip:PrintGoal(rest)
       level = floor(level)
     end
     if not level or level < lowerBound or level > maxLevel then
-      AceM2L2:SafePrint("Kill History: goal level must be between "
+      AceM2L2:SafePrint("Kill Story: goal level must be between "
         .. FormatNumber(lowerBound) .. " and " .. FormatNumber(maxLevel) .. ".")
       return
     end
@@ -605,7 +605,7 @@ function XPTooltip:PrintGoal(rest)
       targetXP = tonumber(db.totals and db.totals.xp) or 0,
       createdAt = Epoch(),
     }
-    AceM2L2:SafePrint("Kill History: leveling goal set to level " .. FormatNumber(level) .. ".")
+    AceM2L2:SafePrint("Kill Story: leveling goal set to level " .. FormatNumber(level) .. ".")
     return
   end
 
@@ -614,7 +614,7 @@ end
 
 function XPTooltip:PrintRate(filter)
   if not self:Supports("hasPerMobXP") then
-    AceM2L2:SafePrint("Kill History: XP rate is unavailable on this client.")
+    AceM2L2:SafePrint("Kill Story: XP rate is unavailable on this client.")
     return
   end
   local settings = self:GetSettings()
@@ -622,11 +622,11 @@ function XPTooltip:PrintRate(filter)
   minutes = floor(max(1, min(60, minutes)))
   local xpPerHour, xpPerMinute, elapsed, count = self:GetXPRate(minutes * 60)
   if not xpPerHour then
-    AceM2L2:SafePrint("Kill History: not enough XP samples yet.")
+    AceM2L2:SafePrint("Kill Story: not enough XP samples yet.")
     return
   end
   AceM2L2:SafePrint(string.format(
-    "Kill History XP rate (%d min window): %s XP/hr (%s XP/min)",
+    "Kill Story XP rate (%d min window): %s XP/hr (%s XP/min)",
     minutes, FormatNumber(xpPerHour), FormatNumber(xpPerMinute)
   ))
   AceM2L2:SafePrint("  Sample window: " .. FormatDuration(elapsed or 0)
@@ -712,7 +712,7 @@ function XPTooltip:PrintDump()
   table.sort(list, function(a, b)
     return (tonumber(a.mob.kills) or 0) > (tonumber(b.mob.kills) or 0)
   end)
-  AceM2L2:SafePrint("Kill History dump (" .. tostring(#list) .. " mobs):")
+  AceM2L2:SafePrint("Kill Story dump (" .. tostring(#list) .. " mobs):")
   for index = 1, min(#list, 50) do
     local entry = list[index]
     local mob = entry.mob
@@ -736,14 +736,14 @@ end
 
 function XPTooltip:PrintTable()
   if not self:Supports("hasXPFormula") then
-    AceM2L2:SafePrint("Kill History: XP table is unavailable on this client.")
+    AceM2L2:SafePrint("Kill Story: XP table is unavailable on this client.")
     return
   end
   local playerLevel = self:GetPlayerLevel()
   local xpMax = self:GetXPMax()
   local xpCurrent = self:GetXP()
   if not playerLevel or not xpMax or not xpCurrent then
-    AceM2L2:SafePrint("Kill History: player XP state is unavailable.")
+    AceM2L2:SafePrint("Kill Story: player XP state is unavailable.")
     return
   end
   local remaining = max(0, xpMax - xpCurrent)
@@ -775,7 +775,14 @@ function XPTooltip:ResetKills()
   if not db then
     return
   end
-  self:InvalidatePendingWork("reset kills", false)
+  self:InvalidatePendingWork("reset kills", true)
+  self.heatmapZoneKey = nil
+  self.selectedIndex = 0
+  self.pendingDeleteKey = nil
+  self.pendingDeleteAt = nil
+  if type(self.ResetScroll) == "function" then
+    self:ResetScroll()
+  end
   db.mobs = {}
   db.quests = {}
   db.areas = {}
@@ -808,7 +815,7 @@ function XPTooltip:ResetKills()
   self:ResetRates()
   self:RecordMoney(self:GetMoney())
   self:EnsureLevelHistory()
-  AceM2L2:SafePrint("Kill History reset.")
+  AceM2L2:SafePrint("Kill Story reset.")
   self:RefreshUI()
 end
 
@@ -817,11 +824,11 @@ function XPTooltip:DeleteMobEntry(mobKey)
   self:MarkMobDeleted(mobKey)
   local name, kills = self:RemoveMobEntry(mobKey)
   if not name then
-    AceM2L2:SafePrint("Kill History: that entry no longer exists.")
+    AceM2L2:SafePrint("Kill Story: that entry no longer exists.")
     return false
   end
   AceM2L2:SafePrint(string.format(
-    "Kill History: removed %s (%s kills).", name, FormatNumber(kills or 0)
+    "Kill Story: removed %s (%s kills).", name, FormatNumber(kills or 0)
   ))
   return true
 end
@@ -850,19 +857,19 @@ function XPTooltip:DeleteMobByName(name, confirm)
   end
 
   if #matches == 0 then
-    AceM2L2:SafePrint("Kill History: no entry named " .. target .. ".")
+    AceM2L2:SafePrint("Kill Story: no entry named " .. target .. ".")
     return
   end
 
   if not confirm then
     if #matches == 1 then
       AceM2L2:SafePrint(string.format(
-        "Kill History: %s has %s kills. Use /acem2l2 xpt delete confirm %s to remove it.",
+        "Kill Story: %s has %s kills. Use /acem2l2 xpt delete confirm %s to remove it.",
         matches[1].name, FormatNumber(matches[1].kills), matches[1].name
       ))
     else
       AceM2L2:SafePrint(string.format(
-        "Kill History: %d entries are named %s. Use /acem2l2 xpt delete confirm %s to remove all of them.",
+        "Kill Story: %d entries are named %s. Use /acem2l2 xpt delete confirm %s to remove all of them.",
         #matches, target, target
       ))
     end
@@ -883,7 +890,7 @@ function XPTooltip:DeleteMobByName(name, confirm)
     self:RefreshAfterMobDelete()
   end
   AceM2L2:SafePrint(string.format(
-    "Kill History: removed %d entr%s named %s (%s kills).",
+    "Kill Story: removed %d entr%s named %s (%s kills).",
     removed, removed == 1 and "y" or "ies", target, FormatNumber(kills)
   ))
 end
@@ -903,7 +910,7 @@ function XPTooltip:DeleteUnknownEntries()
     end
   end
   if #keys == 0 then
-    AceM2L2:SafePrint("Kill History: no Unknown entries to remove.")
+    AceM2L2:SafePrint("Kill Story: no Unknown entries to remove.")
     return
   end
 
@@ -921,7 +928,7 @@ function XPTooltip:DeleteUnknownEntries()
     self:RefreshAfterMobDelete()
   end
   AceM2L2:SafePrint(string.format(
-    "Kill History: removed %d Unknown entr%s (%s kills).",
+    "Kill Story: removed %d Unknown entr%s (%s kills).",
     removed, removed == 1 and "y" or "ies", FormatNumber(kills)
   ))
 end
@@ -946,7 +953,7 @@ function XPTooltip:RefreshAfterMobDelete()
 end
 
 function XPTooltip:PrintHelp()
-  AceM2L2:SafePrint("Kill History commands:")
+  AceM2L2:SafePrint("Kill Story commands:")
   AceM2L2:SafePrint("/acem2l2 xpt on|off")
   AceM2L2:SafePrint("/acem2l2 xpt status")
   AceM2L2:SafePrint("/acem2l2 xpt probe")
@@ -992,10 +999,10 @@ function XPTooltip:HandleCommand(input)
     self:PrintHelp()
   elseif command == "on" then
     self:SetUserEnabled(true)
-    AceM2L2:SafePrint("Kill History enabled.")
+    AceM2L2:SafePrint("Kill Story enabled.")
   elseif command == "off" then
     self:SetUserEnabled(false)
-    AceM2L2:SafePrint("Kill History disabled.")
+    AceM2L2:SafePrint("Kill Story disabled.")
   elseif command == "status" then
     self:PrintStatus()
   elseif command == "probe" then
@@ -1044,7 +1051,7 @@ function XPTooltip:HandleCommand(input)
       local settings = self:GetSettings()
       settings.theme = theme
       self:ApplyTheme()
-      AceM2L2:SafePrint("Kill History theme: " .. theme)
+      AceM2L2:SafePrint("Kill Story theme: " .. theme)
     else
       AceM2L2:SafePrint("Themes: aether, dark, midnight, class, contrast")
     end
@@ -1059,7 +1066,7 @@ function XPTooltip:HandleCommand(input)
       if self.ui and self.ui.SetScale then
         self.ui:SetScale(value)
       end
-      AceM2L2:SafePrint(string.format("Kill History scale: %.2f", value))
+      AceM2L2:SafePrint(string.format("Kill Story scale: %.2f", value))
     else
       AceM2L2:SafePrint("Usage: /acem2l2 xpt scale 80-120")
     end
@@ -1072,7 +1079,7 @@ function XPTooltip:HandleCommand(input)
       if self.ui and self.ui:IsShown() then
         self:SetTab(tab)
       end
-      AceM2L2:SafePrint("Kill History start tab: " .. tab)
+      AceM2L2:SafePrint("Kill Story start tab: " .. tab)
     else
       AceM2L2:SafePrint("Start tabs: overview, mobs, areas, levels, heatmap")
     end
@@ -1085,12 +1092,12 @@ function XPTooltip:HandleCommand(input)
     if action == "off" then
       settings.minimap.hide = true
       self:UpdateMinimapVisibility()
-      AceM2L2:SafePrint("Kill History minimap icon hidden.")
+      AceM2L2:SafePrint("Kill Story minimap icon hidden.")
     elseif action == "on" then
       settings.minimap.hide = false
       self:InitializeMinimap()
       self:UpdateMinimapVisibility()
-      AceM2L2:SafePrint("Kill History minimap icon shown.")
+      AceM2L2:SafePrint("Kill Story minimap icon shown.")
     elseif action == "reset" then
       settings.minimap.minimapPos = 200
       if self.minimapIcon and self.minimapIcon.Refresh then
@@ -1100,7 +1107,7 @@ function XPTooltip:HandleCommand(input)
         self:InitializeMinimap()
       end
       self:UpdateMinimapVisibility()
-      AceM2L2:SafePrint("Kill History minimap position reset.")
+      AceM2L2:SafePrint("Kill Story minimap position reset.")
     elseif action == "status" or action == "" then
       self:PrintMinimapStatus()
     else
@@ -1111,10 +1118,10 @@ function XPTooltip:HandleCommand(input)
     local settings = self:GetSettings()
     if action == "on" then
       settings.debug = true
-      AceM2L2:SafePrint("Kill History debug enabled.")
+      AceM2L2:SafePrint("Kill Story debug enabled.")
     elseif action == "off" then
       settings.debug = false
-      AceM2L2:SafePrint("Kill History debug disabled.")
+      AceM2L2:SafePrint("Kill Story debug disabled.")
     else
       AceM2L2:SafePrint("Usage: /acem2l2 xpt debug on|off")
     end

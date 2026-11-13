@@ -25,7 +25,7 @@ assert(AceM2L2.chatCommands["am2"], "am2 alias missing")
 assert(AceM2L2.events["CHAT_MSG_COMBAT_XP_GAIN"], "core XP event missing")
 assert(AceM2L2.events["PLAYER_XP_UPDATE"], "core XP event missing")
 assert(AceM2L2.events["FACTION_STANDING_CHANGED"], "core reputation event missing")
-assert(module, "Kill History module missing")
+assert(module, "Kill Story module missing")
 
 local function AssertInactiveUnknown()
   assert(not module:IsActive(), "unknown client should be inactive")
@@ -792,7 +792,7 @@ local function HasHeader(category, text)
   return false
 end
 assert(HasHeader(mainCategory, "Chat messages"), "missing Chat messages header")
-assert(HasHeader(mainCategory, "Kill History"), "missing Kill History header")
+assert(HasHeader(mainCategory, "Kill Story"), "missing Kill Story header")
 assert(HasHeader(mainCategory, "Diagnostics"), "missing Diagnostics header")
 assert(HasHeader(tooltipCategory, "XP lines"), "missing XP lines header")
 assert(HasHeader(tooltipCategory, "Kill lines"), "missing Kill lines header")
@@ -1033,5 +1033,96 @@ assert(#levelRecords == 1 and levelRecords[1].level == 11 and levelRecords[1].en
   "reset did not restart level history")
 state.playerLevel = 10
 module:EnsureLevelHistory()
+
+-- Rates, dungeon classification, goals, economy, world data, and nameplates.
+state.money = 0
+module:ResetKills()
+
+local savedTestXP, savedTestXPMax = state.xp, state.xpMax
+state.xp, state.xpMax = 0, 7600
+module:ResetRates()
+module:RecordRateSample(100, "kill")
+AdvanceTime(60)
+module:RecordRateSample(200, "kill")
+local xpPerHour, xpPerMinute, rateElapsed = module:GetXPRate(600)
+assert(xpPerHour and math.abs(xpPerHour - 12000) < 0.001
+  and math.abs(xpPerMinute - 200) < 0.001 and rateElapsed == 60,
+  "rate sample aggregation mismatch")
+local secondsToLevel = module:GetTimeToLevel(600)
+assert(secondsToLevel and math.abs(secondsToLevel - 2280) < 0.001,
+  "time-to-level from XP rate mismatch")
+state.xp, state.xpMax = savedTestXP, savedTestXPMax
+
+state.inInstance, state.instanceType = true, "party"
+ResetTarget()
+module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "Defias Pillager dies, you gain 95 experience.")
+local dungeon = module.char.dungeon
+assert(dungeon.kills == 1 and dungeon.xp == 95 and dungeon.lastInstance == 12,
+  "dungeon kill not classified")
+state.inInstance, state.instanceType = false, nil
+SetTarget("Defias Pillager", GUID_B)
+module:OnTargetChanged("PLAYER_TARGET_CHANGED")
+module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "Defias Pillager dies, you gain 95 experience.")
+assert(dungeon.kills == 1 and dungeon.xp == 95 and module.char.totals.kills == 2,
+  "world kill entered the dungeon bucket")
+
+module:HandleCommand("goal set 20")
+assert(module.char.goal.targetLevel == 20
+  and module.char.goal.targetXP == module.char.totals.xp,
+  "leveling goal not set")
+module:HandleCommand("goal clear")
+assert(module.char.goal.targetLevel == 0 and module.char.goal.createdAt == 0,
+  "leveling goal not cleared")
+
+state.money = 50000
+module:HandleMoneyChanged()
+state.money = 20000
+module:HandleMoneyChanged()
+local economy = module.char.economy
+assert(economy.goldGained == 50000 and economy.goldSpent == 30000,
+  "money delta tracking mismatch")
+module:HandleLootMessage(
+  "You receive loot: |cff9d9d9d|Hitem:12345::::::::|h[Test Item]|h|r x2.",
+  "Tester")
+economy = module.char.economy
+assert(economy.lootValue == 500 and economy.items == 2,
+  "loot value tracking mismatch")
+
+module:ResetKills()
+state.mapID, state.mapX, state.mapY = 12, 0.1, 0.9
+module:HandlePlayerDeath()
+local deaths = module.char.deaths
+assert(#deaths == 1 and deaths[1].mapID == 12
+  and math.abs(deaths[1].x - 0.1) < 0.001 and math.abs(deaths[1].y - 0.9) < 0.001,
+  "death location not recorded")
+module:RecordRespawnInterval(1234, "Defias Pillager", 300)
+module:RecordRespawnInterval(1234, "Defias Pillager", 300)
+module:RecordRespawnInterval(1234, "Defias Pillager", 300)
+local averageRespawn, respawnSamples = module:GetRespawnStats(1234)
+assert(respawnSamples == 3 and averageRespawn == 300,
+  "respawn interval not recorded")
+
+module:ResetHeatmaps()
+assert(module:RecordHeatmapKill(12, 0.25, 0.75), "heatmap kill not captured")
+local heatmapZones = module:GetHeatmapZones()
+assert(#heatmapZones == 1 and heatmapZones[1].mapID == 12
+  and heatmapZones[1].total == 1, "heatmap zones mismatch")
+
+local savedNamePlate = C_NamePlate
+local savedNamePlateAvailable = module.namePlateEventAvailable
+local savedShowNameplateLevel = module:GetSettings().showNameplateLevel
+C_NamePlate = nil
+module.namePlateEventAvailable = true
+module:GetSettings().showNameplateLevel = true
+local namePlateOK = pcall(function()
+  module:HandleNamePlate("nameplate1")
+  module:RefreshNameplateLevels()
+  module:HideNamePlateLevel("nameplate1")
+  module:ClearNameplateLevels()
+end)
+C_NamePlate = savedNamePlate
+module.namePlateEventAvailable = savedNamePlateAvailable
+module:GetSettings().showNameplateLevel = savedShowNameplateLevel
+assert(namePlateOK, "nameplate handler raised without C_NamePlate")
 
 print("Focused smoke test passed (" .. SCENARIO .. ")")

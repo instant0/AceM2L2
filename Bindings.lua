@@ -1,7 +1,7 @@
 -- AceM2L2 bindings and addon-compartment entry points.
 
 BINDING_HEADER_ACEM2L2 = "Ace Mobs 2 Level 2"
-BINDING_NAME_ACEM2L2_XPTOOLTIP = "Toggle Kill History"
+BINDING_NAME_ACEM2L2_XPTOOLTIP = "Toggle Kill Story"
 
 local function ToggleXPTooltip()
   local addon = _G.AceM2L2

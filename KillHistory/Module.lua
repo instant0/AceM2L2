@@ -163,8 +163,8 @@ function XPTooltip:InvalidatePendingWork(reason, full)
     self.poolBeforeKill = nil
     self.deletedMobKeys = {}
   end
-  if reason and self.settings and self.settings.debug then
-    AceM2L2:SafePrint("Kill History: pending work invalidated (" .. tostring(reason) .. ")")
+  if reason and AceM2L2:IsDebugEnabled() then
+    AceM2L2:SafePrint("Kill Story: pending work invalidated (" .. tostring(reason) .. ")")
   end
 end
 
@@ -174,6 +174,7 @@ function XPTooltip:OnDisable()
     pcall(self.UnregisterAllEvents, self)
     self.installed = false
   end
+  self:UninstallTooltipHook()
   self.namePlateEventAvailable = false
   self:InvalidatePendingWork("module disabled", true)
   ClearNameplateTexts(self)
@@ -189,8 +190,16 @@ function XPTooltip:Refresh()
     self.active = false
     self.autoDisabled = true
     self.autoDisableReason = "settings unavailable"
+    if self.installed then
+      pcall(self.UnregisterAllEvents, self)
+      self.installed = false
+    end
+    self:UninstallTooltipHook()
+    self.namePlateEventAvailable = false
     self:InvalidatePendingWork("settings unavailable", true)
     ClearNameplateTexts(self)
+    self:CloseUI()
+    self:HideMinimapIcon()
     return
   end
 
@@ -202,6 +211,7 @@ function XPTooltip:Refresh()
       pcall(self.UnregisterAllEvents, self)
       self.installed = false
     end
+    self:UninstallTooltipHook()
     self.namePlateEventAvailable = false
     self:InvalidatePendingWork("schema blocked", true)
     ClearNameplateTexts(self)
@@ -222,6 +232,7 @@ function XPTooltip:Refresh()
       pcall(self.UnregisterAllEvents, self)
       self.installed = false
     end
+    self:UninstallTooltipHook()
     self.namePlateEventAvailable = false
     self:InvalidatePendingWork("unsupported client", true)
     ClearNameplateTexts(self)
@@ -239,6 +250,7 @@ function XPTooltip:Refresh()
       pcall(self.UnregisterAllEvents, self)
       self.installed = false
     end
+    self:UninstallTooltipHook()
     self.namePlateEventAvailable = false
     self:InvalidatePendingWork("user disabled", true)
     ClearNameplateTexts(self)
@@ -336,7 +348,7 @@ function XPTooltip:SetUserEnabled(value)
     self:StartSession()
   end
   if settings.enabled and self.autoDisabled then
-    AceM2L2:SafePrint("Kill History auto-disabled: " .. tostring(self.autoDisableReason or "incompatible client"))
+    AceM2L2:SafePrint("Kill Story auto-disabled: " .. tostring(self.autoDisableReason or "incompatible client"))
   end
 end
 
@@ -368,14 +380,15 @@ function XPTooltip:ReportError(context, err, countTowardCircuit)
     self.autoDisableReason = "handler errors"
     pcall(self.UnregisterAllEvents, self)
     self.installed = false
+    self:UninstallTooltipHook()
     self.namePlateEventAvailable = false
     self:InvalidatePendingWork("handler errors", true)
     ClearNameplateTexts(self)
     self:CloseUI()
     self:HideMinimapIcon()
   end
-  if self.settings and self.settings.debug then
-    AceM2L2:SafePrint("|cffff5555Kill History " .. message .. "|r")
+  if AceM2L2:IsDebugEnabled() then
+    AceM2L2:SafePrint("|cffff5555Kill Story " .. message .. "|r")
   end
 end
 

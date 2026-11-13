@@ -87,36 +87,115 @@ local function SafeThemeColor(color)
   if type(color) ~= "table" or IsSecret(color) then
     return nil
   end
-  local r = SafeNumber(color.r)
-  local g = SafeNumber(color.g)
-  local b = SafeNumber(color.b)
+  local ok, r, g, b = pcall(function()
+    return color.r, color.g, color.b
+  end)
+  if not ok then
+    return nil
+  end
+  r = SafeNumber(r)
+  g = SafeNumber(g)
+  b = SafeNumber(b)
   if not r or not g or not b then
     return nil
   end
   return r, g, b
 end
 
+-- Core/Defaults.lua ships "aether"; use it whenever settings are missing,
+-- secret, or point at an unknown theme.
+local DEFAULT_THEME = "aether"
+
+local function SafeThemeKey(settings)
+  if type(settings) ~= "table" or IsSecret(settings) then
+    return nil
+  end
+  local ok, key = pcall(function()
+    return settings.theme
+  end)
+  if not ok then
+    return nil
+  end
+  key = SafeString(key)
+  if not key or key == "" or not THEMES[key] then
+    return nil
+  end
+  return key
+end
+
+-- RAID_CLASS_COLORS is a secure table on restricted clients: indexing it (or
+-- an unexpected field) can raise instead of returning nil.
+local function LegacyClassColor(classFile)
+  if not classFile then
+    return nil
+  end
+  local ok, color = pcall(function()
+    if type(RAID_CLASS_COLORS) ~= "table" then
+      return nil
+    end
+    return RAID_CLASS_COLORS[classFile]
+  end)
+  if ok and type(color) == "table" then
+    return color
+  end
+  return nil
+end
+
+local function APIClassColor(classFile)
+  if not classFile then
+    return nil
+  end
+  local ok, color = pcall(function()
+    if type(C_ClassColor) ~= "table" then
+      return nil
+    end
+    local getClassColor = C_ClassColor.GetClassColor
+    if type(getClassColor) ~= "function" then
+      return nil
+    end
+    return getClassColor(classFile)
+  end)
+  if ok and type(color) == "table" then
+    return color
+  end
+  return nil
+end
+
+local function PlayerClassFile()
+  local ok, class = pcall(function()
+    if type(UnitClass) ~= "function" then
+      return nil
+    end
+    local _, file = UnitClass("player")
+    return file
+  end)
+  if not ok then
+    return nil
+  end
+  return SafeString(class)
+end
+
 function XPTooltip:GetTheme()
-  local settings = self.settings or self:GetSettings()
-  local key = settings and settings.theme or "dark"
+  local settings = self.settings
+  if type(settings) ~= "table" then
+    settings = SafeCall(self.GetSettings, self)
+  end
+  local key = SafeThemeKey(settings) or DEFAULT_THEME
   local classFile
   if key == "class" then
-    local _, class = SafeCall(UnitClass, "player")
-    classFile = SafeString(class)
+    classFile = PlayerClassFile()
   end
   local cacheKey = key .. ":" .. tostring(classFile or "")
   if self.themeCacheKey == cacheKey and self.themeCache then
     return self.themeCache
   end
 
-  local base = THEMES[key] or THEMES.aether
+  local base = THEMES[key] or THEMES[DEFAULT_THEME]
   local theme = CopyTable(base)
   if key == "class" then
-    local color = classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile]
-    local r, g, b = SafeThemeColor(color)
-    if not r and classFile and C_ClassColor and C_ClassColor.GetClassColor then
-      color = SafeCall(C_ClassColor.GetClassColor, classFile)
-      r, g, b = SafeThemeColor(color)
+    local r, g, b = SafeThemeColor(LegacyClassColor(classFile))
+    if not r then
+      r, g, b = SafeThemeColor(APIClassColor(classFile))
     end
     if r then
       theme.accent = { r, g, b }

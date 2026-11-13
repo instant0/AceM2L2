@@ -99,7 +99,7 @@ function XPTooltip:OnMinimapTooltip(tooltip)
     return
   end
   local theme = self:GetTheme()
-  tooltip:AddLine("Ace Mobs 2 Level 2 - Kill History", theme.text[1], theme.text[2], theme.text[3])
+  tooltip:AddLine("Ace Mobs 2 Level 2 - Kill Story", theme.text[1], theme.text[2], theme.text[3])
   tooltip:AddLine(self:GetStatusText(), theme.muted[1], theme.muted[2], theme.muted[3])
   local db = self.char
   if db then
@@ -134,5 +134,5 @@ function XPTooltip:PrintMinimapStatus()
   elseif not self:IsActive() then
     state = "inactive (module disabled)"
   end
-  AceM2L2:SafePrint("Kill History minimap icon: " .. state)
+  AceM2L2:SafePrint("Kill Story minimap icon: " .. state)
 end

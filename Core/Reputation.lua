@@ -20,6 +20,44 @@ local GetPlayerGuildName = Util.GetPlayerGuildName
 local AddChatMessage = Util.AddChatMessage
 local SanitizeLabel = Util.SanitizeLabel
 
+--[[--------------------------------------------------------------------------------
+  Restricted API access
+  C_Reputation/C_MajorFactions members can be protected or secret on restricted
+  clients, so resolve them through pcall instead of direct table indexing.
+------------------------------------------------------------------------------------]]
+
+local function SafeGlobal(name)
+  local ok, value = pcall(function()
+    return _G[name]
+  end)
+  if not ok then
+    return nil
+  end
+  return value
+end
+
+local function SafeGlobalFunction(name)
+  local value = SafeGlobal(name)
+  if type(value) ~= "function" then
+    return nil
+  end
+  return value
+end
+
+local function SafeTableFunction(tableName, field)
+  local tbl = SafeGlobal(tableName)
+  if type(tbl) ~= "table" then
+    return nil
+  end
+  local ok, fn = pcall(function()
+    return tbl[field]
+  end)
+  if not ok or type(fn) ~= "function" then
+    return nil
+  end
+  return fn
+end
+
 function AceM2L2:ShouldPrintRepMsg(remaining)
   if not self.db.repEnabled then
     return false
@@ -93,16 +131,18 @@ function AceM2L2:ParseRepMessage(message)
 end
 
 function AceM2L2:GetNumFactions()
-  if C_Reputation and C_Reputation.GetNumFactions then
-    local ok, num = pcall(C_Reputation.GetNumFactions)
+  local getNumFactions = SafeTableFunction("C_Reputation", "GetNumFactions")
+  if getNumFactions then
+    local ok, num = pcall(getNumFactions)
     num = SafeNumber(num)
     if ok and num then
       return num
     end
   end
 
-  if GetNumFactions then
-    local ok, num = pcall(GetNumFactions)
+  local legacyGetNumFactions = SafeGlobalFunction("GetNumFactions")
+  if legacyGetNumFactions then
+    local ok, num = pcall(legacyGetNumFactions)
     num = SafeNumber(num)
     if ok and num then
       return num
@@ -113,8 +153,9 @@ function AceM2L2:GetNumFactions()
 end
 
 function AceM2L2:GetFactionDataByIndex(index)
-  if C_Reputation and C_Reputation.GetFactionDataByIndex then
-    local ok, data = pcall(C_Reputation.GetFactionDataByIndex, index)
+  local getFactionData = SafeTableFunction("C_Reputation", "GetFactionDataByIndex")
+  if getFactionData then
+    local ok, data = pcall(getFactionData, index)
     if ok and data then
       local faction = NormalizeFaction(data)
       if faction then
@@ -124,8 +165,9 @@ function AceM2L2:GetFactionDataByIndex(index)
     end
   end
 
-  if GetFactionInfo then
-    local ok, name, _, standingID, minVal, maxVal, curVal, _, _, isHeader, _, hasRep, _, isChild, factionID = pcall(GetFactionInfo, index)
+  local getFactionInfo = SafeGlobalFunction("GetFactionInfo")
+  if getFactionInfo then
+    local ok, name, _, standingID, minVal, maxVal, curVal, _, _, isHeader, _, hasRep, _, isChild, factionID = pcall(getFactionInfo, index)
     if ok and name then
       local faction = NormalizeFaction({
         name = name,
@@ -154,8 +196,9 @@ function AceM2L2:GetFactionDataByID(factionID)
     return nil
   end
 
-  if C_Reputation and C_Reputation.GetFactionDataByID then
-    local ok, data = pcall(C_Reputation.GetFactionDataByID, id)
+  local getFactionData = SafeTableFunction("C_Reputation", "GetFactionDataByID")
+  if getFactionData then
+    local ok, data = pcall(getFactionData, id)
     if ok and data then
       return NormalizeFaction(data)
     end
@@ -186,8 +229,9 @@ function AceM2L2:RefreshFactionData(faction)
 end
 
 function AceM2L2:GetGuildFactionData()
-  if C_Reputation and C_Reputation.GetGuildFactionData then
-    local ok, data = pcall(C_Reputation.GetGuildFactionData)
+  local getGuildFactionData = SafeTableFunction("C_Reputation", "GetGuildFactionData")
+  if getGuildFactionData then
+    local ok, data = pcall(getGuildFactionData)
     if ok and data then
       return NormalizeFaction(data)
     end
@@ -243,22 +287,29 @@ function AceM2L2:GetReputationProgress(faction)
   local maxVal = SafeNumber(faction.nextReactionThreshold) or 0
   local curVal = SafeNumber(faction.currentStanding) or 0
 
-  if factionID and C_Reputation and C_Reputation.IsFactionParagon and C_Reputation.GetFactionParagonInfo then
-    local ok, isParagon = pcall(C_Reputation.IsFactionParagon, factionID)
-    if ok and SafeBoolean(isParagon) then
-      local ok2, value, threshold = pcall(C_Reputation.GetFactionParagonInfo, factionID)
-      value = SafeNumber(value)
-      threshold = SafeNumber(threshold)
-      if ok2 and value and threshold and threshold > 0 then
-        return 0, threshold, value % threshold
+  if factionID then
+    local isFactionParagon = SafeTableFunction("C_Reputation", "IsFactionParagon")
+    local getFactionParagonInfo = SafeTableFunction("C_Reputation", "GetFactionParagonInfo")
+    if isFactionParagon and getFactionParagonInfo then
+      local ok, isParagon = pcall(isFactionParagon, factionID)
+      if ok and SafeBoolean(isParagon) then
+        local ok2, value, threshold = pcall(getFactionParagonInfo, factionID)
+        value = SafeNumber(value)
+        threshold = SafeNumber(threshold)
+        if ok2 and value and threshold and threshold > 0 then
+          return 0, threshold, value % threshold
+        end
       end
     end
   end
 
-  if factionID and C_MajorFactions and C_MajorFactions.GetMajorFactionData then
+  local getMajorFactionData = factionID
+    and SafeTableFunction("C_MajorFactions", "GetMajorFactionData")
+  if getMajorFactionData then
     local isMajor = true
-    if C_Reputation and C_Reputation.IsMajorFaction then
-      local ok, major = pcall(C_Reputation.IsMajorFaction, factionID)
+    local isMajorFaction = SafeTableFunction("C_Reputation", "IsMajorFaction")
+    if isMajorFaction then
+      local ok, major = pcall(isMajorFaction, factionID)
       if ok and SafeBoolean(major) == false then
         isMajor = false
       end
@@ -266,12 +317,14 @@ function AceM2L2:GetReputationProgress(faction)
 
     if isMajor then
       local ok, earned, threshold = pcall(function()
-        local major = C_MajorFactions.GetMajorFactionData(factionID)
-        if not major then
+        local major = getMajorFactionData(factionID)
+        if type(major) ~= "table" then
           return nil
         end
         return SafeNumber(major.renownReputationEarned), SafeNumber(major.renownLevelThreshold)
       end)
+      earned = SafeNumber(earned)
+      threshold = SafeNumber(threshold)
       if ok and earned and threshold and threshold > 0 then
         return 0, threshold, earned
       end

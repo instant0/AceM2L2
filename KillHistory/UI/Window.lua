@@ -65,7 +65,7 @@ function XPTooltip:CreateUI()
 
   local subtitle = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
-  subtitle:SetText("KILL HISTORY")
+  subtitle:SetText("KILL STORY")
   frame.subtitle = subtitle
 
   local statusText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

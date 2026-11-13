@@ -1,6 +1,6 @@
 --[[---------------------------------------------------------------------------------
   Core/Commands.lua
-  Slash commands, help, status, and Kill History command routing.
+  Slash commands, help, status, and Kill Story command routing.
 ------------------------------------------------------------------------------------]]
 
 local AceM2L2 = AceM2L2
@@ -89,10 +89,10 @@ function AceM2L2:PrintStatus()
   if module and module.GetStatusText then
     local ok, status = pcall(module.GetStatusText, module)
     if ok and status then
-      self:SafePrint("Kill History=" .. tostring(status))
+      self:SafePrint("Kill Story=" .. tostring(status))
     end
   else
-    self:SafePrint("Kill History=module not loaded")
+    self:SafePrint("Kill Story=module not loaded")
   end
   if self.lastError then
     self:SafePrint("LastError=" .. tostring(self.lastError))
@@ -137,9 +137,9 @@ function AceM2L2:HandleSlashCommand(input)
   elseif cmd == "repevery" then
     self.db.repEveryNGains = SanitizeInteger(tonumber(arg) or self.db.repEveryNGains, 1, 1, 1000)
   elseif cmd == "xmin" then
-    self.db.xpMinKillsRemaining = SanitizeInteger(tonumber(arg) or self.db.xpMinKillsRemaining, 0, 0, 1000000)
+    self.db.xpMinKillsRemaining = SanitizeInteger(tonumber(arg) or self.db.xpMinKillsRemaining, 0, 0, 1000)
   elseif cmd == "repmin" then
-    self.db.repMinRemaining = SanitizeInteger(tonumber(arg) or self.db.repMinRemaining, 0, 0, 100000000)
+    self.db.repMinRemaining = SanitizeInteger(tonumber(arg) or self.db.repMinRemaining, 0, 0, 50000)
   elseif cmd == "rolling" then
     local value = self:SetToggle(arg, "rolling")
     if value ~= nil then
@@ -151,7 +151,7 @@ function AceM2L2:HandleSlashCommand(input)
       if module and module.OpenUI then
         pcall(module.OpenUI, module)
       else
-        self:SafePrint("Kill History module is not available.")
+        self:SafePrint("Kill Story module is not available.")
       end
     else
       self.db.rollingXPWindow = SanitizeInteger(tonumber(arg) or self.db.rollingXPWindow, 1, 1, 100)
@@ -169,27 +169,27 @@ function AceM2L2:HandleSlashCommand(input)
     if module and module.OpenUI then
       pcall(module.OpenUI, module)
     else
-      self:SafePrint("Kill History module is not available.")
+      self:SafePrint("Kill Story module is not available.")
     end
   elseif cmd == "kills" then
     local module = self:GetXPTooltipModule()
     if module and module.HandleCommand then
       local ok, err = pcall(module.HandleCommand, module, "kills " .. (arg or ""))
       if not ok then
-        self:ReportError("Kill History command", err)
+        self:ReportError("Kill Story command", err)
       end
     else
-      self:SafePrint("Kill History module is not available.")
+      self:SafePrint("Kill Story module is not available.")
     end
   elseif cmd == "xpt" or cmd == "xptooltip" then
     local module = self:GetXPTooltipModule()
     if module and module.HandleCommand then
       local ok, err = pcall(module.HandleCommand, module, arg)
       if not ok then
-        self:ReportError("Kill History command", err)
+        self:ReportError("Kill Story command", err)
       end
     else
-      self:SafePrint("Kill History module is not available.")
+      self:SafePrint("Kill Story module is not available.")
     end
   elseif cmd == "debug" then
     local value = self:SetToggle(arg, "debug")

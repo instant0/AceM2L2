@@ -338,13 +338,13 @@ end
 
 function XPTooltip:PrintHeatmap(rest)
   if not self:Supports("hasMapPosition") then
-    AceM2L2:SafePrint("Kill History: heatmap is unavailable on this client.")
+    AceM2L2:SafePrint("Kill Story: heatmap is unavailable on this client.")
     return
   end
 
   local zones = self:GetHeatmapZones()
   if #zones == 0 then
-    AceM2L2:SafePrint("Kill History: no heatmap data recorded yet.")
+    AceM2L2:SafePrint("Kill Story: no heatmap data recorded yet.")
     return
   end
 
@@ -365,14 +365,14 @@ function XPTooltip:PrintHeatmap(rest)
     end
 
     if not zone then
-      AceM2L2:SafePrint("Kill History: no heatmap zone matching "
+      AceM2L2:SafePrint("Kill Story: no heatmap zone matching "
         .. requested .. ".")
       return
     end
 
     local cellCount = CountCells(zone.cells)
     AceM2L2:SafePrint(string.format(
-      "Kill History heatmap: %s (%s kills, %s cells)",
+      "Kill Story heatmap: %s (%s kills, %s cells)",
       ZoneName(self, zone.mapID),
       FormatNumber(zone.total),
       FormatNumber(cellCount)
@@ -411,7 +411,7 @@ function XPTooltip:PrintHeatmap(rest)
     return
   end
 
-  AceM2L2:SafePrint("Kill History heatmaps:")
+  AceM2L2:SafePrint("Kill Story heatmaps:")
   for index = 1, min(#zones, 10) do
     local zone = zones[index]
     AceM2L2:SafePrint(string.format(

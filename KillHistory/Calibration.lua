@@ -252,7 +252,7 @@ function XPTooltip:ResetObservations()
   end
   db.calibration = { zones = {}, levels = {}, groups = {}, classes = {}, mobs = {} }
   db.calibrationVersion = CALIBRATION_VERSION
-  AceM2L2:SafePrint("Kill History observations reset.")
+  AceM2L2:SafePrint("Kill Story observations reset.")
   self:RefreshUI()
 end
 
@@ -266,6 +266,6 @@ function XPTooltip:ResetCalibration()
   -- ResetObservations, not by recalibrate.
   db.calibration = { zones = {}, levels = {}, groups = {}, classes = {}, mobs = {} }
   db.calibrationVersion = CALIBRATION_VERSION
-  AceM2L2:SafePrint("Kill History calibration reset (observations kept).")
+  AceM2L2:SafePrint("Kill Story calibration reset (observations kept).")
   self:RefreshUI()
 end

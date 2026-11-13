@@ -29,12 +29,38 @@ function XPTooltip:InstallTooltipHook()
   end
   self.tooltipHookInstalled = true
 
+  local processor = TooltipDataProcessor
+  local canAddProcessor = self.hasProcessor
+    and type(processor) == "table"
+    and type(processor.AddTooltipPostCall) == "function"
+    and Enum
+    and Enum.TooltipDataType
+    and Enum.TooltipDataType.Unit ~= nil
+
   local installed = false
-  if self.hasProcessor then
-    local ok = pcall(TooltipDataProcessor.AddTooltipPostCall, Enum.TooltipDataType.Unit, function(tooltip, data)
-      self:OnTooltip(tooltip, data)
-    end)
-    installed = ok
+  if self.tooltipScriptHooked then
+    -- HookScript callbacks cannot be removed. Reuse the existing one and keep
+    -- it inert through OnTooltip's IsActive check while the module is inactive.
+    installed = true
+    self.hasProcessor = false
+  elseif canAddProcessor then
+    if self.tooltipProcessorCallback and self.tooltipProcessorHooked then
+      -- A previous RemoveTooltipPostCall was unavailable; the tracked callback
+      -- is still registered, so reusing it avoids a duplicate callback.
+      installed = true
+    else
+      local dataType = Enum.TooltipDataType.Unit
+      local callback = function(tooltip, data)
+        self:OnTooltip(tooltip, data)
+      end
+      local ok = pcall(processor.AddTooltipPostCall, dataType, callback)
+      if ok then
+        self.tooltipProcessorCallback = callback
+        self.tooltipProcessorType = dataType
+        self.tooltipProcessorHooked = true
+        installed = true
+      end
+    end
   end
 
   if not installed and GameTooltip and GameTooltip.HookScript then
@@ -44,6 +70,7 @@ function XPTooltip:InstallTooltipHook()
     installed = ok
     if ok then
       self.hasProcessor = false
+      self.tooltipScriptHooked = true
     end
   end
 
@@ -53,11 +80,41 @@ function XPTooltip:InstallTooltipHook()
     self:ReportError("tooltip hook", "no usable tooltip hook", false)
   end
 
-  if GameTooltip and GameTooltip.HookScript then
-    pcall(GameTooltip.HookScript, GameTooltip, "OnTooltipCleared", function(tooltip)
+  if GameTooltip and GameTooltip.HookScript and not self.tooltipClearedHooked then
+    local ok = pcall(GameTooltip.HookScript, GameTooltip, "OnTooltipCleared", function(tooltip)
       tooltip.xpTooltipSignature = nil
     end)
+    if ok then
+      self.tooltipClearedHooked = true
+    end
   end
+end
+
+function XPTooltip:UninstallTooltipHook()
+  local callback = self.tooltipProcessorCallback
+  local dataType = self.tooltipProcessorType
+  if callback and dataType ~= nil then
+    local remove = TooltipDataProcessor and TooltipDataProcessor.RemoveTooltipPostCall
+    if type(remove) == "function" then
+      local ok = pcall(remove, dataType, callback)
+      if not ok then
+        -- Keep the tracked callback so a later InstallTooltipHook can reuse it
+        -- instead of registering a duplicate.
+        self.tooltipHookInstalled = false
+        return
+      end
+    else
+      -- No removal API is available; the callback stays registered but inert
+      -- while IsActive is false and can be reused on the next install.
+      self.tooltipHookInstalled = false
+      return
+    end
+  end
+
+  self.tooltipProcessorCallback = nil
+  self.tooltipProcessorType = nil
+  self.tooltipProcessorHooked = false
+  self.tooltipHookInstalled = false
 end
 
 function XPTooltip:OnTooltip(tooltip, data)

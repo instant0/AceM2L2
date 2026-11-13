@@ -1,11 +1,11 @@
 # Ace Mobs 2 Level 2 (AceM2L2)
 
 AceM2L2 is a World of Warcraft addon that reports XP and reputation progress
-and provides a **Kill History** browser for Forever 1.60.1 and Midnight 12.1.5.
+and provides a **Kill Story** browser for Forever 1.60.1 and Midnight 12.1.5.
 Forever gets the full XP/tooltip experience; Midnight gets counts-focused
 history plus the non-XP features until its XP data is live-verified.
 
-- **Version:** 2.0.0
+- **Version:** 2.1.0
 - **Author:** faslkjd56
 - **Interfaces:** Midnight `120105`, Forever `16001`
 - **Clients:** Midnight 12.1.5 and Forever 1.60.1
@@ -20,11 +20,15 @@ AceM2L2 has two layers:
 
 1. **Core addon** (`ACEM2L2.lua` bootstrap plus `Core/`) — XP-to-level and
    reputation-to-next-rank messages for both Midnight and Forever.
-2. **Kill History module** (`KillHistory/`) — per-character kill tracking on
+2. **Kill Story module** (`KillHistory/`) — per-character kill tracking on
    both clients, with tooltip estimates and calibration on Forever and
    counts-focused tracking on Midnight.
 
-The Kill History module auto-disables for unknown clients or when the active
+Kill Story is the display name. The internal folder `KillHistory/`, module ID
+`XPTooltip`, settings namespace `xpTooltip`, and `/xpt` commands remain for
+compatibility.
+
+The Kill Story module auto-disables for unknown clients or when the active
 client's required APIs are unavailable. Forever requires its XP APIs; the
 Midnight counts-focused profile needs only minimal identity/level APIs. A missing
 tooltip hook disables tooltip lines without disabling the tracker or the
@@ -32,7 +36,7 @@ window.
 
 ## Compatibility
 
-| Client | Project ID | Interface | Core addon | Kill History |
+| Client | Project ID | Interface | Core addon | Kill Story |
 |---|---:|---:|---|---|
 | Forever 1.60.1 | `18` | `16001` | Supported | Full |
 | Midnight 12.1.5 | `1` | `120105` | Supported | Counts-focused |
@@ -42,6 +46,22 @@ The TOC intentionally lists both interface versions:
 ```text
 ## Interface: 120105, 16001
 ```
+
+Both clients share the non-XP history: kill counts, heatmap, death locations,
+respawn intervals, leveling goals, level splits, dungeon activity, and economy.
+The XP layer is still client-specific:
+
+| Capability | Forever | Midnight |
+|---|---|---|
+| Kills, areas, levels, session | Yes | Yes |
+| Heatmap, deaths, respawns | Yes | Yes |
+| Dungeon, goal, splits, economy | Yes | Yes |
+| XP estimate, tooltip XP, kills-to-level | Yes | No |
+| XP rate, time-to-level | Yes | No |
+| Grinding-spot recommendations | Yes | No |
+| Rested and buff models, calibration | Yes | No |
+| Quest XP ledger | Yes | No |
+| Nameplate levels | No | Yes (default off) |
 
 ## Installation
 
@@ -67,7 +87,7 @@ under `Libs/`.
 - Sanitizes saved variables, protects event handlers, and stores the last error
   for `/acem2l2 status`.
 
-### Kill History
+### Kill Story
 
 Both clients share one window, list, detail panel, command surface, and data
 model. Client-specific policy lives only in `KillHistory/Client.lua` and
@@ -91,7 +111,8 @@ model. Client-specific policy lives only in `KillHistory/Client.lua` and
 - Dungeon XP, leveling goals, and speedrun splits.
 - Session loot value, gold/hour, and clear gear-upgrade notifications.
 - Death locations, respawn intervals, and grinding-spot recommendations.
-- Overview, Mobs, Areas, Levels, and Heatmap tabs.
+- Overview, Mobs, Areas, Heatmap, and Levels tabs. The Heatmap tab can be
+  hidden while heatmap data keeps recording.
 - Per-zone 16x16 kill heatmap with optional zone-map art.
 - Search, filters, sort modes, relative bars, and a 3D model hero card.
 - Aether Blue default theme plus dark, midnight, class-color, and
@@ -102,13 +123,17 @@ model. Client-specific policy lives only in `KillHistory/Client.lua` and
 **Midnight 12.1.5 — counts-focused mode**
 
 - Tracks kills by mob, player level, area, and session.
-- Shows kill counts, the mob list, areas, levels, and the 3D model or fallback.
+- Shows the same Overview, Mobs, Areas, Heatmap, and Levels tabs, the mob list,
+  and the 3D model or fallback.
 - Tracks dungeon kills, leveling goals, duration/kill splits, loot, gold,
   death locations, respawns, and zone heatmaps without XP claims.
 - Tooltips show the kill-count line and target level only; no XP, percent,
   kills-to-level, or XP-bonus claims.
-- Formula estimates, calibration, rested/buff models, and group learning stay
-  off until live probes prove the Midnight data is readable and attributable.
+- Optional level text above nameplates. It is Midnight-only and off by default;
+  nameplate sightings still feed respawn tracking when the text is disabled.
+- Formula estimates, calibration, rested/buff models, XP rate, grinding-spot
+  recommendations, and group learning stay off until live probes prove the
+  Midnight data is readable and attributable.
 - `/acem2l2 xpt probe` prints the client capabilities and secret-value status
   for live verification.
 
@@ -121,14 +146,31 @@ The Settings panel uses native section headers and a dedicated **Tooltip**
 subpage:
 
 - **Chat messages** — XP/reputation toggles, output frequency, rolling average,
-  precision, and minimums.
-- **Kill History** — module enable and minimap icon.
+  rolling window, precision, and minimums.
+- **Kill Story** — module enable, minimap icon visibility/lock, and UI sounds.
 - **Diagnostics** — debug output.
-- **Tooltip** subpage — XP lines, kill lines, rested/bonuses, and edge cases.
+- **Tooltip** subpage — sections in this order: XP lines, Kill lines, XP rate,
+  Dungeon, World, Leveling goal, Level splits, Economy, Rested and bonuses,
+  Edge cases.
+
+The Tooltip sections are client-gated:
+
+- **XP lines** — XP estimate, percent of level, XP remaining, kills-to-level.
+- **Kill lines** — kill count and the mob level line.
+- **XP rate** — XP rate, time-to-level, and the rate window (Forever only).
+- **Dungeon** — dungeon activity.
+- **World** — Heatmap tab (shown by default; hiding it does not stop
+  recording), grinding spot (Forever only), and nameplate levels (Midnight
+  only, off by default).
+- **Leveling goal** — goal progress in the Overview.
+- **Level splits** — latest split in the Overview.
+- **Economy** — session loot, gold/hour, and gear upgrades where supported.
+- **Rested and bonuses** — rested bonus, XP bonuses, and manual bonus (Forever).
+- **Edge cases** — unknown mobs and zero-XP kills (Forever).
 
 The **Show mob level** checkbox in the Tooltip page controls the `Level: <n>`
 line on eligible unit tooltips. It is enabled by default and can be turned off
-without disabling Kill History.
+without disabling Kill Story.
 
 ## Kill Tracking Model
 
@@ -151,18 +193,38 @@ entry when the ID becomes available.
 
 ### Recorded data
 
-Each mob entry stores:
+Each client namespace stores:
 
-- total and session kills,
-- kills by player level,
-- kills by map/area,
-- XP observation samples (Forever only),
-- context samples for calibration (Forever only),
-- first and last seen timestamps,
-- NPC ID and classification.
+- `mobs` — keyed by `npc:<npcID>` or `name:<name>`. Each entry has `name`,
+  `npcID`, `classification`, `firstSeen`, `lastSeen`, `kills`,
+  `sessionKills`, `totalXP`, `sessionXP`, `sessionXPKnown`,
+  `killsAtLevel`, `killsByMap`, `killsByAreaLevel`, `contexts`, and `xp`.
+- `quests` — keyed by `quest:<id>` (or `quest:unknown`) with `name`, `count`,
+  `totalXP`, `lastXP`, `firstSeen`, and `lastSeen` (Forever).
+- `levelHistory` — an ordered list of
+  `{ level, startedAt, endedAt, xpGained, kills, duration }`; `xpGained` is
+  Forever-only.
+- `rates` — time-ordered `{ at, xp, source, mapID, level }` samples (Forever).
+- `deaths` — time-ordered `{ at, mapID, x, y }`, oldest first.
+- `respawns` — `[npcID] = { name, intervals = { seconds, ... }, lastSeen,
+  lastDeath }`.
+- `heatmaps` — `[tostring(mapID)] = { cells = { [1..256] = count }, total,
+  lastSeen }` for the 16x16 grid.
+- `areas` — `[mapID] = kills`; `levels` — `[playerLevel] = kills`;
+  `areaLevels` — `[mapID] = { [playerLevel] = kills }`.
+- `calibration` — `zones`, `levels`, `groups`, `classes`, and `mobs` ratio
+  entries `{ ratio, samples, updated }`, plus `calibrationVersion` (Forever).
+- `totals` — `{ kills, xp, uniqueMobs }`; `session` — `{ startedAt, kills,
+  xp }`.
+- `dungeon` — `{ xp, kills, sessionXP, sessionKills, lastInstance }`.
+- `goal` — `{ targetLevel, targetXP, createdAt }`.
+- `economy` — `{ lootValue, sessionLootValue, items, sessionItems, goldStart,
+  goldGained, goldSpent, lastMoney, moneyKnown }`.
 
-Midnight counts-focused entries store the same kill/level/area fields without XP
-samples or calibration contexts.
+Midnight stores the same count/level/area, heatmap, death, respawn, dungeon,
+goal, split, and economy fields, but leaves the XP sample fields (`rates`, mob
+`xp`/`contexts`, quests, calibration, and `levelHistory.xpGained`) empty or
+zero.
 
 ### XP formula
 
@@ -215,10 +277,10 @@ The current module:
 
 | Variable | Scope | Purpose |
 |---|---|---|
-| `AceM2L2DB` | Account | Core settings and Kill History settings |
-| `AceM2L2CharDB` | Character | Kill history, observations, calibration |
+| `AceM2L2DB` | Account | Core settings and Kill Story settings |
+| `AceM2L2CharDB` | Character | Per-client Kill Story data, world data, economy, and calibration |
 
-Kill History settings live under `AceM2L2DB.profile.xpTooltip`. Per-client
+Kill Story settings live under `AceM2L2DB.profile.xpTooltip`. Per-client
 character data lives under:
 
 ```text
@@ -231,17 +293,20 @@ AceM2L2CharDB.xpTooltip = {
 }
 ```
 
-Existing 1.11.x root-scoped data is migrated into `clients[18]` on first load.
-The migration is idempotent and never merges root data into an existing
-per-client table. Midnight starts with an empty `clients[1]` namespace; Forever
+Legacy root-scoped data is migrated into `clients[18]` on first load. The
+migration is idempotent and never merges root data into an existing per-client
+table. Midnight starts with an empty `clients[1]` namespace; Forever
 observations and calibration never seed Midnight.
 
 The first migration also keeps a one-time recoverable snapshot at
 `AceM2L2CharDB.xpTooltip.migrationBackup`. It is outside normal accounting and
 is reported by `/acem2l2 xpt status` and `/acem2l2 xpt probe`.
 
-Back up `WTF/Account/<account>/SavedVariables/AceM2L2*.lua` before upgrading.
-A 1.11.x client cannot read the per-client 1.12.x database after a downgrade.
+Schema `2` is the 2.0.0 per-client generation. Builds that only understand the
+older root-scoped layout cannot read it, so back up
+`WTF/Account/<account>/SavedVariables/AceM2L2*.lua` before upgrading. A storage
+schema newer than `2`, a client data schema newer than `1`, or a calibration
+schema newer than `2` is blocked instead of being rewritten.
 
 Profile schema: `4`  
 Storage schema: `2`  
@@ -250,54 +315,93 @@ Calibration schema: `2`
 
 ## Commands
 
-Use `/acem2l2` or `/am2`. The complete core command list is available with:
+Use `/acem2l2` or `/am2`. `/acem2l2 xptooltip` is an alias for
+`/acem2l2 xpt`. The complete core command list is available with:
 
 ```text
 /acem2l2 help
 ```
 
-Use `/acem2l2 xpt help` for the Kill History command list.
-
-Common commands:
+Core commands:
 
 ```text
 /acem2l2 config
+/acem2l2 options
 /acem2l2 status
 /acem2l2 xp on|off
 /acem2l2 rep on|off
+/acem2l2 xpevery <n>
+/acem2l2 repevery <n>
+/acem2l2 xmin <kills>
+/acem2l2 repmin <value>
+/acem2l2 rolling on|off
+/acem2l2 window [n]
+/acem2l2 precision <0-4>
+/acem2l2 debug on|off
+/acem2l2 reset
 /acem2l2 history
 /acem2l2 kills [name]
+/acem2l2 xpt help
+/acem2l2 xptooltip <subcommand>
+```
+
+Use `/acem2l2 xpt help` for the Kill Story command list:
+
+```text
 /acem2l2 xpt on|off
 /acem2l2 xpt ui
 /acem2l2 xpt status
 /acem2l2 xpt probe
 /acem2l2 xpt kills [name]
+/acem2l2 xpt deaths [count]
+/acem2l2 xpt respawns [name]
+/acem2l2 xpt spots
 /acem2l2 xpt quests
 /acem2l2 xpt history [level]
+/acem2l2 xpt rate [minutes]
+/acem2l2 xpt dungeon
+/acem2l2 xpt goal [set <level>|clear]
+/acem2l2 xpt splits
+/acem2l2 xpt economy
 /acem2l2 xpt areas
+/acem2l2 xpt heatmap [zone]
 /acem2l2 xpt levels
 /acem2l2 xpt session
 /acem2l2 xpt stats
 /acem2l2 xpt dump
 /acem2l2 xpt table
-/acem2l2 xpt starttab overview|mobs|areas|levels
 /acem2l2 xpt theme aether|dark|midnight|class|contrast
 /acem2l2 xpt scale 80-120
+/acem2l2 xpt starttab overview|mobs|areas|heatmap|levels
 /acem2l2 xpt minimap on|off|reset|status
 /acem2l2 xpt debug on|off
 /acem2l2 xpt delete <mob name>
 /acem2l2 xpt delete confirm <mob name>
 /acem2l2 xpt deleteunknown confirm
+/acem2l2 xpt resetunknown confirm
 /acem2l2 xpt recalibrate confirm
 /acem2l2 xpt reset confirm
 /acem2l2 xpt resetkills confirm
 /acem2l2 xpt config
 ```
 
+`xpevery`/`repevery` accept `1-1000`; `window` accepts `1-100` and opens the
+Kill Story window when no value is given; `precision` accepts `0-4`;
+`xmin`/`repmin` accept non-negative minimums. `deaths` defaults to 10 entries
+(max 50), `rate` defaults to the configured window (1-60 minutes), `heatmap`
+accepts a zone-name substring, and `goal set` accepts the current level through
+the client maximum.
+
 `delete` previews the matching entry or entries. `delete confirm` removes exact
-name matches. Destructive resets require `confirm`. Theme, scale, start tab,
-and minimap are command-controlled; the Settings panel covers enable, tooltip
-flags, debug, and minimap visibility.
+name matches. `deleteunknown confirm` and `resetunknown confirm` remove
+Unknown-only entries. `xpt reset confirm` clears XP observations and
+calibration contexts but keeps kill counts; `xpt recalibrate confirm` clears
+learned ratios and keeps observations; `xpt resetkills confirm` clears kill
+history, heatmaps, deaths,
+respawns, economy, goal, and rates. The core `/acem2l2 reset` restores addon
+settings to defaults. Theme, scale, start tab, and minimap are
+command-controlled; the Settings panel covers chat output, module enable,
+diagnostics, and tooltip/world toggles.
 
 `/acem2l2 xpt probe` is a read-only diagnostic. It prints the project ID,
 interface, active profile/mode, capability summary, API availability, a sample
@@ -308,19 +412,38 @@ bug reports.
 ## Project Layout
 
 ```text
-AceM2L2.toc          Addon metadata and load order
-ACEM2L2.lua          AceAddon bootstrap and binding metadata
-Core/                Defaults, utilities, settings, XP, reputation, options, commands, events
-KillHistory/         Module, client profiles, data, formula, calibration, tracking, world data, heatmaps, tooltip, commands, events
-KillHistory/Clients/ Forever and Midnight profile policy
-KillHistory/UI/      Theme, widgets, list, detail, overview, heatmap, nameplates, window, minimap
-Bindings.lua         Keybind and addon-compartment entry points
-Bindings.xml         Ctrl+Shift+X binding definition
-embeds.xml           Embedded library load order
-Libs/                LibStub, CallbackHandler, Ace3, LibDataBroker, LibDBIcon
-tests/               Offline smoke tests, layout checker, release validator, and build script
-README.txt           Player-facing readme
-README.md            Project/developer readme (this file)
+AceM2L2.toc                Addon metadata and load order
+ACEM2L2.lua                AceAddon bootstrap and binding metadata
+Core/                      Defaults, utilities, settings, XP, reputation, options, commands, events
+KillHistory/Module.lua     Module creation and shared helper namespaces
+KillHistory/Client.lua     Client profile registry and capability queries
+KillHistory/Clients/       Forever and Midnight profile policy
+KillHistory/Data.lua       Character store, mob identity, merge, and accounting
+KillHistory/World.lua      Map position, deaths, respawns, and grinding spots
+KillHistory/Heatmap.lua    Per-zone 16x16 kill grid data and capture
+KillHistory/Calibration.lua  XP correction stores and observations
+KillHistory/Tracking.lua     Kill recording, chat/death matching, and pruning
+KillHistory/Tooltip.lua      Tooltip hook and line rendering
+KillHistory/Commands.lua     Kill Story slash commands and chat output
+KillHistory/Events.lua       Event entry points and session lifecycle
+KillHistory/UI/Nameplates.lua  Optional Midnight nameplate levels
+KillHistory/UI/Heatmap.lua     Heatmap panel, zone pager, and map art
+KillHistory/UI/            Theme, widgets, list, detail, overview, window, minimap
+Bindings.lua               Keybind and addon-compartment entry points
+Bindings.xml               Ctrl+Shift+X binding definition
+embeds.xml                 Embedded library load order
+Libs/                      LibStub, CallbackHandler, Ace3, LibDataBroker, LibDBIcon
+tests/snapshot.lua         Deterministic behavior snapshot
+tests/smoke.lua            Client-scenario smoke suite
+tests/fixtures.lua         Shared fixtures for the smoke suite
+tests/libs_smoke.lua       Embedded-library load test
+tests/test_stats.py        Focused-suite size statistics
+tests/check_layout.py      Shipping-layout validator
+tests/check_release.py     Release-zip validator
+tests/build_release.py     Release-zip builder
+tests/run_all.sh           Offline check runner
+README.txt                 Player-facing readme
+README.md                  Project/developer readme (this file)
 ```
 
 `README.txt` is the in-game/player guide; this file is the developer reference.
@@ -396,6 +519,13 @@ The main outstanding areas are:
 - tooltip hook availability and `GameTooltip:GetUnit`,
 - exact XP chat semantics for groups and dungeons,
 - rested pool behavior,
+- heatmap recording, the 16x16 grid, and map-art fallback,
+- death locations and respawn intervals against live map-position and nameplate
+  visibility,
+- grinding-spot recommendations reaching the 5-sample/120-second threshold,
+- nameplate levels on Midnight, including the off-by-default path,
+- economy tracking (loot value, gold/hour, gear upgrades),
+- leveling goals and splits across real level-ups,
 - 3D model rotation and fallback,
 - theme/scale rendering at 80/100/120%,
 - minimap compatibility with ElvUI/Leatrix/SexyMap,
@@ -435,9 +565,9 @@ checks skip release validation unless `CHECK_RELEASE=1`.
 Current release artifacts:
 
 ```text
-dist/AceM2L2-2.0.0.zip
-/mnt/r/AceM2L2-2.0.0.zip
-SHA-256: d29c3d607b186a2ea2f7ce53a36af1458ad01408dea76fbca8f0257db67d0c82
+dist/AceM2L2-2.1.0.zip
+/mnt/r/AceM2L2-2.1.0.zip
+SHA-256: 28073f46b45d14567761a2d17c884b5c4c996380b8e4160a7bb23298492a2409
 ```
 
 Both copies are validated when present. Copy the `dist/` zip to `/mnt/r/` when
@@ -461,21 +591,31 @@ Bindings, Libs, `README.txt`, or `LICENSE`).
   reported as a mob kill.
 - Group and dungeon XP chat amounts are not yet verified live, so group-ratio
   learning remains disabled.
-- Midnight runs in counts-focused mode. XP estimates, calibration,
-  kills-to-level, rested/buff models, and observed XP remain off until live
-  probes validate the Midnight data. Non-XP features still work.
-  `/acem2l2 xpt probe` exists for that verification.
+- Midnight runs in counts-focused mode. XP estimates, XP rate, time-to-level,
+  kills-to-level, calibration, rested/buff models, observed XP, quest XP, and
+  grinding-spot recommendations remain off until live probes validate the
+  Midnight data. Non-XP features still work. `/acem2l2 xpt probe` exists for
+  that verification.
 - If Midnight hides target/death identity, the kill is skipped rather than
   recorded as a fake Unknown entry.
 - Area and level rows are derived views; deletion is offered only for mob rows.
-- Kill History keeps at most 2000 mob entries per client. Older entries can be
-  pruned in long sessions; re-check totals after very large histories.
+- Per-client caps: 2000 mobs, 200 quests, 200 `levelHistory` records, 240 rate
+  samples, 100 deaths, 300 respawn NPCs (20 intervals each), 40 heatmap zones
+  (16x16 cells each), and 12 calibration contexts per mob (pruned after 120
+  days). Older entries are pruned by recency.
+- Heatmap recording and death locations need a readable map-position API
+  (`C_Map.GetPlayerMapPosition` or `GetPlayerMapPosition`). Respawn intervals
+  also need GUID identity and nameplate/capture sightings. Without them, only
+  those features are unavailable.
+- Nameplate levels need `C_NamePlate` and are available only on Midnight.
+- Heatmap zone art is best-effort through `C_Map.GetMapArtLayers`,
+  `C_Map.GetMapArtLayerTextures`, or legacy `GetMapInfo`; the 16x16 grid still
+  renders when art is unavailable.
+- Grinding spots need at least 5 rate samples spanning 120 seconds and are
+  Forever-only. Midnight never recommends one.
 - Well Fed XP Boost (`1243969`), Well-Rested/Cozy Sleeping Bag (`429959`), and
   Camp Tent (`1307230`) are mapped to the existing bonus/rested display.
   Camp Tent is a rested-pool top-up, not a separate XP multiplier.
-- Midnight observed XP, calibrated estimates, kills-to-level, rested/buffs, and
-  group learning are **not available in 2.0.0**. No setting or command enables
-  them; they stay behind the live probe gates.
 
 ## License
 

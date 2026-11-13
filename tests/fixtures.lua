@@ -66,6 +66,11 @@ local state = {
   groupSize = 1,
   tapped = false,
   critter = false,
+  inInstance = false,
+  instanceType = nil,
+  mapX = 0.5,
+  mapY = 0.5,
+  money = 0,
 }
 
 state.targetName = "Defias Pillager"
@@ -340,9 +345,53 @@ function GetNumGroupMembers()
   return state.groupSize or 1
 end
 
+function IsInInstance()
+  return state.inInstance == true, state.instanceType
+end
+
+function GetMoney()
+  return state.money or 0
+end
+
+function UnitStat(unit, statIndex)
+  if unit ~= "player" then
+    return 0
+  end
+  if statIndex == 1 then
+    return 100
+  elseif statIndex == 2 then
+    return 50
+  elseif statIndex == 4 then
+    return 25
+  end
+  return 0
+end
+
+function GetInventoryItemLink(unit, slot)
+  return nil
+end
+
+function GetItemStats(link)
+  return {}
+end
+
+function GetItemInfo(item)
+  local id = tonumber(item) or 0
+  return "Test Item",
+    "|cff9d9d9d|Hitem:" .. tostring(id) .. "::::::::|h[Test Item]|h|r",
+    1, 0, 0, "", "", 20, "", "Interface\\Icons\\INV_Misc_QuestionMark", 250
+end
+
 C_Map = {
   GetBestMapForUnit = function(unit)
     return state.mapID
+  end,
+  GetPlayerMapPosition = function(mapID, unit)
+    return {
+      GetXY = function()
+        return state.mapX, state.mapY
+      end,
+    }
   end,
   GetMapInfo = function(mapID)
     if tonumber(mapID) == 12 then
@@ -351,6 +400,16 @@ C_Map = {
     return { name = "Map " .. tostring(mapID), mapID = mapID }
   end,
 }
+
+C_NamePlate = {
+  GetNamePlateForUnit = function(unit)
+    return nil
+  end,
+  GetNamePlates = function()
+    return {}
+  end,
+}
+
 
 AuraUtil = {
   FindAuraByName = function()

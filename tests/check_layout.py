@@ -201,6 +201,12 @@ LOAD_ORDER_RULES = (
     ("KillHistory/Formula.lua", "KillHistory/Tracking.lua"),
     ("KillHistory/Formula.lua", "KillHistory/Tooltip.lua"),
     ("KillHistory/UI/Widgets.lua", "KillHistory/UI/Window.lua"),
+    ("KillHistory/Util.lua", "KillHistory/World.lua"),
+    ("KillHistory/Util.lua", "KillHistory/Heatmap.lua"),
+    ("KillHistory/UI/Theme.lua", "KillHistory/UI/Heatmap.lua"),
+    ("KillHistory/UI/Widgets.lua", "KillHistory/UI/Heatmap.lua"),
+    ("KillHistory/UI/Overview.lua", "KillHistory/UI/Window.lua"),
+    ("KillHistory/Heatmap.lua", "KillHistory/UI/Window.lua"),
 )
 
 

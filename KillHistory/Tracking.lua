@@ -210,7 +210,7 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
 
   if self.settings and self.settings.debug then
     AceM2L2:SafePrint(string.format(
-      "Kill History: kill %s (%s) total=%s base=%s source=%s",
+      "Kill Story: kill %s (%s) total=%s base=%s source=%s",
       tostring(mob.name or mobKey), tostring(mobKey), tostring(totalXP or "?"),
       tostring(rawBase or "?"), tostring(source or "?")
     ))
@@ -228,7 +228,7 @@ function XPTooltip:AddKillXP(entry, info, totalXP, rawBase, buffedXP, skipObserv
   if type(mob) ~= "table" then
     if self.settings and self.settings.debug then
       AceM2L2:SafePrint(string.format(
-        "Kill History: late XP %s has no surviving mob entry (%s); skipping.",
+        "Kill Story: late XP %s has no surviving mob entry (%s); skipping.",
         tostring(totalXP), tostring(mobKey or "?")
       ))
     end
@@ -267,7 +267,7 @@ function XPTooltip:AddKillXP(entry, info, totalXP, rawBase, buffedXP, skipObserv
 
   if self.settings and self.settings.debug then
     AceM2L2:SafePrint(string.format(
-      "Kill History: late XP %s added to %s (%s); kills unchanged.",
+      "Kill Story: late XP %s added to %s (%s); kills unchanged.",
       tostring(totalXP), tostring(mob.name or mobKey), tostring(mobKey)
     ))
   end
@@ -297,7 +297,7 @@ function XPTooltip:QueueUnidentifiedKill(info, totalXP, rawBase, buffedXP, skipO
   self.pendingChatXP[#self.pendingChatXP + 1] = entry
   if self.settings and self.settings.debug then
     AceM2L2:SafePrint(string.format(
-      "Kill History: XP %s has no creature name yet; waiting for UNIT_DIED.",
+      "Kill Story: XP %s has no creature name yet; waiting for UNIT_DIED.",
       tostring(totalXP or "?")
     ))
   end
@@ -354,7 +354,7 @@ function XPTooltip:CommitUnidentifiedKill(entry)
   local info = entry.info or { name = "Unknown" }
   if entry.ambiguousQuest and (not info.name or info.name == "Unknown") then
     if self.settings and self.settings.debug then
-      AceM2L2:SafePrint("Kill History: ambiguous quest/unnamed XP had no death identity; suppressed.")
+      AceM2L2:SafePrint("Kill Story: ambiguous quest/unnamed XP had no death identity; suppressed.")
     end
     self.lastPool = self:GetRestedPool()
     return
@@ -374,7 +374,7 @@ function XPTooltip:CommitUnidentifiedKill(entry)
   end
   if self.settings and self.settings.debug then
     AceM2L2:SafePrint(string.format(
-      "Kill History: no death identity for XP %s; recording as %s.",
+      "Kill Story: no death identity for XP %s; recording as %s.",
       tostring(entry.totalXP or "?"), tostring(info.name or "Unknown")
     ))
   end
@@ -1114,7 +1114,7 @@ function XPTooltip:CheckGearUpgrade(itemID)
 
   local slotName = GEAR_SLOT_NAMES[slotIndex] or ("slot " .. tostring(slotIndex))
   AceM2L2:SafePrint(string.format(
-    "Kill History: upgrade for %s: %s (iLvl %d > %d)",
+    "Kill Story: upgrade for %s: %s (iLvl %d > %d)",
     slotName, newItem.name, math.floor(newLevel), math.floor(equippedLevel)
   ))
 end

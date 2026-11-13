@@ -1,260 +1,150 @@
 _____________________________________________________________________________________
 
 Ace Mobs 2 Level 2 (AceM2L2)
-XP, reputation, and Kill History
+XP, reputation, and Kill Story
 
 Author:     faslkjd56
-Version:    2.0.0
+Version:    2.1.0
 GameVer.:   Midnight 12.1.5 (Retail) / Forever 1.60.1 (Classic+)
 _____________________________________________________________________________________
 
-This addon tells you how many of the current target you will need to kill
-before you level up.
+Level faster with less guesswork.
 
-This will be displayed in the chat window in the format.
-
-"[15] [Blind Bureaucrat] kills to level"
-
-
-It also tells you how many more mobs or handins/quests you have to do
-(with the current reward) to reach the next reputation rank.
-
-This will be displayed in the format:
-
-"[23463] to go with [Darnassus] = [502] repeats (kills/quests)"
-
-
-It also includes Kill History on both clients. Forever 1.60.1 gets full XP
-estimates on tooltips, a 3D mob viewer, calibration, and a record of what you
-have killed. Midnight 12.1.5 gets counts-focused kill, area, level, and session
-history plus non-XP features until its XP data is live-verified.
-
+AceM2L2 shows how many kills or quest hand-ins you need for your next level or
+reputation rank. Its bundled Kill Story window keeps the details: what you
+killed, where you killed it, how fast you are leveling, what you looted, and
+where your kills cluster on each zone map.
 
 _____________________________________________________________________________________
 
 	FEATURES
 _____________________________________________________________________________________
 
-- Shows how many mobs you still need for your next level.
-- Shows how many kills or quest handins you need for your next reputation rank.
+Progress at a glance
+- Kills-to-level and reputation-repeat estimates in chat.
+- XP remaining, kills remaining, and time-to-level.
+- XP/hour and XP/minute from measured gains.
 - Works with normal kills, unnamed kills, groups, raids, quests, and rested XP.
-- Tracks reputation from kills, quests, bonuses, guild rep, paragon, and renown.
-- Opens its settings from the addon options or with `/acem2l2 config`.
-- Groups settings into Chat messages, Kill History, Diagnostics, and a Tooltip
-  subpage with native section headers.
-- Lets you toggle tooltip lines individually, including Show mob level.
-- Keeps the addon quiet and safe when game data is restricted.
-- Works on Midnight and Forever, with modern settings on both.
 
-Kill History:
-- Includes a window with Overview, Mobs, Areas, Levels, and Heatmap tabs.
-- Shows XP/hour, XP/minute, and time-to-level from measured gains.
-- Tracks dungeon activity, leveling goals, and per-level speedrun splits.
-- Tracks session loot value, gold/hour, and clear gear upgrades.
-- Records death locations, respawn intervals, and grinding spots.
-- Shows a per-zone kill heatmap with a 16x16 density grid.
-- Shows a 3D model of the selected mob and a clear list of your kills.
-- Lets you search, filter, and sort your mob list.
-- Uses the blue Aether Blue theme by default, with dark, midnight, class-color,
-  and high-contrast themes available.
-- Keeps duplicate mob rows together and cleans them up automatically.
-- Lets you remove a single mob row, or all Unknown rows, without clearing your
-  whole history.
-- Has a minimap icon, an addon-compartment entry, and a Ctrl+Shift+X keybind.
-- Remembers its position and sort order; the start tab is configurable.
-- Can be turned off on its own and turns itself off on unknown clients.
+Kill Story window
+- Overview, Mobs, Areas, Heatmap, and Levels tabs.
+- Kill history by mob, player level, area, and session.
+- Quest XP ledger and per-level leveling history.
+- Dungeon XP, leveling goals, and speedrun splits.
+- Loot value, gold/hour, and clear gear-upgrade notifications.
+- Death locations, respawn intervals, and grinding-spot suggestions.
+- Per-zone kill heatmap with a 16x16 density grid.
+- 3D mob model, search, filters, sort modes, and multiple themes.
+- Minimap icon, addon-compartment entry, and Ctrl+Shift+X keybind.
 
-Kill History on Forever 1.60.1 (full mode):
-- Adds XP, percent of level, XP remaining, mob level, XP bonuses,
-  kills-to-level, and kill-count lines to mob tooltips.
-- Uses Forever's XP rules, including Well Fed XP Boost food, Well-Rested
-  (including the Cozy Sleeping Bag), Camp Tent rested XP, and rested XP.
-- Shows the active XP bonus breakdown used by the estimate.
-- Learns from your kills so estimates improve over time.
-- Tracks kills by mob, by your level, and by area.
-- Records quest XP separately with `/acem2l2 xpt quests`.
-- Records per-level time, XP, and kills with `/acem2l2 xpt history [level]`.
-- Shows measured rates, dungeon XP, goals, economy, world data, and heatmaps.
-- Shows each row clearly, such as "16 kills | avg 54 XP".
+Tooltips
+- Forever: XP estimates, percent of level, XP remaining, mob level,
+  kills-to-level, rested bonus, XP bonuses, and kill counts.
+- Midnight: kill count and target level only, with no XP claims.
+- Optional level text above nameplates on Midnight, off by default.
 
-Kill History on Midnight 12.1.5 (counts-focused):
-- Tracks kills by mob, by your level, by area, and per session.
-- Shows kill counts and target level in the window and on mob tooltips.
-- Tracks dungeon kills, leveling goals, duration/kill splits, loot, gold,
-  death locations, respawns, and zone heatmaps without XP claims.
-- Hides XP, percent, kills-to-level, calibration, rested, and buff claims until
-  the Midnight data is verified.
-- Stores Midnight and Forever history separately.
+Quality of life
+- Per-character history is stored separately for Forever and Midnight.
+- Settings use native section headers and a Tooltip subpage.
+- Reads safely around restricted or secret game data.
+- No external Ace3 install required; libraries are embedded.
 
-[ENGLISH]
 _____________________________________________________________________________________
 
-	USAGE
+	FOREVER AND MIDNIGHT
 _____________________________________________________________________________________
 
-- Install and enable. It automatically prints in chat when you kill an
-  XP-rewarding mob or gain reputation.
-- Open Kill History with `/acem2l2 xpt ui`, `/acem2l2 history`, the minimap
-  icon, the addon compartment, or Ctrl+Shift+X.
-- Most Kill History settings are in `/acem2l2 config`; theme, scale,
-  start tab, minimap position, and resets are command-controlled.
+Forever 1.60.1 — full mode
+- Full XP formula, tooltip estimates, calibration, and rested/buff models.
+- XP rate, time-to-level, and grinding-spot suggestions.
+- Well Fed XP Boost food, Well-Rested, and Camp Tent rested XP.
+- Quest XP, leveling history, loot, gold, deaths, respawns, and heatmaps.
 
-Common commands:
-  /acem2l2 or /am2
-  /acem2l2 config
-  /acem2l2 status
-  /acem2l2 xp on|off
-  /acem2l2 rep on|off
-  /acem2l2 history
-  /acem2l2 kills [name]
-  /acem2l2 xpt help
-  /acem2l2 xpt on|off
-  /acem2l2 xpt ui
-  /acem2l2 xpt status
-  /acem2l2 xpt probe
-  /acem2l2 xpt kills [name]
-  /acem2l2 xpt quests
-  /acem2l2 xpt history [level]
-  /acem2l2 xpt areas
-  /acem2l2 xpt levels
-  /acem2l2 xpt session
-  /acem2l2 xpt stats
-  /acem2l2 xpt dump
-  /acem2l2 xpt table
-  /acem2l2 xpt starttab overview|mobs|areas|levels
-  /acem2l2 xpt theme aether|dark|midnight|class|contrast
-  /acem2l2 xpt scale 80-120
-  /acem2l2 xpt minimap on|off|reset|status
-  /acem2l2 xpt debug on|off
-  /acem2l2 xpt delete <mob name>
-  /acem2l2 xpt delete confirm <mob name>
-  /acem2l2 xpt deleteunknown confirm
-  /acem2l2 xpt recalibrate confirm
-  /acem2l2 xpt reset confirm
-  /acem2l2 xpt resetkills confirm
-  /acem2l2 xpt config
+Midnight 12.1.5 — counts-focused mode
+- Kill, area, level, and session tracking with the full Kill Story window.
+- Heatmaps, death locations, respawns, dungeon activity, goals, splits,
+  loot, gold, and gear upgrades without XP claims.
+- Optional nameplate levels.
+- No XP rate, grinding-spot, calibration, rested, or buff claims until the
+  Midnight data is live-verified.
 
-Use `/acem2l2 help` for core commands and `/acem2l2 xpt help` for Kill History
-commands.
+_____________________________________________________________________________________
 
-Tooltip notes:
-- On Midnight, tooltips show the kill count and target level only; XP lines stay
-  hidden.
-- Midnight records kills, areas, levels, and sessions. It does not record XP
-  observations, percent of level, kills-to-level, rested, or group XP. Those
-  features stay off until live testing verifies the Midnight data.
-- If Midnight cannot read a target/death identity, that kill is skipped rather
-  than recorded as Unknown. This can make Midnight counts lower than expected.
-- On Forever, the estimate may start with "~" until it has learned enough from
-  your kills.
-- In a group, the tooltip shows your share and the solo estimate.
-- Gray mobs can still appear in Kill History even though they award no XP.
-- Quest XP is recorded separately from kills; `/acem2l2 xpt quests` lists the
-  top quest rewards and the totals.
-- `/acem2l2 xpt history` lists per-level time, XP, and kills. Add a level number
-  to filter, for example `/acem2l2 xpt history 24`.
-- XP bonus lines only list sources the estimate actually applies: Well Fed XP
-  Boost food, Well-Rested (inn or Cozy Sleeping Bag), and the manual bonus
-  setting. Camp Tent raises your rested pool; it is not a separate multiplier.
-- `/acem2l2 xpt debug on` prints extra XP and kill-identification information
-  if you need to report a problem.
+	QUICK START
+_____________________________________________________________________________________
 
-Diagnostics and upgrades:
-- `/acem2l2 xpt status` shows the active client and mode.
-- `/acem2l2 xpt probe` prints a read-only diagnostic block: project/interface,
-  profile, capabilities, API availability, a sample unit, map/group/XP/rested
-  values, and secret markers. Secret values print as "<secret>".
-- Include `/acem2l2 xpt status` and `/acem2l2 xpt probe` output in bug reports.
-- Back up WTF/Account/<account>/SavedVariables/AceM2L2*.lua before upgrading.
-  Existing 1.11.x Forever history migrates into the per-client Forever
-  namespace. Midnight starts with separate, empty history.
-- The first migration keeps a one-time backup at
-  AceM2L2CharDB.xpTooltip.migrationBackup; status/probe report it.
-- A 1.11.x client cannot read the per-client 1.12.x database after a downgrade.
-- Midnight observed XP is not available in 2.0.0. No setting or command enables
-  it.
-- Well Fed XP Boost (`1243969`), Well-Rested/Cozy Sleeping Bag (`429959`), and
-  Camp Tent (`1307230`) are mapped to the existing bonus/rested display. Camp
-  Tent is a rested-pool top-up, not a separate XP multiplier.
+1. Copy the `AceM2L2` folder into `Interface/AddOns/`.
+2. Enable the addon and run `/reload`.
+3. Open Kill Story with `/acem2l2 xpt ui`, `/acem2l2 history`, the minimap icon,
+   the addon compartment, or Ctrl+Shift+X.
+4. Open settings with `/acem2l2 config`.
 
-Window controls:
-- Overview, Mobs, Areas, Levels, and Heatmap tabs.
-- Search and filter on the Mobs tab; Sort cycles Kills, Name, and Recent.
-- Select a mob and choose Remove in the detail panel. Choose Confirm within five
-  seconds to delete that one entry.
-- Use `/acem2l2 xpt deleteunknown confirm` to remove only Unknown entries.
+Commands are discoverable in game:
+- `/acem2l2 help` — core XP and reputation commands.
+- `/acem2l2 xpt help` — Kill Story commands.
+
+Kill Story is the display name. The internal folder, saved-variable namespace,
+and `/xpt` command prefix keep their original names for compatibility.
+
+_____________________________________________________________________________________
+
+	WHAT YOU WILL SEE
+_____________________________________________________________________________________
+
+Chat:
+- `[15] [Blind Bureaucrat] kills to level`
+- `[23463] to go with [Darnassus] = [502] repeats (kills/quests)`
+
+Window tabs:
+- Overview — session totals, top mobs, level range, rate, dungeon, goal,
+  economy, world data, and recent level history.
+- Mobs — search, filter, sort, remove one mob, or clean Unknown rows.
+- Areas — where you have been killing.
+- Heatmap — switch zones, inspect a 16x16 kill-density grid, and see the zone
+  total. Map art is optional; the grid works without it.
+- Levels — kill and XP performance by player level.
+
+Tips:
 - Drag the window to move it; drag the 3D model to rotate it.
-- Press Escape or the X button to close it.
-
-
-_____________________________________________________________________________________
-
-	TODO
-_____________________________________________________________________________________
-
-- More in-game testing on Forever 1.60.1 and Midnight 12.1.5.
-- Confirm quest XP labeling against live quest turn-ins on both clients.
-- Confirm the displayed Well Fed/Well-Rested/rested values in client; the
-  Forever aura/spell IDs are verified online.
-- Confirm group and dungeon XP values.
-- Future visual polish: larger layout, custom panel art, a full level chart, map
-  thumbnails, and a reduce-motion option.
+- Press Escape or the X button to close the window.
+- Use `/acem2l2 xpt debug on` only when reporting a problem.
+- Back up `WTF/Account/<account>/SavedVariables/AceM2L2*.lua` before major
+  upgrades.
 
 _____________________________________________________________________________________
 
-	VERSION HISTORY
+	KNOWN LIMITATIONS
 _____________________________________________________________________________________
 
-[2026-11-13] v2.0.0 - Major feature release: XP rate and time-to-level,
-                     dungeon XP, leveling goals, speedrun splits, economy
-                     (loot value, gold/hour, gear upgrades), death locations,
-                     respawn tracking, grinding spots, optional nameplate
-                     levels, and per-zone kill heatmaps. Settings reorganized.
-[2026-11-13] v1.14.2 - Reorganized the Settings panel with native section
-                     headers and a Tooltip subpage. Added a discoverable
-                     "Show mob level" checkbox with search tags and clearer
-                     option names.
-[2026-11-13] v1.14.1 - Verified Forever buff IDs online: Well Fed XP Boost
-                     (1243969), Well-Rested/Cozy Sleeping Bag (429959), Camp
-                     Tent (1307230), and Boosted Rest (1229451). Well Fed food
-                     is now matched by spell ID; speculative bag/campfire
-                     multiplier flags were removed.
-[2026-11-13] v1.14.0 - Completed the partial-feature pass: XP remaining and
-                     mob level tooltip lines, quest XP ledger with `/xpt
-                     quests`, XP bonus breakdown, leveling history with `/xpt
-                     history`, and live-gated food/camping bonus plumbing.
-                     Midnight remains counts-only.
-[2026-11-13] v1.13.0 - Refactored shared defaults and mob normalization,
-                     removed dead code, fixed command/help drift, reduced the
-                     offline suite to a focused set with snapshot and load-order
-                     checks, and simplified developer documentation. No
-                     behavior changes to Forever or Midnight.
-[2026-11-13] v1.12.0 - Added Kill History counts-only support for Midnight
-                     12.1.5, per-client data migration, client capability
-                     profiles, a kill-count-first tooltip, and an xpt probe
-                     diagnostic. Forever keeps the full XP experience.
-[2026-11-12] v1.11.3 - Improved tracking when kills happen quickly or the target
-                     clears, added ways to remove one kill-history entry or
-                     just the Unknown entries, and split the addon into Core/
-                     and KillHistory/ modules for maintainability.
-[2026-11-12] v1.11.2 - New Aether Blue look with a larger model card, cleaner
-                     tabs and buttons, improved search, and better merging of
-                     duplicate mob entries.
-[2026-11-12] v1.11.1 - Renamed the XPTooltip feature to Kill History and
-                     improved XP estimate accuracy.
-[2026-11-12] v1.11.0 - Added the XPTooltip/Kill History window, overview,
-                     themes, scaling, minimap icon, addon-compartment entry, and
-                     keybind.
-[2026-11-11] v1.10.1 - Improved group-size display and XP estimate accuracy.
-[2026-11-11] v1.10.0 - Added XPTooltip/Kill History, 3D mob models, searchable
-                     lists, and area/level tracking for Forever.
-[2026-11-09] v1.9.0 - Stability and compatibility improvements.
-[2026-11-09] v1.8.0 - Added Midnight and Forever support and refreshed settings.
-[2026-03-17] v1.7   - Updated for Midnight with improved XP parsing and
-                     reputation fallback support.
-[2026-03-17] v1.6   - Beta Midnight update.
-[2023-01-15] v1.5   - Updated for Dragonflight and rewrote reputation for
-                     Renown.
-[2018-08-14] v1.4   - Updated for BfA.
-[2016-09-13] v1.3   - Updated for Legion.
-[2014-10-21] v1.2   - Updated for 6.0/Warlords and fixed a guild reputation bug.
+- Heatmaps keep up to 40 zones; each zone is a 16x16 grid.
+- Death history keeps 100 deaths; respawn tracking keeps 300 NPCs with up to
+  20 samples each.
+- Quest history keeps 200 quests; level history keeps 200 records; rate history
+  keeps 240 samples; mob history keeps 2000 mobs per client.
+- Heatmaps, death locations, respawns, and nameplate levels need the client's
+  map-position and nameplate APIs. Missing or secret values limit those features
+  without stopping normal kill tracking.
+- Grinding spots need at least 5 kill-XP samples over 120 seconds, so short
+  sessions may not produce a recommendation.
+- Midnight XP estimates, calibration, kills-to-level, rested, and buffs stay
+  off until its data is live-verified.
+- Live verification of quest XP labels, group/dungeon XP, and Midnight behavior
+  is still pending.
+
+_____________________________________________________________________________________
+
+	CHANGELOG
+_____________________________________________________________________________________
+
+2.1.0 — User-facing documentation refresh, Kill Story naming throughout, and
+        reliability fixes for settings ranges, world/economy normalization,
+        tooltip hooks, debug output, migration, and restricted API data.
+2.0.0 — Major feature release: XP rate and time-to-level, dungeon XP, leveling
+        goals, speedrun splits, loot value, gold/hour, gear upgrades, death
+        locations, respawn tracking, grinding spots, optional nameplate levels,
+        and per-zone kill heatmaps.
+1.14.x — Tooltip, quest XP, leveling history, buff, and settings improvements.
+1.13.0 — Internal refactor, normalization, and focused test suite.
+1.12.0 — Midnight counts-focused support and per-client data.
+1.11.x — Kill Story window, Aether theme, search, and tracking improvements.
+Older   — Compatibility updates for Midnight, Dragonflight, BfA, and Legion.

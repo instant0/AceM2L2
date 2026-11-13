@@ -29,6 +29,7 @@ local RESPAWN_MAX_SECONDS = 3600
 local MIN_SPOT_SAMPLES = 5
 local MIN_SPOT_SECONDS = 120
 local MAX_SPOT_RESULTS = 5
+local SPOT_MAX_AGE = 3600
 
 XPTooltip.MAX_DEATHS = MAX_DEATHS
 XPTooltip.MAX_RESPAWN_NPCS = MAX_RESPAWN_NPCS
@@ -39,6 +40,7 @@ XPTooltip.RESPAWN_MAX_SECONDS = RESPAWN_MAX_SECONDS
 XPTooltip.MIN_SPOT_SAMPLES = MIN_SPOT_SAMPLES
 XPTooltip.MIN_SPOT_SECONDS = MIN_SPOT_SECONDS
 XPTooltip.MAX_SPOT_RESULTS = MAX_SPOT_RESULTS
+XPTooltip.SPOT_MAX_AGE = SPOT_MAX_AGE
 
 --[[--------------------------------------------------------------------------------
   Validation helpers
@@ -248,7 +250,7 @@ end
 
 function XPTooltip:PrintDeaths(rest)
   if not self:Supports("hasMapPosition") or not self:HasMapPositionAPI() then
-    AceM2L2:SafePrint("Kill History: death locations are unavailable on this client.")
+    AceM2L2:SafePrint("Kill Story: death locations are unavailable on this client.")
     return
   end
   local db = self.char
@@ -258,14 +260,14 @@ function XPTooltip:PrintDeaths(rest)
 
   local list = self:NormalizeDeaths()
   if #list == 0 then
-    AceM2L2:SafePrint("Kill History: no deaths recorded yet.")
+    AceM2L2:SafePrint("Kill Story: no deaths recorded yet.")
     return
   end
 
   local requested = tonumber(rest) or 10
   local count = max(1, min(50, floor(requested)))
   local shown = min(count, #list)
-  AceM2L2:SafePrint("Kill History deaths (last " .. shown .. "):")
+  AceM2L2:SafePrint("Kill Story deaths (last " .. shown .. "):")
   for index = #list, #list - shown + 1, -1 do
     local entry = list[index]
     AceM2L2:SafePrint(string.format(
@@ -511,7 +513,7 @@ end
 
 function XPTooltip:PrintRespawns(rest)
   if not self:Supports("hasKillTracking") or not self:Supports("hasGUIDIdentity") then
-    AceM2L2:SafePrint("Kill History: respawn tracking is unavailable on this client.")
+    AceM2L2:SafePrint("Kill Story: respawn tracking is unavailable on this client.")
     return
   end
   local db = self.char
@@ -548,7 +550,7 @@ function XPTooltip:PrintRespawns(rest)
   end
 
   if #list == 0 then
-    AceM2L2:SafePrint("Kill History: no respawn intervals recorded yet.")
+    AceM2L2:SafePrint("Kill Story: no respawn intervals recorded yet.")
     return
   end
 
@@ -559,7 +561,7 @@ function XPTooltip:PrintRespawns(rest)
     return a.name < b.name
   end)
 
-  AceM2L2:SafePrint("Kill History respawns:")
+  AceM2L2:SafePrint("Kill Story respawns:")
   for index = 1, min(#list, 15) do
     local entry = list[index]
     if entry.samples < MIN_RESPAWN_SAMPLES then
@@ -598,13 +600,19 @@ function XPTooltip:GetGrindingSpots(limit)
   end
 
   local groups = {}
+  local now = Epoch()
+  local cutoff = now > 0 and (now - SPOT_MAX_AGE) or nil
   for _, sample in ipairs(db.rates) do
     if type(sample) == "table" then
       local at = PositiveNumber(sample.at)
       local xp = PositiveNumber(sample.xp)
       local mapID = PositiveNumber(sample.mapID)
       local level = PositiveNumber(sample.level)
-      if at and xp and mapID and level then
+      local source = SafeString(sample.source)
+      -- Grinding spots reflect kill XP only; quest turn-ins and stale samples
+      -- would otherwise inflate or distort the zone rate.
+      if at and xp and mapID and level and source == "kill"
+        and (not cutoff or at >= cutoff) then
         local key = tostring(mapID) .. ":" .. tostring(level)
         local group = groups[key]
         if not group then
@@ -670,19 +678,19 @@ end
 
 function XPTooltip:PrintSpots()
   if not self:Supports("hasPerMobXP") then
-    AceM2L2:SafePrint("Kill History: grinding spots are unavailable on this client.")
+    AceM2L2:SafePrint("Kill Story: grinding spots are unavailable on this client.")
     return
   end
 
   local spots = self:GetGrindingSpots(MAX_SPOT_RESULTS)
   if #spots == 0 then
-    AceM2L2:SafePrint("Kill History: not enough XP samples for a grinding spot yet"
+    AceM2L2:SafePrint("Kill Story: not enough XP samples for a grinding spot yet"
       .. " (need " .. MIN_SPOT_SAMPLES .. " samples over "
       .. floor(MIN_SPOT_SECONDS / 60) .. " minutes).")
     return
   end
 
-  AceM2L2:SafePrint("Kill History grinding spots:")
+  AceM2L2:SafePrint("Kill Story grinding spots:")
   for _, spot in ipairs(spots) do
     AceM2L2:SafePrint(string.format(
       "  %s (level %d): %s XP/hr from %d samples over %s",

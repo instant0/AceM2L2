@@ -304,5 +304,5 @@ function XPTooltip:RequestDeleteSelected()
   self.pendingDeleteKey = selected.key
   self.pendingDeleteAt = now
   self:UpdateDeleteButton(selected)
-  AceM2L2:SafePrint("Kill History: click Remove again within 5 seconds to delete this entry.")
+  AceM2L2:SafePrint("Kill Story: click Remove again within 5 seconds to delete this entry.")
 end

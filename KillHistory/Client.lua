@@ -2,7 +2,7 @@
   KillHistory/Client.lua
   Client profile registry and capability queries.
 
-  Shared Kill History code asks a profile for capabilities instead of branching on
+  Shared Kill Story code asks a profile for capabilities instead of branching on
   WOW_PROJECT_ID. Client-specific XP formulas/API policy live in Clients/.
 ------------------------------------------------------------------------------------]]
 

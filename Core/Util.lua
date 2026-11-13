@@ -416,13 +416,43 @@ function AceM2L2:SafePrint(...)
   end
 end
 
+-- Debug output is shared by the core addon and Kill Story. Either the core
+-- debug toggle or the Kill Story debug toggle enables both error paths.
+function AceM2L2:IsDebugEnabled()
+  local db = self.db
+  if type(db) ~= "table" then
+    return false
+  end
+  if db.debug == true then
+    return true
+  end
+
+  local xpTooltip = db.xpTooltip
+  if type(xpTooltip) == "table" and xpTooltip.debug == true then
+    return true
+  end
+
+  -- Defensive fallback for callers that keep the saved-variable root in db.
+  local profile = db.profile
+  if type(profile) == "table" then
+    if profile.debug == true then
+      return true
+    end
+    local profileXPTooltip = profile.xpTooltip
+    if type(profileXPTooltip) == "table" and profileXPTooltip.debug == true then
+      return true
+    end
+  end
+  return false
+end
+
 function AceM2L2:ReportError(context, err)
   local message = tostring(context or "error") .. ": " .. tostring(err)
   if #message > 500 then
     message = message:sub(1, 500)
   end
   self.lastError = message
-  if self.db and self.db.debug then
+  if self:IsDebugEnabled() then
     self:SafePrint("|cffff5555" .. message .. "|r")
   end
 end

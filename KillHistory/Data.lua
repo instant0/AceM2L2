@@ -65,36 +65,80 @@ local function NewEmptyClientData()
   }
 end
 
+-- Reject non-finite stored numbers (NaN and both infinities) before clamping.
+-- A malformed SavedVariables value must never poison totals or spread through
+-- later arithmetic.
+local function NonNegativeFinite(value)
+  local number = tonumber(value)
+  if not number or number ~= number or number == math.huge or number == -math.huge then
+    return 0
+  end
+  return max(0, number)
+end
+
 -- Dungeon totals are a self-contained bucket. Rebuild only the five supported
 -- fields so stale or unknown keys never survive a load. Counters and the last
--- instance map are non-negative.
+-- instance map are finite and non-negative.
 local function NormalizeDungeon(value)
   local source = type(value) == "table" and value or {}
   return {
-    xp = max(0, tonumber(source.xp) or 0),
-    kills = max(0, tonumber(source.kills) or 0),
-    sessionXP = max(0, tonumber(source.sessionXP) or 0),
-    sessionKills = max(0, tonumber(source.sessionKills) or 0),
-    lastInstance = max(0, tonumber(source.lastInstance) or 0),
+    xp = NonNegativeFinite(source.xp),
+    kills = NonNegativeFinite(source.kills),
+    sessionXP = NonNegativeFinite(source.sessionXP),
+    sessionKills = NonNegativeFinite(source.sessionKills),
+    lastInstance = NonNegativeFinite(source.lastInstance),
   }
 end
 
 -- Economy totals are a self-contained bucket too. Rebuild only the nine
 -- supported fields so stale or unknown keys never survive a load. Counters are
--- non-negative whole numbers; moneyKnown stays a strict boolean.
+-- finite, non-negative whole numbers; moneyKnown stays a strict boolean.
 local function NormalizeEconomy(value)
   local source = type(value) == "table" and value or {}
   return {
-    lootValue = max(0, math.floor(tonumber(source.lootValue) or 0)),
-    sessionLootValue = max(0, math.floor(tonumber(source.sessionLootValue) or 0)),
-    items = max(0, math.floor(tonumber(source.items) or 0)),
-    sessionItems = max(0, math.floor(tonumber(source.sessionItems) or 0)),
-    goldStart = max(0, math.floor(tonumber(source.goldStart) or 0)),
-    goldGained = max(0, math.floor(tonumber(source.goldGained) or 0)),
-    goldSpent = max(0, math.floor(tonumber(source.goldSpent) or 0)),
-    lastMoney = max(0, math.floor(tonumber(source.lastMoney) or 0)),
+    lootValue = math.floor(NonNegativeFinite(source.lootValue)),
+    sessionLootValue = math.floor(NonNegativeFinite(source.sessionLootValue)),
+    items = math.floor(NonNegativeFinite(source.items)),
+    sessionItems = math.floor(NonNegativeFinite(source.sessionItems)),
+    goldStart = math.floor(NonNegativeFinite(source.goldStart)),
+    goldGained = math.floor(NonNegativeFinite(source.goldGained)),
+    goldSpent = math.floor(NonNegativeFinite(source.goldSpent)),
+    lastMoney = math.floor(NonNegativeFinite(source.lastMoney)),
     moneyKnown = source.moneyKnown == true,
   }
+end
+
+-- Overwrite a bucket with a normalized snapshot while preserving the table
+-- identity. Callers and UI code can hold a reference to dungeon/economy across
+-- a normalization pass without observing stale values.
+local function ReplaceTableContents(target, normalized)
+  for key in pairs(target) do
+    if normalized[key] == nil then
+      target[key] = nil
+    end
+  end
+  for key, value in pairs(normalized) do
+    target[key] = value
+  end
+  return target
+end
+
+local function NormalizeDungeonInPlace(db)
+  if type(db) ~= "table" then
+    return nil
+  end
+  local existing = type(db.dungeon) == "table" and db.dungeon or {}
+  db.dungeon = ReplaceTableContents(existing, NormalizeDungeon(existing))
+  return db.dungeon
+end
+
+local function NormalizeEconomyInPlace(db)
+  if type(db) ~= "table" then
+    return nil
+  end
+  local existing = type(db.economy) == "table" and db.economy or {}
+  db.economy = ReplaceTableContents(existing, NormalizeEconomy(existing))
+  return db.economy
 end
 
 -- Keep rate samples as a time-ordered list of numeric observations. Source is
@@ -132,6 +176,55 @@ local function NormalizeRateList(list)
   return normalized
 end
 
+-- Clamp the shared accounting buckets in place. Totals and session accept only
+-- finite, non-negative values; quest counters and timestamps follow the same
+-- rule so malformed saved data cannot reach derived displays.
+local function NormalizeAccounting(db)
+  if type(db) ~= "table" then
+    return
+  end
+
+  db.totals = type(db.totals) == "table" and db.totals or {}
+  db.totals.kills = NonNegativeFinite(db.totals.kills)
+  db.totals.xp = NonNegativeFinite(db.totals.xp)
+  db.totals.uniqueMobs = NonNegativeFinite(db.totals.uniqueMobs)
+
+  db.session = type(db.session) == "table" and db.session or {}
+  db.session.startedAt = NonNegativeFinite(db.session.startedAt)
+  db.session.kills = NonNegativeFinite(db.session.kills)
+  db.session.xp = NonNegativeFinite(db.session.xp)
+
+  db.quests = EnsureNumberMap(db.quests)
+  for _, quest in pairs(db.quests) do
+    if type(quest) == "table" then
+      quest.count = NonNegativeFinite(quest.count)
+      quest.totalXP = NonNegativeFinite(quest.totalXP)
+      quest.lastXP = NonNegativeFinite(quest.lastXP)
+      quest.firstSeen = NonNegativeFinite(quest.firstSeen)
+      quest.lastSeen = NonNegativeFinite(quest.lastSeen)
+    end
+  end
+end
+
+-- Public normalization entry points for the active character. Each mutates the
+-- corresponding client bucket in place and returns the normalized result.
+function XPTooltip:NormalizeDungeon()
+  return NormalizeDungeonInPlace(self.char)
+end
+
+function XPTooltip:NormalizeEconomy()
+  return NormalizeEconomyInPlace(self.char)
+end
+
+function XPTooltip:NormalizeAccounting()
+  local db = self.char
+  if type(db) ~= "table" then
+    return nil
+  end
+  NormalizeAccounting(db)
+  return db
+end
+
 function XPTooltip:GetMigrationBackup()
   if type(AceM2L2CharDB) ~= "table" then
     return nil
@@ -147,9 +240,39 @@ function XPTooltip:HasMigrationBackup()
   return self:GetMigrationBackup() ~= nil
 end
 
--- Move 1.11.x root-scoped Kill History data into clients[Forever] once.
--- The migration is idempotent and never merges root data into a non-empty
--- clients table. When it moves data, the root data keys are cleared.
+-- Copy source keys that are not already present in target. Existing backup
+-- values win, but nested tables are merged so later stranded keys are retained.
+local function MergeTableInto(target, source)
+  for key, value in pairs(source) do
+    if target[key] == nil then
+      target[key] = type(value) == "table" and CopyTable(value) or value
+    elseif type(target[key]) == "table" and type(value) == "table" then
+      MergeTableInto(target[key], value)
+    end
+  end
+end
+
+local function EnsureMigrationBackup(root, storageSchema)
+  local backup = type(root.migrationBackup) == "table" and root.migrationBackup or nil
+  if not backup then
+    backup = {
+      createdAt = Epoch(),
+      storageSchema = storageSchema,
+      data = {},
+    }
+    root.migrationBackup = backup
+  end
+  if type(backup.data) ~= "table" then
+    backup.data = {}
+  end
+  return backup
+end
+
+-- Move 1.11.x root-scoped Kill Story data into clients[Forever] once.
+-- The migration is idempotent. Root data is only merged into the Forever client
+-- when no per-client data exists. If any client data is already present, root
+-- data is never merged into it: the migration keeps/merges a recoverable backup,
+-- flags the stranded keys, and clears them so the branch is not retried.
 function XPTooltip:MigrateDB()
   if type(AceM2L2CharDB) ~= "table" then
     AceM2L2CharDB = {}
@@ -165,32 +288,48 @@ function XPTooltip:MigrateDB()
     return root, true
   end
 
-  if type(root.clients) ~= "table" or next(root.clients) == nil then
-    local clients = type(root.clients) == "table" and root.clients or {}
-    local legacy = nil
-    for _, key in ipairs(LEGACY_DATA_KEYS) do
-      if root[key] ~= nil then
-        legacy = legacy or {}
-        legacy[key] = root[key]
-        root[key] = nil
-      end
+  local legacy
+  for _, key in ipairs(LEGACY_DATA_KEYS) do
+    if root[key] ~= nil then
+      legacy = legacy or {}
+      legacy[key] = root[key]
     end
-    if legacy then
-      local backupData
-      if type(root.migrationBackup) ~= "table" then
-        backupData = CopyTable(legacy)
+  end
+
+  local clients = type(root.clients) == "table" and root.clients or nil
+  local hasClientData = clients ~= nil and next(clients) ~= nil
+
+  if legacy then
+    local backup = EnsureMigrationBackup(root, storageSchema)
+    -- Snapshot before the migrated payload is stamped with dataSchema.
+    MergeTableInto(backup.data, legacy)
+
+    if hasClientData then
+      -- Populated clients are authoritative. Record why the root data could not
+      -- be migrated, but leave every client table untouched.
+      backup.stranded = true
+      if type(backup.strandedKeys) ~= "table" then
+        backup.strandedKeys = {}
       end
+      for key in pairs(legacy) do
+        backup.strandedKeys[key] = true
+      end
+      backup.strandedAt = Epoch()
+      backup.strandedStorageSchema = storageSchema
+    else
+      clients = clients or {}
       legacy.dataSchema = CLIENT_DATA_SCHEMA
       clients[LEGACY_PROJECT_ID] = legacy
-      if backupData then
-        root.migrationBackup = {
-          createdAt = Epoch(),
-          storageSchema = storageSchema,
-          data = backupData,
-        }
-      end
+      root.clients = clients
     end
-    root.clients = clients
+
+    for _, key in ipairs(LEGACY_DATA_KEYS) do
+      root[key] = nil
+    end
+  end
+
+  if type(root.clients) ~= "table" then
+    root.clients = {}
   end
 
   root.storageSchema = STORAGE_SCHEMA
@@ -249,15 +388,6 @@ function XPTooltip:EnsureDB()
     end
   end
   db.quests = EnsureNumberMap(db.quests)
-  for _, quest in pairs(db.quests) do
-    if type(quest) == "table" then
-      quest.count = tonumber(quest.count) or 0
-      quest.totalXP = tonumber(quest.totalXP) or 0
-      quest.lastXP = tonumber(quest.lastXP) or 0
-      quest.firstSeen = tonumber(quest.firstSeen) or 0
-      quest.lastSeen = tonumber(quest.lastSeen) or 0
-    end
-  end
   db.areas = EnsureNumberMap(db.areas)
   db.levels = EnsureNumberMap(db.levels)
   db.areaLevels = EnsureNumberMap(db.areaLevels)
@@ -286,19 +416,16 @@ function XPTooltip:EnsureDB()
   db.calibration.groups = EnsureNumberMap(db.calibration.groups)
   db.calibration.classes = EnsureNumberMap(db.calibration.classes)
   db.calibration.mobs = EnsureNumberMap(db.calibration.mobs)
-  db.totals = type(db.totals) == "table" and db.totals or {}
-  db.totals.kills = tonumber(db.totals.kills) or 0
-  db.totals.xp = tonumber(db.totals.xp) or 0
-  db.totals.uniqueMobs = tonumber(db.totals.uniqueMobs) or 0
-  db.session = type(db.session) == "table" and db.session or {}
-  db.session.startedAt = tonumber(db.session.startedAt) or 0
-  db.session.kills = tonumber(db.session.kills) or 0
-  db.session.xp = tonumber(db.session.xp) or 0
-  db.dungeon = NormalizeDungeon(db.dungeon)
-  db.goal = self:NormalizeGoal(db.goal)
-  db.economy = NormalizeEconomy(db.economy)
 
   self.char = db
+  -- Accounting, world, and goal buckets are normalized once the active
+  -- character is in place.
+  self:NormalizeAccounting()
+  self:NormalizeDungeon()
+  db.goal = self:NormalizeGoal(db.goal)
+  self:NormalizeEconomy()
+  -- Level history uses self.char, so normalize it exactly once here.
+  self:NormalizeLevelHistory()
   -- World.lua loads after Data.lua and owns death/respawn normalization; both
   -- operate on self.char, so run them once the active character is in place.
   if type(self.NormalizeDeaths) == "function" then
@@ -383,7 +510,7 @@ function XPTooltip:RecordDungeonXP(xp)
   if not self:IsInDungeon() then
     return false
   end
-  db.dungeon = NormalizeDungeon(db.dungeon)
+  NormalizeDungeonInPlace(db)
   db.dungeon.xp = db.dungeon.xp + value
   db.dungeon.sessionXP = db.dungeon.sessionXP + value
   return true
@@ -393,16 +520,16 @@ end
 -- whole level clamped to 0..max; a zero target clears the whole goal.
 function XPTooltip:NormalizeGoal(value)
   local source = type(value) == "table" and value or {}
-  local targetLevel = math.floor(tonumber(source.targetLevel) or 0)
-  local maxLevel = tonumber(self:GetMaxLevel()) or 0
+  local targetLevel = math.floor(NonNegativeFinite(source.targetLevel))
+  local maxLevel = NonNegativeFinite(self:GetMaxLevel())
   targetLevel = max(0, min(targetLevel, maxLevel))
   if targetLevel <= 0 then
     return { targetLevel = 0, targetXP = 0, createdAt = 0 }
   end
   return {
     targetLevel = targetLevel,
-    targetXP = max(0, tonumber(source.targetXP) or 0),
-    createdAt = max(0, tonumber(source.createdAt) or 0),
+    targetXP = NonNegativeFinite(source.targetXP),
+    createdAt = NonNegativeFinite(source.createdAt),
   }
 end
 
@@ -439,8 +566,7 @@ function XPTooltip:RecordLoot(itemID, quantity)
   end
   local price = SafeNumber(sellPrice) or 0
 
-  db.economy = NormalizeEconomy(db.economy)
-  local economy = db.economy
+  local economy = NormalizeEconomyInPlace(db)
   economy.items = economy.items + qty
   economy.sessionItems = economy.sessionItems + qty
   if price > 0 then
@@ -466,8 +592,7 @@ function XPTooltip:RecordMoney(current)
     return false
   end
 
-  db.economy = NormalizeEconomy(db.economy)
-  local economy = db.economy
+  local economy = NormalizeEconomyInPlace(db)
   if not economy.moneyKnown then
     economy.goldStart = money
     economy.lastMoney = money
@@ -1122,12 +1247,12 @@ function XPTooltip:NormalizeLevelHistory()
     if type(record) ~= "table" then
       table.remove(list, index)
     else
-      record.level = tonumber(record.level) or 0
-      record.startedAt = tonumber(record.startedAt) or 0
-      record.endedAt = tonumber(record.endedAt) or 0
-      record.xpGained = tonumber(record.xpGained) or 0
-      record.kills = tonumber(record.kills) or 0
-      record.duration = tonumber(record.duration) or 0
+      record.level = NonNegativeFinite(record.level)
+      record.startedAt = NonNegativeFinite(record.startedAt)
+      record.endedAt = NonNegativeFinite(record.endedAt)
+      record.xpGained = NonNegativeFinite(record.xpGained)
+      record.kills = NonNegativeFinite(record.kills)
+      record.duration = NonNegativeFinite(record.duration)
     end
   end
   return list
