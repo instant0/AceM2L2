@@ -447,6 +447,11 @@ function AceM2L2:SafeRegister(event, method)
   return ok
 end
 
+function AceM2L2:SafeRegisterOptional(event, method)
+  local ok = pcall(self.RegisterEvent, self, event, method)
+  return ok
+end
+
 function AceM2L2:SafeUnregister(event)
   pcall(self.UnregisterEvent, self, event)
 end

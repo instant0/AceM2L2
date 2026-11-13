@@ -442,6 +442,27 @@ function XPTooltip:IsUnitEligible(unit)
     return false
   end
 
+  local name = Trim(SafeCall(UnitName, unit))
+  if not name or name == "" then
+    name = nil
+  end
+  local guid = SafeString(SafeCall(UnitGUID, unit))
+  local npcID = guid and self:ParseNPCID(guid) or nil
+
+  -- GUID checks are safe even when the boolean APIs are secret or missing.
+  if guid then
+    if guid:match("^Player%-") or guid:match("^Pet%-") or guid:match("^Vehicle%-") then
+      return false
+    end
+    if guid:match("^Creature%-") then
+      if not npcID then
+        return false
+      end
+    elseif not name then
+      return false
+    end
+  end
+
   local strict = self:Supports("hasReadableBooleans")
   local isPlayer = SafeBool(SafeCall(UnitIsPlayer, unit))
   if strict then
@@ -484,12 +505,6 @@ function XPTooltip:IsUnitEligible(unit)
   end
 
   -- Counts need some readable identity; never manufacture an Unknown entry.
-  local name = Trim(SafeCall(UnitName, unit))
-  if not name or name == "" then
-    name = nil
-  end
-  local guid = SafeString(SafeCall(UnitGUID, unit))
-  local npcID = guid and self:ParseNPCID(guid) or nil
   return name ~= nil or npcID ~= nil
 end
 

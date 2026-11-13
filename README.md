@@ -207,6 +207,10 @@ The migration is idempotent and never merges root data into an existing
 per-client table. Midnight starts with an empty `clients[1]` namespace; Forever
 observations and calibration never seed Midnight.
 
+The first migration also keeps a one-time recoverable snapshot at
+`AceM2L2CharDB.xpTooltip.migrationBackup`. It is outside normal accounting and
+is reported by `/acem2l2 xpt status` and `/acem2l2 xpt probe`.
+
 Back up `WTF/Account/<account>/SavedVariables/AceM2L2*.lua` before upgrading.
 A 1.11.x client cannot read the per-client 1.12.x database after a downgrade.
 
@@ -290,7 +294,9 @@ dev/DOCS_INDEX.md   Documentation status/ownership index
 dev/IN_GAME_VERIFICATION.md  Live-client verification checklist
 dev/UPGRADE_PLAN.md  Release notes and upgrade history
 dev/TASKS.md         Current open-work tracker (ignored by Git)
-dev/IMPROVEMENT_PLAN_2026-11-13.md  Post-1.12 correctness/docs/UI plan
+dev/IMPROVEMENT_PLAN_2026-11-13.md  Post-1.12 closeout plan
+dev/DETAILED_EXECUTION_PLAN_2026-11-13.md  Implementation-level closeout detail
+dev/REFACTOR_AND_CLEANUP_PLAN_2026-11-13.md  1.13.0 refactor/test/doc cleanup plan
 dev/MIDNIGHT_KILL_HISTORY_PLAN.md  Shipped 1.12.0 Midnight design record
 dev/CODE_REVIEW_2026-11-12.md  Historical 1.11.3 code/doc review
 dev/archive/         Historical task logs and retired source copies
@@ -429,9 +435,9 @@ Bindings, Libs, `README.txt`, or `LICENSE`).
 
 - Unnamed XP that never receives a readable death event can still fall back to
   an Unknown entry after the short identity wait.
-- Quest XP source detection depends on the localized combat-XP chat key. If the
-  key is unrecognized or the source is ambiguous, the estimate can be suppressed
-  or mislabelled as a mob kill; tracked as C15.
+- Quest XP is disambiguated by `QUEST_TURNED_IN` when the client exposes it.
+  If the source remains ambiguous, the estimate is suppressed rather than
+  reported as a mob kill.
 - Group and dungeon XP chat amounts are not yet verified live, so group-ratio
   learning remains disabled.
 - Midnight runs in counts-only mode. XP estimates, calibration, kills-to-level,

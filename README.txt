@@ -143,6 +143,8 @@ Diagnostics and upgrades:
 - Back up WTF/Account/<account>/SavedVariables/AceM2L2*.lua before upgrading.
   Existing 1.11.x Forever history migrates into the per-client Forever
   namespace. Midnight starts with separate, empty history.
+- The first migration keeps a one-time backup at
+  AceM2L2CharDB.xpTooltip.migrationBackup; status/probe report it.
 - A 1.11.x client cannot read the per-client 1.12.x database after a downgrade.
 - Midnight observed XP is not available in 1.12.0. No setting or command enables
   it.
@@ -163,8 +165,7 @@ ________________________________________________________________________________
 _____________________________________________________________________________________
 
 - More in-game testing on Forever 1.60.1 and Midnight 12.1.5.
-- Fix quest XP occasionally being labelled as "Mob kills to level"; quest
-  source detection depends on the localized combat-XP chat text.
+- Confirm quest XP labeling against live quest turn-ins on both clients.
 - Confirm group and dungeon XP values.
 - Future visual polish: larger layout, custom panel art, a full level chart, map
   thumbnails, and a reduce-motion option.

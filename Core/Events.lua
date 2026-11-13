@@ -83,6 +83,9 @@ function AceM2L2:OnInitialize()
   self.lastCreatureName = nil
   self.lastXPSource = nil
   self.lastXPInfoTime = 0
+  self.lastChatXPAmount = nil
+  self.questXPWindowUntil = 0
+  self.questXPAmount = nil
   self.useStandingEvent = false
   self.optionsFailed = false
 
@@ -97,6 +100,7 @@ end
 function AceM2L2:OnEnable()
   self:SafeRegister("CHAT_MSG_COMBAT_XP_GAIN", "C")
   self:SafeRegister("PLAYER_XP_UPDATE", "OnPlayerXPUpdate")
+  self:SafeRegisterOptional("QUEST_TURNED_IN", "OnQuestTurnedIn")
   self:SafeRegister("PLAYER_LEVEL_UP", "OnLevelUp")
   self:SafeRegister("PLAYER_ENTERING_WORLD", "OnEnteringWorld")
   self:SafeRegister("ADDON_LOADED", "OnAddonLoaded")
@@ -110,6 +114,9 @@ function AceM2L2:OnEnable()
   self.lastCreatureName = nil
   self.lastXPSource = nil
   self.lastXPInfoTime = 0
+  self.lastChatXPAmount = nil
+  self.questXPWindowUntil = 0
+  self.questXPAmount = nil
   self:SafeInvoke("RefreshFactionBaseline", "RefreshFactionBaseline")
 
   if not self.optionsCategory then
@@ -121,6 +128,7 @@ function AceM2L2:OnDisable()
   self:SafeUnregister("CHAT_MSG_COMBAT_XP_GAIN")
   self:SafeUnregister("CHAT_MSG_COMBAT_FACTION_CHANGE")
   self:SafeUnregister("PLAYER_XP_UPDATE")
+  self:SafeUnregister("QUEST_TURNED_IN")
   self:SafeUnregister("PLAYER_LEVEL_UP")
   self:SafeUnregister("PLAYER_ENTERING_WORLD")
   self:SafeUnregister("ADDON_LOADED")
@@ -146,6 +154,9 @@ function AceM2L2:HandleEnteringWorld()
   self.lastCreatureName = nil
   self.lastXPSource = nil
   self.lastXPInfoTime = 0
+  self.lastChatXPAmount = nil
+  self.questXPWindowUntil = 0
+  self.questXPAmount = nil
   self.factionCache = nil
   self:SafeInvoke("RefreshFactionBaseline", "RefreshFactionBaseline")
 end
@@ -161,4 +172,7 @@ function AceM2L2:HandleLevelUp()
   self.lastCreatureName = nil
   self.lastXPSource = nil
   self.lastXPInfoTime = 0
+  self.lastChatXPAmount = nil
+  self.questXPWindowUntil = 0
+  self.questXPAmount = nil
 end

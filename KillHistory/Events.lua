@@ -121,7 +121,19 @@ function XPTooltip:StartSession()
     if type(mob) == "table" then
       mob.sessionKills = 0
       mob.sessionXP = 0
+      mob.sessionXPKnown = false
     end
+  end
+end
+
+local function RunPruneSafely(self)
+  self.pruneScheduled = false
+  if not self:IsActive() then
+    return
+  end
+  local ok, err = pcall(self.Prune, self)
+  if not ok then
+    self:ReportError("Prune", err)
   end
 end
 
@@ -131,15 +143,14 @@ function XPTooltip:SchedulePrune()
   end
   self.pruneScheduled = true
   if C_Timer and C_Timer.After then
-    pcall(C_Timer.After, 5, function()
-      self.pruneScheduled = false
-      if self:IsActive() then
-        self:Prune()
-      end
+    local scheduled = pcall(C_Timer.After, 5, function()
+      RunPruneSafely(self)
     end)
+    if not scheduled then
+      self.pruneScheduled = false
+    end
   else
-    self.pruneScheduled = false
-    self:Prune()
+    RunPruneSafely(self)
   end
 end
 
@@ -169,6 +180,7 @@ function XPTooltip:Prune()
       mob.contexts = EnsureNumberMap(mob.contexts)
       mob.totalXP = tonumber(mob.totalXP) or 0
       mob.sessionXP = tonumber(mob.sessionXP) or 0
+      mob.sessionXPKnown = mob.sessionXPKnown == true
 
       local contextCount = 0
       local oldestKey, oldestSeen
@@ -210,16 +222,18 @@ function XPTooltip:Prune()
         removable[#removable + 1] = { key = mobKey, seen = tonumber(mob.lastSeen) or 0 }
       end
     end
-    table.sort(removable, function(a, b) return a.seen < b.seen end)
+    table.sort(removable, function(a, b)
+      if a.seen == b.seen then
+        return a.key < b.key
+      end
+      return a.seen < b.seen
+    end)
     for _, entry in ipairs(removable) do
       if mobCount <= MAX_MOBS then
         break
       end
       self:MarkMobDeleted(entry.key)
-      db.mobs[entry.key] = nil
-      if db.calibration and db.calibration.mobs then
-        db.calibration.mobs[entry.key] = nil
-      end
+      self:RemoveMobEntry(entry.key, true)
       mobCount = mobCount - 1
     end
   end
@@ -231,16 +245,18 @@ function XPTooltip:Prune()
         removable[#removable + 1] = { key = mobKey, seen = tonumber(mob.lastSeen) or 0 }
       end
     end
-    table.sort(removable, function(a, b) return a.seen < b.seen end)
+    table.sort(removable, function(a, b)
+      if a.seen == b.seen then
+        return a.key < b.key
+      end
+      return a.seen < b.seen
+    end)
     for _, entry in ipairs(removable) do
       if mobCount <= MAX_MOBS then
         break
       end
       self:MarkMobDeleted(entry.key)
-      db.mobs[entry.key] = nil
-      if db.calibration and db.calibration.mobs then
-        db.calibration.mobs[entry.key] = nil
-      end
+      self:RemoveMobEntry(entry.key, true)
       mobCount = mobCount - 1
     end
   end

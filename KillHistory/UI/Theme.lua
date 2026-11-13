@@ -10,6 +10,9 @@ local Util = XPTooltip.Util
 
 local CopyTable = Util.CopyTable
 local SafeCall = Util.SafeCall
+local SafeNumber = Util.SafeNumber
+local SafeString = Util.SafeString
+local IsSecret = Util.IsSecret
 
 local THEMES = {
   aether = {
@@ -80,13 +83,26 @@ UI.THEMES = THEMES
 
 
 
+local function SafeThemeColor(color)
+  if type(color) ~= "table" or IsSecret(color) then
+    return nil
+  end
+  local r = SafeNumber(color.r)
+  local g = SafeNumber(color.g)
+  local b = SafeNumber(color.b)
+  if not r or not g or not b then
+    return nil
+  end
+  return r, g, b
+end
+
 function XPTooltip:GetTheme()
   local settings = self.settings or self:GetSettings()
   local key = settings and settings.theme or "dark"
   local classFile
   if key == "class" then
     local _, class = SafeCall(UnitClass, "player")
-    classFile = class
+    classFile = SafeString(class)
   end
   local cacheKey = key .. ":" .. tostring(classFile or "")
   if self.themeCacheKey == cacheKey and self.themeCache then
@@ -97,13 +113,15 @@ function XPTooltip:GetTheme()
   local theme = CopyTable(base)
   if key == "class" then
     local color = classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile]
-    if not color and classFile and C_ClassColor and C_ClassColor.GetClassColor then
+    local r, g, b = SafeThemeColor(color)
+    if not r and classFile and C_ClassColor and C_ClassColor.GetClassColor then
       color = SafeCall(C_ClassColor.GetClassColor, classFile)
+      r, g, b = SafeThemeColor(color)
     end
-    if color then
-      theme.accent = { color.r, color.g, color.b }
-      theme.accentSoft = { color.r, color.g, color.b, 0.22 }
-      theme.bar = { color.r, color.g, color.b, 0.45 }
+    if r then
+      theme.accent = { r, g, b }
+      theme.accentSoft = { r, g, b, 0.22 }
+      theme.bar = { r, g, b, 0.45 }
     end
   end
   self.themeCacheKey = cacheKey

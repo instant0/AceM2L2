@@ -106,6 +106,8 @@ function XPTooltip:OnInitialize()
   self.active = false
   self.autoDisabled = false
   self.autoDisableReason = nil
+  self.schemaBlocked = false
+  self.schemaBlockedReason = nil
   self.circuitErrors = 0
   self.dataGeneration = 0
   self.searchText = ""
@@ -161,6 +163,20 @@ function XPTooltip:Refresh()
     self.autoDisabled = true
     self.autoDisableReason = "settings unavailable"
     self:InvalidatePendingWork("settings unavailable", true)
+    return
+  end
+
+  if self.schemaBlocked then
+    self.active = false
+    self.autoDisabled = true
+    self.autoDisableReason = self.schemaBlockedReason or "newer schema; read-only"
+    if self.installed then
+      pcall(self.UnregisterAllEvents, self)
+      self.installed = false
+    end
+    self:InvalidatePendingWork("schema blocked", true)
+    self:CloseUI()
+    self:HideMinimapIcon()
     return
   end
 
@@ -258,6 +274,7 @@ function XPTooltip:IsActive()
     and self.settings ~= nil
     and self.settings.enabled == true
     and not self.autoDisabled
+    and not self.schemaBlocked
 end
 
 function XPTooltip:ReportError(context, err, countTowardCircuit)
@@ -293,6 +310,9 @@ function XPTooltip:GetStatusText()
   local settings = self:GetSettings()
   if not settings then
     return "settings unavailable"
+  end
+  if self.schemaBlocked then
+    return "blocked (" .. tostring(self.schemaBlockedReason or "newer schema; read-only") .. ")"
   end
   if not settings.enabled then
     return "disabled by user"

@@ -146,6 +146,7 @@ function AceM2L2:ParseXPMessage(message)
   end
 
   local text = StripColorCodes(message) or message
+  local matches = {}
   for _, info in ipairs(self:GetXPFmts()) do
     local _, ordered = ParseFormatted(text, info.fmt)
     if ordered then
@@ -165,16 +166,59 @@ function AceM2L2:ParseXPMessage(message)
 
       local total = SelectXPAmount(numbers, info.key)
       if total and total > 0 then
-        return name, total, info.key
+        matches[#matches + 1] = {
+          name = name,
+          total = total,
+          key = info.key,
+        }
       end
     end
   end
 
-  return nil
+  if #matches == 0 then
+    return nil
+  end
+
+  local first = matches[1]
+  local ambiguousQuest = false
+  if not first.key:find("_QUEST", 1, true) then
+    for index = 2, #matches do
+      if matches[index].key:find("_QUEST", 1, true) then
+        ambiguousQuest = true
+        break
+      end
+    end
+  end
+  return first.name, first.total, first.key, ambiguousQuest
 end
 
 function AceM2L2:C(_, message)
   self:SafeInvoke("CHAT_MSG_COMBAT_XP_GAIN", "HandleXPText", message)
+end
+
+function AceM2L2:IsQuestXPWindowActive()
+  local untilTime = tonumber(self.questXPWindowUntil) or 0
+  return untilTime > 0 and GetSafeTime() <= untilTime
+end
+
+function AceM2L2:ClearQuestXPWindow()
+  self.questXPWindowUntil = 0
+  self.questXPAmount = nil
+end
+
+function AceM2L2:OnQuestTurnedIn(event, questID, xpReward)
+  local now = GetSafeTime()
+  local reward = SafeNumber(xpReward)
+  self.questXPWindowUntil = now + 5
+  self.questXPAmount = reward and reward > 0 and reward or nil
+  self.lastCreatureName = nil
+  self.lastXPSource = "quest"
+  self.lastXPInfoTime = now
+  self.lastChatXPAmount = nil
+  if self.db and self.db.debug then
+    self:SafePrint("XP source: quest turn-in [" .. tostring(questID)
+      .. ", reward=" .. tostring(xpReward) .. "]")
+  end
 end
 
 function AceM2L2:HandleXPText(message)
@@ -192,21 +236,45 @@ function AceM2L2:HandleXPText(message)
     return
   end
 
-  local name, _, key = self:ParseXPMessage(message)
+  local name, total, key, ambiguousQuest = self:ParseXPMessage(message)
   if not key then
     self.lastCreatureName = nil
     self.lastXPSource = nil
     self.lastXPInfoTime = GetSafeTime()
+    self.lastChatXPAmount = nil
     return
   end
 
   local isQuest = key:find("_QUEST", 1, true) ~= nil
+  if not isQuest and ambiguousQuest then
+    if self:IsQuestXPWindowActive() then
+      isQuest = true
+    else
+      -- Quest and unnamed-kill formats can be identical. Without a quest
+      -- turn-in signal, suppress instead of claiming this was a mob kill.
+      self.lastCreatureName = nil
+      self.lastXPSource = nil
+      self.lastXPInfoTime = GetSafeTime()
+      self.lastChatXPAmount = nil
+      if self.db.debug then
+        self:SafePrint("XP source: ambiguous quest/unnamed gain suppressed ["
+          .. tostring(key) .. "]")
+      end
+      return
+    end
+  end
+
   self.lastCreatureName = name
   self.lastXPSource = isQuest and "quest" or "kill"
   self.lastXPInfoTime = GetSafeTime()
+  self.lastChatXPAmount = total
+  if isQuest then
+    self:ClearQuestXPWindow()
+  end
 
   if self.db.debug then
-    self:SafePrint("XP source: " .. tostring(name or (isQuest and "quest" or "mob")) .. " [" .. tostring(key) .. "]")
+    self:SafePrint("XP source: " .. tostring(name or (isQuest and "quest" or "mob"))
+      .. (ambiguousQuest and " (ambiguous)" or "") .. " [" .. tostring(key) .. "]")
   end
 end
 
@@ -297,23 +365,53 @@ function AceM2L2:HandlePlayerXPUpdate()
   end
 
   local now = GetSafeTime()
+  local questWindow = self:IsQuestXPWindowActive()
   local hasInfo = self.lastXPInfoTime and self.lastXPInfoTime > 0
     and (now - self.lastXPInfoTime) < 2
   if not hasInfo or not self.lastXPSource then
+    if questWindow then
+      local questXP = delta
+      self:ClearQuestXPWindow()
+      self.lastCreatureName = nil
+      self.lastXPSource = nil
+      self.lastXPInfoTime = 0
+      self.lastChatXPAmount = nil
+      self:HandleXPGain(nil, questXP, true)
+      return
+    end
     -- An XP delta without a recognized kill/quest chat source (for example
     -- exploration or bonus XP) must not enter the rolling kill average.
     self.lastCreatureName = nil
     self.lastXPSource = nil
     self.lastXPInfoTime = 0
+    self.lastChatXPAmount = nil
     return
   end
 
   local isQuest = self.lastXPSource == "quest"
+  local chatXPAmount = self.lastChatXPAmount
+  local questAmount = self.questXPAmount
+  if not isQuest and questWindow and questAmount
+    and math.abs(delta - questAmount) <= 1
+    and not (chatXPAmount and math.abs(delta - chatXPAmount) <= 1) then
+    -- A quest reward can follow a kill chat in the same window. Prefer the
+    -- quest source when the delta matches the turn-in reward and not the
+    -- last chat amount.
+    isQuest = true
+  end
   local name = self.lastCreatureName
+  if isQuest then
+    -- A quest gain must not reuse a stale kill creature name.
+    name = nil
+  end
 
   self.lastCreatureName = nil
   self.lastXPSource = nil
   self.lastXPInfoTime = 0
+  self.lastChatXPAmount = nil
+  if isQuest then
+    self:ClearQuestXPWindow()
+  end
 
   self:HandleXPGain(name, delta, isQuest)
 end

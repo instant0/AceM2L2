@@ -39,6 +39,14 @@ function XPTooltip:PrintStatus()
     .. ", perMobXP=" .. tostring(self:Supports("hasPerMobXP"))
     .. ", tooltipXP=" .. tostring(self:Supports("hasTooltipXP")))
   AceM2L2:SafePrint("  Buff detection=" .. tostring(self:CanDetectBuffs()))
+  if self.schemaBlocked then
+    AceM2L2:SafePrint("  Schema: blocked ("
+      .. tostring(self.schemaBlockedReason or "newer schema; read-only") .. ")")
+  end
+  local backup = self:GetMigrationBackup()
+  if backup then
+    AceM2L2:SafePrint("  Migration backup: yes (" .. FormatDate(backup.createdAt) .. ")")
+  end
   local settings = self:GetSettings()
   local minimap = settings and settings.minimap or {}
   AceM2L2:SafePrint("  Minimap=" .. (minimap.hide and "hidden" or "shown"))
@@ -74,6 +82,13 @@ function XPTooltip:PrintProbe()
   ProbeValue("mode", profile and profile:GetStatusLabel() or "unavailable")
   ProbeValue("active", self:IsActive())
   ProbeValue("autoDisabled", self.autoDisabled)
+  ProbeValue("schemaBlocked", self.schemaBlocked)
+  ProbeValue("schemaBlockedReason", self.schemaBlockedReason)
+  local backup = self:GetMigrationBackup()
+  ProbeValue("migrationBackup", backup ~= nil)
+  ProbeValue("migrationBackupAt", backup and backup.createdAt or nil)
+  ProbeValue("migrationBackupHasMobs", backup and type(backup.data) == "table"
+    and type(backup.data.mobs) == "table" or false)
   ProbeValue("tooltipHook", self.tooltipHookInstalled)
 
   AceM2L2:SafePrint("  Capabilities (" .. self:GetCapabilitySummary() .. ")")
@@ -114,8 +129,8 @@ function XPTooltip:PrintProbe()
   ProbeValue("maxLevel", self:GetMaxLevel())
   ProbeValue("xp", self:GetXP())
   ProbeValue("xpMax", self:GetXPMax())
-  ProbeValue("xpRaw", SafeCall(UnitXP, "player"))
-  ProbeValue("xpMaxRaw", SafeCall(UnitXPMax, "player"))
+  ProbeValue("xpRawDiagnostic", SafeCall(UnitXP, "player"))
+  ProbeValue("xpMaxRawDiagnostic", SafeCall(UnitXPMax, "player"))
   ProbeValue("restedPool", self:GetRestedPool())
 end
 

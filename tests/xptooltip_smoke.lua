@@ -73,6 +73,14 @@ state.targetGUID = "Creature-0-1-2-3-1234-00000001"
 state.mouseoverName = nil
 state.mouseoverGUID = nil
 state.targetClassification = "normal"
+state.className = "Mage"
+state.classFile = "MAGE"
+state.targetIsPlayer = false
+state.targetControlled = false
+state.targetCanAttack = true
+state.mouseoverIsPlayer = false
+state.mouseoverControlled = false
+state.mouseoverCanAttack = true
 
 local DEFAULT_CREATURE_GUID = "Creature-0-1-2-3-1234-00000001"
 
@@ -88,6 +96,20 @@ local function SetMouseover(name, guid, level, classification)
   state.mouseoverGUID = guid
   state.mouseoverLevel = level
   state.mouseoverClassification = classification
+end
+
+local function SetTargetFlags(flags)
+  flags = flags or {}
+  state.targetIsPlayer = flags.isPlayer == true
+  state.targetControlled = flags.controlled == true
+  state.targetCanAttack = flags.canAttack ~= false
+end
+
+local function SetMouseoverFlags(flags)
+  flags = flags or {}
+  state.mouseoverIsPlayer = flags.isPlayer == true
+  state.mouseoverControlled = flags.controlled == true
+  state.mouseoverCanAttack = flags.canAttack ~= false
 end
 
 local timers = {}
@@ -219,6 +241,14 @@ function UnitClassification(unit)
   return state.targetClassification or "normal"
 end
 
+function UnitClass(unit)
+  return state.className or "Mage", state.classFile or "MAGE"
+end
+
+RAID_CLASS_COLORS = {
+  MAGE = { r = 0.25, g = 0.55, b = 0.95 },
+}
+
 function UnitCreatureType(unit)
   return "Humanoid", 7
 end
@@ -234,7 +264,10 @@ function UnitIsPlayer(unit)
   if config.secretBooleans then
     return SECRET
   end
-  return false
+  if unit == "mouseover" then
+    return state.mouseoverIsPlayer == true
+  end
+  return state.targetIsPlayer == true
 end
 
 function UnitIsDead(unit)
@@ -251,7 +284,10 @@ function UnitPlayerControlled(unit)
   if config.secretBooleans then
     return SECRET
   end
-  return false
+  if unit == "mouseover" then
+    return state.mouseoverControlled == true
+  end
+  return state.targetControlled == true
 end
 
 function UnitIsTapDenied(unit)
@@ -272,7 +308,13 @@ function UnitCanAttack(a, b)
   if config.secretBooleans then
     return SECRET
   end
-  return b == "target"
+  if b == "mouseover" then
+    return state.mouseoverCanAttack ~= false
+  end
+  if b == "target" then
+    return state.targetCanAttack ~= false
+  end
+  return false
 end
 
 function GetXPExhaustion()
@@ -460,6 +502,12 @@ end
 
 UIParent = NewObject("Frame", "UIParent")
 UISpecialFrames = {}
+DEFAULT_CHAT_FRAME = {
+  messages = {},
+  AddMessage = function(self, message)
+    self.messages[#self.messages + 1] = tostring(message)
+  end,
+}
 
 local function CreateFrameMock(frameType, name, parent, template)
   local object = NewObject(frameType, name)
@@ -696,6 +744,106 @@ local precisionName, precisionTotal = AceM2L2:ParseXPMessage(
 assert(precisionName == "Defias Pillager" and precisionTotal and math.abs(precisionTotal - 95.5) < 0.001,
   "width/precision XP format failed")
 
+-- P1-8/C15: quest XP must not print as a mob kill.
+assert(AceM2L2.events["QUEST_TURNED_IN"], "QUEST_TURNED_IN was not registered")
+local savedQuestState = {
+  xp = state.xp,
+  lastXP = AceM2L2.lastXP,
+  samples = AceM2L2.xpSamples,
+  counter = AceM2L2.xpKillCounter,
+}
+DEFAULT_CHAT_FRAME.messages = {}
+AceM2L2.xpSamples = {}
+AceM2L2.xpKillCounter = 0
+AceM2L2.lastXP = state.xp
+AceM2L2.lastCreatureName = nil
+AceM2L2.lastXPSource = nil
+AceM2L2.lastXPInfoTime = 0
+AceM2L2.lastChatXPAmount = nil
+AceM2L2:OnQuestTurnedIn("QUEST_TURNED_IN", 1234, 100)
+local killsBeforeQuest = tonumber(module.char.totals.kills) or 0
+module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "You gain 100 experience.")
+assert((tonumber(module.char.totals.kills) or 0) == killsBeforeQuest,
+  "quest XP was recorded as a Kill History kill")
+state.xp = state.xp + 100
+AceM2L2:HandleXPText("You gain 100 experience.")
+AceM2L2:HandlePlayerXPUpdate()
+RunTimers()
+local questText = table.concat(DEFAULT_CHAT_FRAME.messages, "\n")
+assert(questText:find("quests to level", 1, true),
+  "quest turn-in was not labeled as quest: " .. questText)
+assert(not questText:find("kills to level", 1, true),
+  "quest turn-in was labeled as mob kills: " .. questText)
+assert(#AceM2L2.xpSamples == 0, "quest XP entered the kill average")
+
+-- Ambiguous quest/unnamed text without a turn-in signal is suppressed.
+DEFAULT_CHAT_FRAME.messages = {}
+AceM2L2.lastXP = state.xp
+AceM2L2.lastCreatureName = nil
+AceM2L2.lastXPSource = nil
+AceM2L2.lastXPInfoTime = 0
+AceM2L2.lastChatXPAmount = nil
+AceM2L2.questXPWindowUntil = 0
+AceM2L2.questXPAmount = nil
+local killsBeforeAmbiguous = tonumber(module.char.totals.kills) or 0
+module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "You gain 50 experience.")
+assert((tonumber(module.char.totals.kills) or 0) == killsBeforeAmbiguous,
+  "ambiguous quest/unnamed XP was recorded immediately as a kill")
+AdvanceTime(5.1)
+assert((tonumber(module.char.totals.kills) or 0) == killsBeforeAmbiguous,
+  "ambiguous quest/unnamed XP became an Unknown kill")
+assert(#module.pendingChatXP == 0, "ambiguous quest/unnamed XP stayed pending")
+state.xp = state.xp + 50
+AceM2L2:HandleXPText("You gain 50 experience.")
+AceM2L2:HandlePlayerXPUpdate()
+RunTimers()
+assert(#DEFAULT_CHAT_FRAME.messages == 0,
+  "ambiguous quest/unnamed XP printed a message: " .. table.concat(DEFAULT_CHAT_FRAME.messages, "\n"))
+
+-- Named kill XP still prints a kill message.
+DEFAULT_CHAT_FRAME.messages = {}
+AceM2L2.lastXP = state.xp
+AceM2L2.lastCreatureName = nil
+AceM2L2.lastXPSource = nil
+AceM2L2.lastXPInfoTime = 0
+AceM2L2.lastChatXPAmount = nil
+state.xp = state.xp + 95
+AceM2L2:HandleXPText("Defias Pillager dies, you gain 95 experience.")
+AceM2L2:HandlePlayerXPUpdate()
+RunTimers()
+local killText = table.concat(DEFAULT_CHAT_FRAME.messages, "\n")
+assert(killText:find("kills to level", 1, true),
+  "named kill XP was not labeled as a kill: " .. killText)
+
+-- A quest reward can follow a kill chat in the window; amount matching keeps
+-- the quest label and does not reuse the creature name.
+DEFAULT_CHAT_FRAME.messages = {}
+AceM2L2.lastXP = state.xp
+AceM2L2.lastCreatureName = nil
+AceM2L2.lastXPSource = nil
+AceM2L2.lastXPInfoTime = 0
+AceM2L2.lastChatXPAmount = nil
+AceM2L2:OnQuestTurnedIn("QUEST_TURNED_IN", 1235, 120)
+AceM2L2:HandleXPText("Defias Pillager dies, you gain 95 experience.")
+state.xp = state.xp + 120
+AceM2L2:HandlePlayerXPUpdate()
+RunTimers()
+local mixedQuestText = table.concat(DEFAULT_CHAT_FRAME.messages, "\n")
+assert(mixedQuestText:find("quests to level", 1, true),
+  "quest reward after kill chat was not labeled as quest: " .. mixedQuestText)
+assert(not mixedQuestText:find("Defias Pillager", 1, true),
+  "quest reward reused the kill creature name: " .. mixedQuestText)
+
+state.xp = savedQuestState.xp
+AceM2L2.lastXP = savedQuestState.lastXP
+AceM2L2.xpSamples = savedQuestState.samples
+AceM2L2.xpKillCounter = savedQuestState.counter
+AceM2L2.lastCreatureName = nil
+AceM2L2.lastXPSource = nil
+AceM2L2.lastXPInfoTime = 0
+AceM2L2.lastChatXPAmount = nil
+AceM2L2:ClearQuestXPWindow()
+
 module:OnTargetChanged("PLAYER_TARGET_CHANGED")
 module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "Defias Pillager dies, you gain 95 experience.")
 
@@ -745,6 +893,22 @@ module:AddTooltipLines(GameTooltip, nil)
 local noPercentText = table.concat(GameTooltip.lines, "\n")
 assert(not noPercentText:find("% of level", 1, true), "showPercent=false still rendered the percent")
 module.settings = savedTooltipSettings
+
+-- P1-7: tooltip uses data.unitToken and fails closed without a unit token.
+local savedTooltipUnitName, savedTooltipUnitToken = GameTooltip.unitName, GameTooltip.unitToken
+GameTooltip.unitName, GameTooltip.unitToken = nil, nil
+GameTooltip.lines = {}
+GameTooltip.xpTooltipSignature = nil
+module:AddTooltipLines(GameTooltip, { unitToken = "target" })
+assert(#GameTooltip.lines > 0, "tooltip did not use data.unitToken")
+SetMouseover("Defias Pillager", "Creature-0-1-2-3-1234-00000001")
+module.lastMouseover = module:CaptureUnit("mouseover")
+GameTooltip.lines = {}
+GameTooltip.xpTooltipSignature = nil
+module:AddTooltipLines(GameTooltip, { guid = "Creature-0-1-2-3-1234-99999999" })
+assert(#GameTooltip.lines == 0, "tooltip fell back to mouseover without a unit token")
+GameTooltip.unitName, GameTooltip.unitToken = savedTooltipUnitName, savedTooltipUnitToken
+module.lastMouseover = nil
 
 -- Chat first, then death: must not double count.
 module:OnUnitDied("UNIT_DIED", "Creature-0-1-2-3-1234-00000001")
@@ -900,6 +1064,28 @@ module.circuitErrors = 0
 module:SetUserEnabled(true)
 assert(module:IsActive(), "module did not recover after circuit breaker test")
 module:GetSettings().countZeroXPMobs = savedCountZero
+
+-- C6: a prune error must be reported, not escape the timer.
+local originalPrune = module.Prune
+module.Prune = function()
+  error("forced prune failure")
+end
+module.pruneScheduled = false
+module.lastError = nil
+module.circuitErrors = 0
+module:SchedulePrune()
+AdvanceTime(5)
+assert(module.pruneScheduled == false, "pruneScheduled did not reset after a prune error")
+assert(module.lastError and module.lastError:find("Prune", 1, true),
+  "prune error was not reported: " .. tostring(module.lastError))
+assert(module:IsActive(), "prune error incorrectly disabled the module")
+module.Prune = originalPrune
+module.lastError = nil
+module.circuitErrors = 0
+module:SchedulePrune()
+AdvanceTime(5)
+assert(module.pruneScheduled == false, "successful prune did not reset pruneScheduled")
+assert(module.lastError == nil, "successful prune left an error: " .. tostring(module.lastError))
 
 -- Exact GUID identity survives a long fight.
 module:ResetKills()
@@ -1061,6 +1247,33 @@ assert(not module.ui.modelHolder.shown, "model holder should hide on levels")
 assert(not module.ui.deleteButton.shown, "delete button should hide on levels")
 assert(module.ui.heroName.text ~= "", "level hero name missing")
 module:SetTab("mobs")
+-- P1-7: class-color theme guards secret class/color fields.
+local savedClassFile = state.classFile
+local savedClassColor = RAID_CLASS_COLORS.MAGE
+module:GetSettings().theme = "class"
+module.themeCacheKey = nil
+module.themeCache = nil
+local classTheme = module:GetTheme()
+assert(classTheme.accent and math.abs(classTheme.accent[1] - savedClassColor.r) < 0.001,
+  "class theme accent mismatch")
+state.classFile = SECRET
+module.themeCacheKey = nil
+module.themeCache = nil
+local secretClassTheme = module:GetTheme()
+assert(secretClassTheme.accent and type(secretClassTheme.accent[1]) == "number",
+  "secret class token produced a non-numeric accent")
+state.classFile = savedClassFile
+RAID_CLASS_COLORS.MAGE = { r = SECRET, g = SECRET, b = SECRET }
+module.themeCacheKey = nil
+module.themeCache = nil
+local secretColorTheme = module:GetTheme()
+assert(secretColorTheme.accent and type(secretColorTheme.accent[1]) == "number",
+  "secret class color produced a non-numeric accent")
+RAID_CLASS_COLORS.MAGE = savedClassColor
+module:GetSettings().theme = "aether"
+module.themeCacheKey = nil
+module.themeCache = nil
+
 module:HandleCommand("theme midnight")
 assert(module:GetSettings().theme == "midnight", "theme command failed")
 module:HandleCommand("scale 90")
@@ -1395,6 +1608,9 @@ deleteDB.mobs["name:unknown"] = {
   name = "Unknown",
   kills = 2,
   sessionKills = 2,
+  totalXP = 200,
+  sessionXP = 200,
+  sessionXPKnown = true,
   killsAtLevel = { ["10"] = 2 },
   killsByMap = { ["12"] = 2 },
   contexts = {},
@@ -1408,6 +1624,9 @@ deleteDB.mobs["npc:66666"] = {
   npcID = 66666,
   kills = 1,
   sessionKills = 1,
+  totalXP = 100,
+  sessionXP = 100,
+  sessionXPKnown = true,
   killsAtLevel = { ["10"] = 1 },
   killsByMap = { ["12"] = 1 },
   contexts = {},
@@ -1433,6 +1652,250 @@ assert((tonumber(deleteDB.areas["12"]) or 0) == unknownBase.area, "Unknown delet
 assert((tonumber(deleteDB.session.kills) or 0) == unknownBase.sessionKills, "Unknown delete did not restore session kills")
 assert((tonumber(deleteDB.session.xp) or 0) == unknownBase.sessionXP, "Unknown delete did not restore session XP")
 assert((tonumber(deleteDB.totals.uniqueMobs) or 0) == unknownBase.unique, "Unknown delete did not restore unique mob count")
+
+-- Aggregate invariant helper for controlled accounting fixtures.
+local function AssertAggregateInvariant(label)
+  local db = module.char
+  local kills, xp, sessionKills, sessionXP, unique = 0, 0, 0, 0, 0
+  local levels, areas, areaLevels = {}, {}, {}
+  for _, mob in pairs(db.mobs or {}) do
+    if type(mob) == "table" then
+      unique = unique + 1
+      kills = kills + (tonumber(mob.kills) or 0)
+      xp = xp + (tonumber(mob.totalXP) or 0)
+      sessionKills = sessionKills + (tonumber(mob.sessionKills) or 0)
+      sessionXP = sessionXP + (tonumber(mob.sessionXP) or 0)
+      for key, value in pairs(mob.killsAtLevel or {}) do
+        levels[key] = (levels[key] or 0) + (tonumber(value) or 0)
+      end
+      for key, value in pairs(mob.killsByMap or {}) do
+        areas[key] = (areas[key] or 0) + (tonumber(value) or 0)
+      end
+      for mapKey, byLevel in pairs(mob.killsByAreaLevel or {}) do
+        if type(byLevel) == "table" then
+          areaLevels[mapKey] = areaLevels[mapKey] or {}
+          for levelKey, value in pairs(byLevel) do
+            areaLevels[mapKey][levelKey] = (areaLevels[mapKey][levelKey] or 0) + (tonumber(value) or 0)
+          end
+        end
+      end
+    end
+  end
+  assert((tonumber(db.totals.kills) or 0) == kills, label .. ": total kills mismatch")
+  assert((tonumber(db.totals.xp) or 0) == xp, label .. ": total XP mismatch")
+  assert((tonumber(db.session.kills) or 0) == sessionKills, label .. ": session kills mismatch")
+  assert((tonumber(db.session.xp) or 0) == sessionXP, label .. ": session XP mismatch")
+  assert((tonumber(db.totals.uniqueMobs) or 0) == unique, label .. ": unique mobs mismatch")
+  for key, value in pairs(levels) do
+    assert((tonumber(db.levels[key]) or 0) == value, label .. ": level " .. tostring(key) .. " mismatch")
+  end
+  for key, value in pairs(areas) do
+    assert((tonumber(db.areas[key]) or 0) == value, label .. ": area " .. tostring(key) .. " mismatch")
+  end
+  for mapKey, byLevel in pairs(areaLevels) do
+    for levelKey, value in pairs(byLevel) do
+      local actual = db.areaLevels[mapKey] and tonumber(db.areaLevels[mapKey][levelKey]) or 0
+      assert(actual == value,
+        label .. ": area-level " .. tostring(mapKey) .. "/" .. tostring(levelKey) .. " mismatch")
+    end
+  end
+end
+
+-- P1-1: prune must subtract every removed entry from aggregates.
+module:ResetKills()
+local pruneDB = module.char
+local pruneTotal = 2002
+for index = 1, pruneTotal do
+  local key = string.format("npc:%05d", index)
+  pruneDB.mobs[key] = {
+    name = "Prune Mob " .. tostring(index),
+    npcID = index,
+    classification = "normal",
+    kills = 1,
+    sessionKills = 1,
+    totalXP = 95,
+    sessionXP = 95,
+    sessionXPKnown = true,
+    killsAtLevel = { ["10"] = 1 },
+    killsByMap = { ["12"] = 1 },
+    killsByAreaLevel = { ["12"] = { ["10"] = 1 } },
+    contexts = {},
+    xp = { samples = 1, sumBase = 95, sumBuffed = 95, sumTotal = 95, minBase = 95, maxBase = 95, lastBase = 95, lastTotal = 95 },
+    firstSeen = 1,
+    lastSeen = 1,
+  }
+end
+pruneDB.totals = { kills = pruneTotal, xp = pruneTotal * 95, uniqueMobs = pruneTotal }
+pruneDB.session = { startedAt = 1, kills = pruneTotal, xp = pruneTotal * 95 }
+pruneDB.levels = { ["10"] = pruneTotal }
+pruneDB.areas = { ["12"] = pruneTotal }
+pruneDB.areaLevels = { ["12"] = { ["10"] = pruneTotal } }
+AssertAggregateInvariant("prune setup")
+module:Prune()
+assert((tonumber(pruneDB.totals.uniqueMobs) or 0) == 2000, "prune did not cap the mob table")
+assert(pruneDB.mobs["npc:00001"] == nil and pruneDB.mobs["npc:00002"] == nil,
+  "prune eviction was not deterministic")
+assert(pruneDB.mobs["npc:00003"] ~= nil, "prune removed too many entries")
+AssertAggregateInvariant("after prune")
+module:ResetKills()
+
+-- P1-1/P1-2: deleting a mob must not invent session XP.
+module:ResetKills()
+local sessionDB = module.char
+sessionDB.mobs["npc:90001"] = {
+  name = "Unknown Session XP",
+  npcID = 90001,
+  classification = "normal",
+  kills = 3,
+  sessionKills = 2,
+  totalXP = 300,
+  sessionXP = 0,
+  sessionXPKnown = false,
+  killsAtLevel = { ["10"] = 3 },
+  killsByMap = { ["12"] = 3 },
+  killsByAreaLevel = { ["12"] = { ["10"] = 3 } },
+  contexts = {},
+  xp = { samples = 0, sumBase = 0, sumBuffed = 0, sumTotal = 0, minBase = 0, maxBase = 0, lastBase = 0, lastTotal = 0 },
+  firstSeen = 1,
+  lastSeen = 1,
+}
+sessionDB.mobs["npc:90002"] = {
+  name = "Known Session XP",
+  npcID = 90002,
+  classification = "normal",
+  kills = 1,
+  sessionKills = 1,
+  totalXP = 100,
+  sessionXP = 100,
+  sessionXPKnown = true,
+  killsAtLevel = { ["10"] = 1 },
+  killsByMap = { ["12"] = 1 },
+  killsByAreaLevel = { ["12"] = { ["10"] = 1 } },
+  contexts = {},
+  xp = { samples = 1, sumBase = 100, sumBuffed = 100, sumTotal = 100, minBase = 100, maxBase = 100, lastBase = 100, lastTotal = 100 },
+  firstSeen = 1,
+  lastSeen = 1,
+}
+sessionDB.totals = { kills = 4, xp = 400, uniqueMobs = 2 }
+sessionDB.session = { startedAt = 1, kills = 3, xp = 100 }
+sessionDB.levels = { ["10"] = 4 }
+sessionDB.areas = { ["12"] = 4 }
+sessionDB.areaLevels = { ["12"] = { ["10"] = 4 } }
+AssertAggregateInvariant("session XP setup")
+module:RemoveMobEntry("npc:90001")
+assert((tonumber(sessionDB.session.xp) or 0) == 100, "delete invented session XP")
+assert((tonumber(sessionDB.totals.xp) or 0) == 100, "delete did not subtract lifetime XP")
+AssertAggregateInvariant("after session XP delete")
+module:ResetKills()
+
+-- P1-3: overlapping merge uses count winner for counts and sample source for XP.
+module:ResetKills()
+local mergeDB = module.char
+mergeDB.mobs["name:merge disjoint"] = {
+  name = "Merge Disjoint",
+  kills = 10,
+  sessionKills = 0,
+  totalXP = 1000,
+  sessionXP = 0,
+  sessionXPKnown = false,
+  killsAtLevel = { ["10"] = 10 },
+  killsByMap = { ["12"] = 10 },
+  killsByAreaLevel = { ["12"] = { ["10"] = 10 } },
+  contexts = {},
+  xp = { samples = 0, sumBase = 0, sumBuffed = 0, sumTotal = 0, minBase = 0, maxBase = 0, lastBase = 0, lastTotal = 0 },
+  firstSeen = 100,
+  lastSeen = 200,
+  classification = "normal",
+}
+mergeDB.mobs["npc:91001"] = {
+  name = "Merge Disjoint",
+  npcID = 91001,
+  kills = 10,
+  sessionKills = 0,
+  totalXP = 1000,
+  sessionXP = 0,
+  sessionXPKnown = false,
+  killsAtLevel = { ["11"] = 10 },
+  killsByMap = { ["12"] = 10 },
+  killsByAreaLevel = { ["12"] = { ["11"] = 10 } },
+  contexts = {},
+  xp = { samples = 0, sumBase = 0, sumBuffed = 0, sumTotal = 0, minBase = 0, maxBase = 0, lastBase = 0, lastTotal = 0 },
+  firstSeen = 150,
+  lastSeen = 250,
+  classification = "normal",
+}
+mergeDB.totals = { kills = 20, xp = 2000, uniqueMobs = 2 }
+mergeDB.session = { startedAt = 1, kills = 0, xp = 0 }
+mergeDB.levels = { ["10"] = 10, ["11"] = 10 }
+mergeDB.areas = { ["12"] = 20 }
+mergeDB.areaLevels = { ["12"] = { ["10"] = 10, ["11"] = 10 } }
+AssertAggregateInvariant("merge disjoint setup")
+module:MergeMobEntries("name:merge disjoint", "npc:91001", true)
+local mergedDisjoint = mergeDB.mobs["npc:91001"]
+assert(mergeDB.mobs["name:merge disjoint"] == nil, "overlapping merge kept the name-only entry")
+assert(mergedDisjoint and mergedDisjoint.kills == 10, "overlapping merge kill count mismatch")
+assert((tonumber(mergeDB.levels["10"]) or 0) == 0, "overlapping merge kept losing level counts")
+assert((tonumber(mergeDB.levels["11"]) or 0) == 10, "overlapping merge lost winner level counts")
+assert((tonumber(mergeDB.areas["12"]) or 0) == 10, "overlapping merge area count mismatch")
+assert((tonumber(mergeDB.areaLevels["12"]["11"]) or 0) == 10,
+  "overlapping merge winner joint count mismatch")
+assert((tonumber(mergeDB.areaLevels["12"]["10"]) or 0) == 0,
+  "overlapping merge kept losing joint counts")
+AssertAggregateInvariant("merge disjoint levels")
+
+module:ResetKills()
+mergeDB = module.char
+mergeDB.mobs["name:merge samples"] = {
+  name = "Merge Samples",
+  kills = 5,
+  sessionKills = 5,
+  totalXP = 800,
+  sessionXP = 800,
+  sessionXPKnown = true,
+  killsAtLevel = { ["10"] = 5 },
+  killsByMap = { ["12"] = 5 },
+  killsByAreaLevel = { ["12"] = { ["10"] = 5 } },
+  contexts = {},
+  xp = { samples = 5, sumBase = 800, sumBuffed = 800, sumTotal = 800, minBase = 160, maxBase = 160, lastBase = 160, lastTotal = 160 },
+  firstSeen = 100,
+  lastSeen = 200,
+  classification = "normal",
+}
+mergeDB.mobs["npc:91002"] = {
+  name = "Merge Samples",
+  npcID = 91002,
+  kills = 5,
+  sessionKills = 5,
+  totalXP = 700,
+  sessionXP = 700,
+  sessionXPKnown = true,
+  killsAtLevel = { ["10"] = 5 },
+  killsByMap = { ["12"] = 5 },
+  killsByAreaLevel = { ["12"] = { ["10"] = 5 } },
+  contexts = {},
+  xp = { samples = 5, sumBase = 700, sumBuffed = 700, sumTotal = 700, minBase = 140, maxBase = 140, lastBase = 140, lastTotal = 140 },
+  firstSeen = 150,
+  lastSeen = 250,
+  classification = "normal",
+}
+mergeDB.totals = { kills = 10, xp = 1500, uniqueMobs = 2 }
+mergeDB.session = { startedAt = 1, kills = 10, xp = 1500 }
+mergeDB.levels = { ["10"] = 10 }
+mergeDB.areas = { ["12"] = 10 }
+mergeDB.areaLevels = { ["12"] = { ["10"] = 10 } }
+AssertAggregateInvariant("merge samples setup")
+module:MergeMobEntries("name:merge samples", "npc:91002", true)
+local mergedSamples = mergeDB.mobs["npc:91002"]
+assert(mergedSamples and mergedSamples.kills == 5, "sample merge kill count mismatch")
+assert((tonumber(mergedSamples.totalXP) or 0) == 800, "sample merge total XP mismatch")
+assert((tonumber(mergedSamples.sessionXP) or 0) == 800, "sample merge session XP mismatch")
+assert((tonumber(mergedSamples.xp.samples) or 0) == 5, "sample merge lost samples")
+assert((tonumber(mergedSamples.xp.sumTotal) or 0) == 800, "sample merge xp.sumTotal mismatch")
+assert(mergedSamples.sessionXPKnown == true, "sample merge lost sessionXPKnown")
+assert((tonumber(mergeDB.totals.xp) or 0) == 800, "sample merge aggregate XP mismatch")
+assert((tonumber(mergeDB.session.xp) or 0) == 800, "sample merge session aggregate XP mismatch")
+AssertAggregateInvariant("merge sample-rich overlap")
+module:ResetKills()
 
 -- Command and settings fallback regressions.
 assert(pcall(function() module:HandleCommand("kills Defias") end), "filtered kills command failed")
@@ -1604,10 +2067,23 @@ assert(migrated.clients[18].mobs["npc:4242"].contexts["p10-m10-g1-z12-cnormal-bn
 assert(migrated.clients[18].calibration.zones["12"].samples == 3, "legacy calibration was lost")
 assert(migrated.clients[18].areaLevels["12"]["10"] == 7, "legacy area-level counts were lost")
 
--- Running migration again must be idempotent.
+-- P1-5: migration keeps a one-time recoverable snapshot outside accounting.
+assert(module:HasMigrationBackup(), "migration backup was not created")
+local migrationBackup = module:GetMigrationBackup()
+assert(migrationBackup.createdAt and migrationBackup.createdAt > 0, "migration backup timestamp missing")
+assert(migrationBackup.data.mobs["npc:4242"].kills == 7, "migration backup lost legacy kills")
+assert(migrationBackup.data.totals.kills == 7, "migration backup lost legacy totals")
+assert(tonumber(migrated.clients[18].totals.kills) == 7, "migration backup affected accounting")
+
+-- Running migration again must be idempotent and must not replace the backup.
+local backupAt = migrationBackup.createdAt
 module:EnsureDB()
 assert(AceM2L2CharDB.xpTooltip.clients[18].mobs["npc:4242"].kills == 7,
   "migration was not idempotent")
+assert(module:GetMigrationBackup() == migrationBackup, "migration backup was replaced")
+assert(module:GetMigrationBackup().createdAt == backupAt, "migration backup timestamp changed")
+assert(module:GetMigrationBackup().data.mobs["npc:4242"].kills == 7,
+  "migration backup data changed on repeated migration")
 
 -- Root data must never be merged into an existing clients table.
 migrated.mobs = { ["npc:4243"] = { name = "Root Only", kills = 99 } }
@@ -1630,6 +2106,81 @@ AceM2L2CharDB.xpTooltip = savedRoot
 module:EnsureDB()
 assert(module.char == AceM2L2CharDB.xpTooltip.clients[18], "data namespace was not restored")
 
+-- P1-4: future storage schema is blocked before migration and left untouched.
+local savedSchemaRoot = AceM2L2CharDB.xpTooltip
+local futureStorage = {
+  storageSchema = 3,
+  clients = {
+    [18] = {
+      dataSchema = 2,
+      calibrationVersion = 99,
+      mobs = { ["npc:70001"] = { name = "Future Storage", kills = 5, contexts = { ["ctx"] = { samples = 1 } } } },
+    },
+  },
+}
+AceM2L2CharDB.xpTooltip = futureStorage
+module.char = nil
+module:EnsureDB()
+assert(module.schemaBlocked == true, "future storage schema was not blocked")
+assert(module.schemaBlockedReason:find("storage", 1, true), "storage block reason mismatch")
+assert(futureStorage.storageSchema == 3, "future storage schema was rewritten")
+assert(futureStorage.clients[18].dataSchema == 2, "future data schema was rewritten")
+assert(futureStorage.clients[18].mobs["npc:70001"].kills == 5, "future storage data was mutated")
+assert(module.char ~= futureStorage.clients[18], "future data was used as writable char")
+assert(next(module.char.mobs) == nil, "blocked client exposed writable data")
+assert(module:GetStatusText():find("blocked", 1, true), "status did not report schema block")
+assert(pcall(function() module:HandleCommand("status") end), "blocked status command failed")
+assert(pcall(function() module:HandleCommand("probe") end), "blocked probe command failed")
+
+-- P1-4: future client data schema is read-only and does not clear contexts.
+local futureData = {
+  storageSchema = 2,
+  clients = {
+    [18] = {
+      dataSchema = 2,
+      calibrationVersion = 2,
+      mobs = { ["npc:70002"] = { name = "Future Data", kills = 3, contexts = { ["ctx"] = { samples = 1 } } } },
+    },
+  },
+}
+AceM2L2CharDB.xpTooltip = futureData
+module.char = nil
+module:EnsureDB()
+assert(module.schemaBlocked == true, "future data schema was not blocked")
+assert(module.schemaBlockedReason:find("data", 1, true), "data block reason mismatch")
+assert(futureData.clients[18].dataSchema == 2, "future data schema was rewritten")
+assert(futureData.clients[18].mobs["npc:70002"].contexts["ctx"],
+  "future data schema contexts were cleared")
+assert(module.char ~= futureData.clients[18], "future data was used as writable char")
+
+-- P1-4: future calibration version does not clear exact contexts.
+local futureCalibration = {
+  storageSchema = 2,
+  clients = {
+    [18] = {
+      dataSchema = 1,
+      calibrationVersion = 99,
+      calibration = { zones = {}, levels = {}, groups = {}, classes = {}, mobs = {} },
+      mobs = { ["npc:70003"] = { name = "Future Calibration", kills = 1, contexts = { ["ctx"] = { samples = 1 } } } },
+    },
+  },
+}
+AceM2L2CharDB.xpTooltip = futureCalibration
+module.char = nil
+module:EnsureDB()
+assert(module.schemaBlocked == true, "future calibration version was not blocked")
+assert(module.schemaBlockedReason:find("calibration", 1, true), "calibration block reason mismatch")
+assert(futureCalibration.clients[18].calibrationVersion == 99,
+  "future calibration version was rewritten")
+assert(futureCalibration.clients[18].mobs["npc:70003"].contexts["ctx"],
+  "future calibration version cleared contexts")
+
+AceM2L2CharDB.xpTooltip = savedSchemaRoot
+module.char = nil
+module:EnsureDB()
+assert(not module.schemaBlocked, "schema block was not cleared after restore")
+assert(module.char == AceM2L2CharDB.xpTooltip.clients[18], "schema restore did not select client data")
+
 else
   local function RunMidnightChecks()
     assert(module:IsActive(), "Midnight Kill History should be active")
@@ -1648,6 +2199,31 @@ else
       "Midnight should not expose player XP state through the capability-gated helpers")
     assert(next(module.char.calibration.zones) == nil, "Midnight calibration should start empty")
     assert(next(module.char.calibration.mobs) == nil, "Midnight mob calibration should start empty")
+
+    -- P1-6: GUID/boolean eligibility matrix.
+    local eligibilityGUID = "Creature-0-1-2-3-1234-00000001"
+    SetTarget("Enemy Player", "Player-1-00000002")
+    SetTargetFlags({})
+    assert(not module:CaptureUnit("target"), "Midnight accepted a Player-* GUID")
+    SetTarget("Pet", "Pet-0-1234-5678")
+    assert(not module:CaptureUnit("target"), "Midnight accepted a Pet-* GUID")
+    SetTarget("Defias Pillager", eligibilityGUID)
+    SetTargetFlags({})
+    if config.secretIdentity then
+      assert(not module:CaptureUnit("target"), "secret identity was captured")
+    else
+      assert(module:CaptureUnit("target"), "Midnight rejected a readable creature")
+      if not config.secretBooleans then
+        SetTargetFlags({ controlled = true })
+        assert(not module:CaptureUnit("target"), "Midnight accepted a controlled creature")
+        SetTargetFlags({ canAttack = false })
+        assert(not module:CaptureUnit("target"), "Midnight accepted an unattackable creature")
+        SetTargetFlags({ isPlayer = true })
+        assert(not module:CaptureUnit("target"), "Midnight accepted UnitIsPlayer=true")
+      end
+    end
+    SetTargetFlags({})
+    SetTarget("Defias Pillager", eligibilityGUID)
 
     if config.missingTooltip then
       assert(not module.tooltipHookInstalled, "missing tooltip hook should stay uninstalled")

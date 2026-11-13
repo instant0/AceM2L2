@@ -103,16 +103,18 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
     end
   end
   if not unit and data then
-    local guid = SafeString(data.guid)
-    if guid and self.lastTarget and self.lastTarget.guid == guid then
-      unit = "target"
-    elseif guid and self.lastMouseover and self.lastMouseover.guid == guid then
-      unit = "mouseover"
+    unit = SafeString(data.unitToken) or SafeString(data.unit)
+    if not unit then
+      local guid = SafeString(data.guid)
+      if guid and self.lastTarget and self.lastTarget.guid == guid then
+        unit = "target"
+      elseif guid and self.lastMouseover and self.lastMouseover.guid == guid then
+        unit = "mouseover"
+      end
     end
   end
-  if not unit and SafeBool(SafeCall(UnitExists, "mouseover")) then
-    unit = "mouseover"
-  end
+  -- Do not fall back to mouseover when the tooltip unit is unknown. Showing
+  -- mouseover counts on a target tooltip is worse than showing no line.
   if not self:IsTooltipCandidate(unit) then
     return
   end

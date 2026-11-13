@@ -96,6 +96,7 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
   if totalXP and supportsPerMobXP then
     mob.totalXP = (tonumber(mob.totalXP) or 0) + totalXP
     mob.sessionXP = (tonumber(mob.sessionXP) or 0) + totalXP
+    mob.sessionXPKnown = true
     db.totals.xp = (tonumber(db.totals.xp) or 0) + totalXP
     db.session.xp = (tonumber(db.session.xp) or 0) + totalXP
   end
@@ -137,6 +138,7 @@ function XPTooltip:AddKillXP(entry, info, totalXP, rawBase, buffedXP, skipObserv
 
   mob.totalXP = (tonumber(mob.totalXP) or 0) + totalXP
   mob.sessionXP = (tonumber(mob.sessionXP) or 0) + totalXP
+  mob.sessionXPKnown = true
   mob.lastSeen = Epoch()
   db.totals.xp = (tonumber(db.totals.xp) or 0) + totalXP
   db.session.xp = (tonumber(db.session.xp) or 0) + totalXP
@@ -158,7 +160,7 @@ function XPTooltip:AddKillXP(entry, info, totalXP, rawBase, buffedXP, skipObserv
   return true
 end
 
-function XPTooltip:QueueUnidentifiedKill(info, totalXP, rawBase, buffedXP, skipObservation)
+function XPTooltip:QueueUnidentifiedKill(info, totalXP, rawBase, buffedXP, skipObservation, ambiguousQuest)
   if not self.pendingChatXP then
     self.pendingChatXP = {}
   end
@@ -176,6 +178,7 @@ function XPTooltip:QueueUnidentifiedKill(info, totalXP, rawBase, buffedXP, skipO
     generation = self.dataGeneration,
     consumed = false,
     canceled = false,
+    ambiguousQuest = ambiguousQuest and true or false,
   }
   self.pendingChatXP[#self.pendingChatXP + 1] = entry
   if self.settings and self.settings.debug then
@@ -235,6 +238,13 @@ function XPTooltip:CommitUnidentifiedKill(entry)
     return
   end
   local info = entry.info or { name = "Unknown" }
+  if entry.ambiguousQuest and (not info.name or info.name == "Unknown") then
+    if self.settings and self.settings.debug then
+      AceM2L2:SafePrint("Kill History: ambiguous quest/unnamed XP had no death identity; suppressed.")
+    end
+    self.lastPool = self:GetRestedPool()
+    return
+  end
   info.playerLevel = info.playerLevel or self:GetPlayerLevel() or 1
   info.level = info.level or info.playerLevel
   info.classification = info.classification or "normal"
@@ -383,11 +393,12 @@ function XPTooltip:HandleXPChat(message)
     return
   end
 
-  local name, total, key = AceM2L2:ParseXPMessage(message)
+  local name, total, key, ambiguousQuest = AceM2L2:ParseXPMessage(message)
   if not key or not total or total <= 0 then
     return
   end
-  if key:find("_QUEST", 1, true) then
+  local questWindow = AceM2L2.IsQuestXPWindowActive and AceM2L2:IsQuestXPWindowActive()
+  if key:find("_QUEST", 1, true) or (ambiguousQuest and questWindow) then
     return
   end
 
@@ -404,6 +415,41 @@ function XPTooltip:HandleXPChat(message)
   -- expose the base/rested split. The total already includes rested, so only
   -- non-rested observations are clean.
   local skipObservation = (poolAfter > 0) or (poolBefore > poolAfter) or (not buffDetection)
+
+  if ambiguousQuest then
+    -- A quest and unnamed-kill format can be identical. Without a quest
+    -- turn-in signal, wait for UNIT_DIED: if no death identifies the mob, the
+    -- pending entry is suppressed instead of becoming an Unknown kill.
+    local playerLevel = self:GetPlayerLevel() or 1
+    local groupSize = self:GetGroupSize()
+    local mapID = self:GetMapID()
+    local buffSignature = self:GetBuffSignature()
+    if buffSignature ~= "none" then
+      skipObservation = true
+    end
+    if groupSize > 1 then
+      skipObservation = true
+    end
+    if not self:CanReadRested() then
+      skipObservation = true
+    end
+    local info = {
+      name = nil,
+      playerLevel = playerLevel,
+      level = playerLevel,
+      classification = "normal",
+      groupSize = groupSize,
+      mapID = mapID,
+      buffSignature = buffSignature,
+      contextKey = ContextKey(
+        playerLevel, playerLevel, groupSize, mapID, "normal", buffSignature
+      ),
+      at = now,
+    }
+    self.lastPool = poolAfter
+    self:QueueUnidentifiedKill(info, total, rawBase, buffedXP, skipObservation, true)
+    return
+  end
 
   local source, mode = self:FindKillInfo(name, now)
   if mode == "duplicate" then
