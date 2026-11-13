@@ -366,10 +366,7 @@ function XPTooltip:ResetKills()
   if not db then
     return
   end
-  self.dataGeneration = (self.dataGeneration or 0) + 1
-  self.pendingDeaths = {}
-  self.recentChatKills = {}
-  self.pendingChatXP = {}
+  self:InvalidatePendingWork("reset kills", false)
   db.mobs = {}
   db.areas = {}
   db.levels = {}
@@ -383,7 +380,8 @@ function XPTooltip:ResetKills()
 end
 
 function XPTooltip:DeleteMobEntry(mobKey)
-  self.dataGeneration = (self.dataGeneration or 0) + 1
+  self:InvalidatePendingWork("delete mob", false)
+  self:MarkMobDeleted(mobKey)
   local name, kills = self:RemoveMobEntry(mobKey)
   if not name then
     AceM2L2:SafePrint("Kill History: that entry no longer exists.")
@@ -439,8 +437,9 @@ function XPTooltip:DeleteMobByName(name, confirm)
   end
 
   local removed, kills = 0, 0
-  self.dataGeneration = (self.dataGeneration or 0) + 1
+  self:InvalidatePendingWork("delete mob by name", false)
   for _, match in ipairs(matches) do
+    self:MarkMobDeleted(match.key)
     local removedName, removedKills = self:RemoveMobEntry(match.key, true)
     if removedName then
       removed = removed + 1
@@ -476,8 +475,9 @@ function XPTooltip:DeleteUnknownEntries()
   end
 
   local removed, kills = 0, 0
-  self.dataGeneration = (self.dataGeneration or 0) + 1
+  self:InvalidatePendingWork("delete unknown entries", false)
   for _, mobKey in ipairs(keys) do
+    self:MarkMobDeleted(mobKey)
     local removedName, removedKills = self:RemoveMobEntry(mobKey, true)
     if removedName then
       removed = removed + 1

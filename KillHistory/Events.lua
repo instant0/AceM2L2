@@ -215,6 +215,7 @@ function XPTooltip:Prune()
       if mobCount <= MAX_MOBS then
         break
       end
+      self:MarkMobDeleted(entry.key)
       db.mobs[entry.key] = nil
       if db.calibration and db.calibration.mobs then
         db.calibration.mobs[entry.key] = nil
@@ -235,6 +236,7 @@ function XPTooltip:Prune()
       if mobCount <= MAX_MOBS then
         break
       end
+      self:MarkMobDeleted(entry.key)
       db.mobs[entry.key] = nil
       if db.calibration and db.calibration.mobs then
         db.calibration.mobs[entry.key] = nil

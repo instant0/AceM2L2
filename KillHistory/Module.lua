@@ -91,6 +91,7 @@ function XPTooltip:OnInitialize()
   self.pendingDeaths = {}
   self.recentChatKills = {}
   self.pendingChatXP = {}
+  self.deletedMobKeys = {}
   self.lastXP = nil
   self.lastPool = nil
   self.poolBeforeKill = nil
@@ -118,18 +119,35 @@ function XPTooltip:OnEnable()
   end
 end
 
+function XPTooltip:InvalidatePendingWork(reason, full)
+  self.dataGeneration = (self.dataGeneration or 0) + 1
+  for _, entry in ipairs(self.pendingChatXP or {}) do
+    entry.canceled = true
+  end
+  for _, entry in ipairs(self.pendingDeaths or {}) do
+    entry.expired = true
+  end
+  self.pendingDeaths = {}
+  self.recentChatKills = {}
+  self.pendingChatXP = {}
+  if full then
+    self.lastTarget = nil
+    self.lastMouseover = nil
+    self.poolBeforeKill = nil
+    self.deletedMobKeys = {}
+  end
+  if reason and self.settings and self.settings.debug then
+    AceM2L2:SafePrint("Kill History: pending work invalidated (" .. tostring(reason) .. ")")
+  end
+end
+
 function XPTooltip:OnDisable()
   self.active = false
   if self.installed then
     pcall(self.UnregisterAllEvents, self)
     self.installed = false
   end
-  for _, entry in ipairs(self.pendingChatXP or {}) do
-    entry.canceled = true
-  end
-  self.pendingDeaths = {}
-  self.recentChatKills = {}
-  self.pendingChatXP = {}
+  self:InvalidatePendingWork("module disabled", true)
   self:CloseUI()
   self:HideMinimapIcon()
 end
@@ -142,6 +160,7 @@ function XPTooltip:Refresh()
     self.active = false
     self.autoDisabled = true
     self.autoDisableReason = "settings unavailable"
+    self:InvalidatePendingWork("settings unavailable", true)
     return
   end
 
@@ -157,6 +176,7 @@ function XPTooltip:Refresh()
       pcall(self.UnregisterAllEvents, self)
       self.installed = false
     end
+    self:InvalidatePendingWork("unsupported client", true)
     self:CloseUI()
     self:HideMinimapIcon()
     return
@@ -171,6 +191,7 @@ function XPTooltip:Refresh()
       pcall(self.UnregisterAllEvents, self)
       self.installed = false
     end
+    self:InvalidatePendingWork("user disabled", true)
     self:CloseUI()
     self:HideMinimapIcon()
     return
@@ -259,6 +280,7 @@ function XPTooltip:ReportError(context, err, countTowardCircuit)
     self.autoDisableReason = "handler errors"
     pcall(self.UnregisterAllEvents, self)
     self.installed = false
+    self:InvalidatePendingWork("handler errors", true)
     self:CloseUI()
     self:HideMinimapIcon()
   end

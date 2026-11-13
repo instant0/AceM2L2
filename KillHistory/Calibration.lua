@@ -243,10 +243,7 @@ function XPTooltip:ResetObservations()
   if not db then
     return
   end
-  self.dataGeneration = (self.dataGeneration or 0) + 1
-  self.pendingDeaths = {}
-  self.recentChatKills = {}
-  self.pendingChatXP = {}
+  self:InvalidatePendingWork("reset observations", false)
   for _, mob in pairs(db.mobs) do
     if type(mob) == "table" then
       mob.contexts = {}
@@ -264,10 +261,7 @@ function XPTooltip:ResetCalibration()
   if not db then
     return
   end
-  self.dataGeneration = (self.dataGeneration or 0) + 1
-  self.pendingDeaths = {}
-  self.recentChatKills = {}
-  self.pendingChatXP = {}
+  self:InvalidatePendingWork("reset calibration", false)
   -- Aggregate calibration only; exact per-mob observations are cleared by
   -- ResetObservations, not by recalibrate.
   db.calibration = { zones = {}, levels = {}, groups = {}, classes = {}, mobs = {} }

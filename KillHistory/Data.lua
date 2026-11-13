@@ -62,11 +62,15 @@ end
 function XPTooltip:EnsureDB()
   local root = self:MigrateDB()
   local projectID = self:GetProjectID()
+  if self.dataProjectID and self.dataProjectID ~= projectID then
+    self:InvalidatePendingWork("client switch", true)
+  end
   local db = root.clients[projectID]
   if type(db) ~= "table" then
     db = {}
     root.clients[projectID] = db
   end
+  self.dataProjectID = projectID
 
   -- Preserve a newer schema written by a future build instead of silently
   -- downgrading it. Version 1 has no migration steps yet.

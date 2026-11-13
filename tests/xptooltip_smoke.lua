@@ -54,21 +54,6 @@ function issecretvalue(value)
   return value == SECRET
 end
 
-local timers = {}
-C_Timer = {
-  After = function(delay, fn)
-    timers[#timers + 1] = fn
-  end,
-}
-
-local function RunTimers()
-  local pending = timers
-  timers = {}
-  for _, fn in ipairs(pending) do
-    fn()
-  end
-end
-
 local state = {
   xp = 0,
   xpMax = 7600,
@@ -82,6 +67,86 @@ local state = {
   tapped = false,
   critter = false,
 }
+
+state.targetName = "Defias Pillager"
+state.targetGUID = "Creature-0-1-2-3-1234-00000001"
+state.mouseoverName = nil
+state.mouseoverGUID = nil
+state.targetClassification = "normal"
+
+local DEFAULT_CREATURE_GUID = "Creature-0-1-2-3-1234-00000001"
+
+local function SetTarget(name, guid, level, classification)
+  state.targetName = name or "Defias Pillager"
+  state.targetGUID = guid or DEFAULT_CREATURE_GUID
+  state.targetLevel = level or 10
+  state.targetClassification = classification or "normal"
+end
+
+local function SetMouseover(name, guid, level, classification)
+  state.mouseoverName = name
+  state.mouseoverGUID = guid
+  state.mouseoverLevel = level
+  state.mouseoverClassification = classification
+end
+
+local timers = {}
+local nextTimerID = 0
+C_Timer = {
+  After = function(delay, fn)
+    nextTimerID = nextTimerID + 1
+    timers[#timers + 1] = {
+      runAt = state.now + (tonumber(delay) or 0),
+      id = nextTimerID,
+      fn = fn,
+    }
+  end,
+}
+
+local function SortTimers()
+  table.sort(timers, function(a, b)
+    if a.runAt == b.runAt then
+      return a.id < b.id
+    end
+    return a.runAt < b.runAt
+  end)
+end
+
+-- Existing tests use this to run every queued callback immediately. It must
+-- not advance the clock.
+local function RunTimers()
+  SortTimers()
+  local pending = timers
+  timers = {}
+  for _, timer in ipairs(pending) do
+    timer.fn()
+  end
+end
+
+-- Run timers due within `delta` seconds, invoking each callback with the clock
+-- set to that timer's own runAt. This lets callbacks read Now() accurately.
+local function AdvanceTime(delta)
+  local target = state.now + (tonumber(delta) or 0)
+  SortTimers()
+  while true do
+    local index
+    for i, timer in ipairs(timers) do
+      if timer.runAt <= target then
+        index = i
+        break
+      end
+    end
+    if not index then
+      break
+    end
+    local timer = table.remove(timers, index)
+    state.now = timer.runAt
+    timer.fn()
+  end
+  state.now = target
+  SortTimers()
+end
+
 
 function GetTime()
   return state.now
@@ -115,6 +180,9 @@ function UnitLevel(unit)
   if unit == "player" then
     return state.playerLevel
   end
+  if unit == "mouseover" then
+    return state.mouseoverLevel or state.targetLevel
+  end
   return state.targetLevel
 end
 
@@ -125,7 +193,10 @@ function UnitName(unit)
   if config.secretIdentity or config.secretName then
     return SECRET
   end
-  return "Defias Pillager", nil
+  if unit == "mouseover" then
+    return state.mouseoverName or state.targetName
+  end
+  return state.targetName or "Defias Pillager", nil
 end
 
 function UnitGUID(unit)
@@ -135,11 +206,17 @@ function UnitGUID(unit)
   if config.secretIdentity then
     return SECRET
   end
-  return "Creature-0-1-2-3-1234-00000001"
+  if unit == "mouseover" then
+    return state.mouseoverGUID or state.targetGUID
+  end
+  return state.targetGUID or DEFAULT_CREATURE_GUID
 end
 
 function UnitClassification(unit)
-  return "normal"
+  if unit == "mouseover" then
+    return state.mouseoverClassification or state.targetClassification or "normal"
+  end
+  return state.targetClassification or "normal"
 end
 
 function UnitCreatureType(unit)
@@ -693,6 +770,136 @@ module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "Defias Pillager dies, you gain 95 ex
 RunTimers()
 db = module.char
 assert(db.mobs["npc:1234"] and db.mobs["npc:1234"].kills == 1, "committed death + late chat double counted")
+
+-- P0-1: death -> chat -> second same-name death with a different GUID.
+module:ResetKills()
+local GUID_A = "Creature-0-1-2-3-1234-00000001"
+local GUID_B = "Creature-0-1-2-3-1234-00000002"
+SetTarget("Defias Pillager", GUID_A)
+module:OnTargetChanged("PLAYER_TARGET_CHANGED")
+module:OnUnitDied("UNIT_DIED", GUID_A)
+AdvanceTime(0.5)
+module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "Defias Pillager dies, you gain 95 experience.")
+SetTarget("Defias Pillager", GUID_B)
+module:OnTargetChanged("PLAYER_TARGET_CHANGED")
+module:OnUnitDied("UNIT_DIED", GUID_B)
+AdvanceTime(2.5)
+db = module.char
+mob = db.mobs["npc:1234"]
+assert(mob and mob.kills == 2, "same-name different-GUID deaths were merged")
+assert(mob.totalXP == 95, "same-name different-GUID XP mismatch")
+assert((mob.xp.samples or 0) == 1, "same-name different-GUID sample mismatch")
+assert(db.totals.kills == 2, "same-name different-GUID total mismatch")
+assert(db.totals.xp == 95, "same-name different-GUID total XP mismatch")
+assert(db.session.xp == 95, "same-name different-GUID session XP mismatch")
+
+-- P0-1: duplicate UNIT_DIED for the same GUID must count once.
+module:ResetKills()
+SetTarget("Defias Pillager", GUID_A)
+module:OnTargetChanged("PLAYER_TARGET_CHANGED")
+module:OnUnitDied("UNIT_DIED", GUID_A)
+module:OnUnitDied("UNIT_DIED", GUID_A)
+AdvanceTime(2.5)
+assert(module.char.totals.kills == 1, "duplicate UNIT_DIED counted twice")
+
+-- P0-1: countZeroXPMobs=false must not lose a late chat.
+local savedCountZero = module:GetSettings().countZeroXPMobs
+module:GetSettings().countZeroXPMobs = false
+module:ResetKills()
+SetTarget("Defias Pillager", GUID_A)
+module:OnTargetChanged("PLAYER_TARGET_CHANGED")
+module:OnUnitDied("UNIT_DIED", GUID_A)
+AdvanceTime(2.5)
+assert(module.char.totals.kills == 0, "countZeroXPMobs=false counted a zero-XP death")
+AdvanceTime(0.1)
+module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "Defias Pillager dies, you gain 95 experience.")
+db = module.char
+mob = db.mobs["npc:1234"]
+assert(mob and mob.kills == 1, "late chat after countZeroXPMobs=false was lost")
+assert(mob.totalXP == 95, "late chat XP after countZeroXPMobs=false was lost")
+
+-- P0-1: a committed zero-XP death must accept late chat without a second kill.
+module:GetSettings().countZeroXPMobs = true
+module:ResetKills()
+SetTarget("Defias Pillager", GUID_A)
+module:OnTargetChanged("PLAYER_TARGET_CHANGED")
+module:OnUnitDied("UNIT_DIED", GUID_A)
+AdvanceTime(2.5)
+db = module.char
+mob = db.mobs["npc:1234"]
+assert(mob and mob.kills == 1 and (mob.totalXP or 0) == 0, "zero-XP death did not commit")
+AdvanceTime(0.6)
+module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "Defias Pillager dies, you gain 95 experience.")
+db = module.char
+mob = db.mobs["npc:1234"]
+assert(mob.kills == 1, "late chat created a second kill")
+assert(mob.totalXP == 95, "late chat XP was not added to the existing kill")
+assert((mob.xp.samples or 0) == 1, "late chat observation was not recorded")
+assert(db.totals.xp == 95, "late chat total XP mismatch")
+
+-- P0-1: duplicate chat for a tombstone must not add XP twice.
+module:ResetKills()
+SetTarget("Defias Pillager", GUID_A)
+module:OnTargetChanged("PLAYER_TARGET_CHANGED")
+module:OnUnitDied("UNIT_DIED", GUID_A)
+AdvanceTime(2.5)
+AdvanceTime(0.6)
+module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "Defias Pillager dies, you gain 95 experience.")
+module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "Defias Pillager dies, you gain 95 experience.")
+db = module.char
+mob = db.mobs["npc:1234"]
+assert(mob.kills == 1, "duplicate tombstone chat changed the kill count")
+assert(mob.totalXP == 95, "duplicate tombstone chat added XP twice")
+assert((mob.xp.samples or 0) == 1, "duplicate tombstone chat added an extra sample")
+
+-- P0-2: a late chat must not resurrect a deleted mob.
+module:ResetKills()
+SetTarget("Defias Pillager", GUID_A)
+module:OnTargetChanged("PLAYER_TARGET_CHANGED")
+module:OnUnitDied("UNIT_DIED", GUID_A)
+AdvanceTime(2.5)
+assert(module.char.totals.kills == 1, "delete tombstone setup did not count")
+module:DeleteMobEntry("npc:1234")
+AdvanceTime(0.1)
+module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "Defias Pillager dies, you gain 95 experience.")
+assert(module.char.mobs["npc:1234"] == nil, "late chat resurrected a deleted mob")
+assert(module.char.totals.kills == 0, "late chat re-added a deleted kill")
+
+-- P0-2: disable/re-enable must cancel a pending death.
+module:GetSettings().countZeroXPMobs = true
+module:ResetKills()
+SetTarget("Defias Pillager", GUID_A)
+module:OnTargetChanged("PLAYER_TARGET_CHANGED")
+module:OnUnitDied("UNIT_DIED", GUID_A)
+module:SetUserEnabled(false)
+module:SetUserEnabled(true)
+AdvanceTime(5)
+assert(module.char.totals.kills == 0, "pending death committed after re-enable")
+
+-- P0-2: an active config refresh must not cancel legitimate pending work.
+module:ResetKills()
+SetTarget("Defias Pillager", GUID_A)
+module:OnTargetChanged("PLAYER_TARGET_CHANGED")
+module:OnUnitDied("UNIT_DIED", GUID_A)
+module:Refresh()
+AdvanceTime(2.5)
+assert(module.char.totals.kills == 1, "active refresh canceled pending death")
+
+-- P0-2: the circuit breaker must cancel a pending death.
+module:ResetKills()
+SetTarget("Defias Pillager", GUID_A)
+module:OnTargetChanged("PLAYER_TARGET_CHANGED")
+module:OnUnitDied("UNIT_DIED", GUID_A)
+module.circuitErrors = 4
+module.lastErrorTime = GetTime()
+module:ReportError("test", "failure")
+assert(module.autoDisabled, "circuit breaker did not auto-disable")
+AdvanceTime(5)
+assert(module.char.totals.kills == 0, "pending death committed after circuit breaker")
+module.circuitErrors = 0
+module:SetUserEnabled(true)
+assert(module:IsActive(), "module did not recover after circuit breaker test")
+module:GetSettings().countZeroXPMobs = savedCountZero
 
 -- Exact GUID identity survives a long fight.
 module:ResetKills()
