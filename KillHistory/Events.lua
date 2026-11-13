@@ -34,6 +34,26 @@ function XPTooltip:OnPlayerXPUpdate(event)
   end
 end
 
+function XPTooltip:OnMoneyChanged(event)
+  if not self:IsActive() then
+    return
+  end
+  local ok, err = pcall(self.HandleMoneyChanged, self)
+  if not ok then
+    self:ReportError("OnMoneyChanged", err)
+  end
+end
+
+function XPTooltip:OnLootMessage(event, message, sender)
+  if not self:IsActive() then
+    return
+  end
+  local ok, err = pcall(self.HandleLootMessage, self, message, sender)
+  if not ok then
+    self:ReportError("OnLootMessage", err)
+  end
+end
+
 function XPTooltip:OnUnitDied(event, guid)
   if not self:IsActive() then
     return
@@ -41,6 +61,16 @@ function XPTooltip:OnUnitDied(event, guid)
   local ok, err = pcall(self.HandleUnitDied, self, guid)
   if not ok then
     self:ReportError("OnUnitDied", err)
+  end
+end
+
+function XPTooltip:OnPlayerDied(event)
+  if not self:IsActive() then
+    return
+  end
+  local ok, err = pcall(self.HandlePlayerDeath, self)
+  if not ok then
+    self:ReportError("OnPlayerDied", err)
   end
 end
 
@@ -68,6 +98,26 @@ function XPTooltip:OnMouseoverChanged(event)
   end
 end
 
+function XPTooltip:OnNamePlateAdded(event, unit)
+  if not self:IsActive() then
+    return
+  end
+  local ok, err = pcall(self.HandleNamePlate, self, unit)
+  if not ok then
+    self:ReportError("OnNamePlateAdded", err)
+  end
+end
+
+function XPTooltip:OnNamePlateRemoved(event, unit)
+  if not self:IsActive() then
+    return
+  end
+  local ok, err = pcall(self.HideNamePlateLevel, self, unit)
+  if not ok then
+    self:ReportError("OnNamePlateRemoved", err)
+  end
+end
+
 function XPTooltip:OnZoneChanged(event)
   self.lastPool = self:GetRestedPool()
   if self.ui and self.ui:IsShown() then
@@ -76,6 +126,8 @@ function XPTooltip:OnZoneChanged(event)
 end
 
 function XPTooltip:OnLevelUp(event, level)
+  self:FinalizeLevelHistory(level)
+  self:ResetRates()
   self.lastPool = self:GetRestedPool()
   self:SchedulePrune()
   if self.ui and self.ui:IsShown() then
@@ -85,7 +137,7 @@ end
 
 function XPTooltip:OnLogin(event)
   self:StartSession()
-  self.lastXP = self:GetXP()
+  self:EnsureLevelHistory()
   self.lastPool = self:GetRestedPool()
   self:SchedulePrune()
 end
@@ -98,11 +150,9 @@ function XPTooltip:OnEnteringWorld(event)
 end
 
 function XPTooltip:OnXPGainEnabled(event)
-  self.lastXP = self:GetXP()
 end
 
 function XPTooltip:OnXPGainDisabled(event)
-  self.lastXP = self:GetXP()
 end
 
 function XPTooltip:OnMaxLevelUpdate(event)
@@ -117,6 +167,24 @@ function XPTooltip:StartSession()
   db.session.startedAt = Epoch()
   db.session.kills = 0
   db.session.xp = 0
+  local dungeon = db.dungeon
+  if type(dungeon) ~= "table" then
+    dungeon = {}
+    db.dungeon = dungeon
+  end
+  dungeon.sessionXP = 0
+  dungeon.sessionKills = 0
+  local economy = db.economy
+  if type(economy) ~= "table" then
+    economy = {}
+    db.economy = economy
+  end
+  economy.sessionLootValue = 0
+  economy.sessionItems = 0
+  economy.goldGained = 0
+  economy.goldSpent = 0
+  economy.moneyKnown = false
+  self:RecordMoney(self:GetMoney())
   for _, mob in pairs(db.mobs) do
     if type(mob) == "table" then
       mob.sessionKills = 0
@@ -124,6 +192,7 @@ function XPTooltip:StartSession()
       mob.sessionXPKnown = false
     end
   end
+  self:ResetRates()
 end
 
 local function RunPruneSafely(self)
@@ -167,20 +236,12 @@ function XPTooltip:Prune()
       db.mobs[mobKey] = nil
     else
       mobCount = mobCount + 1
-      mob.kills = math.max(0, tonumber(mob.kills) or 0)
-      mob.sessionKills = math.max(0, tonumber(mob.sessionKills) or 0)
+      self:NormalizeMobFields(mob)
       if type(mob.name) ~= "string" then
         mob.name = "Unknown"
       elseif #mob.name > 80 then
         mob.name = mob.name:sub(1, 80)
       end
-      mob.killsAtLevel = EnsureNumberMap(mob.killsAtLevel)
-      mob.killsByMap = EnsureNumberMap(mob.killsByMap)
-      mob.killsByAreaLevel = EnsureNumberMap(mob.killsByAreaLevel)
-      mob.contexts = EnsureNumberMap(mob.contexts)
-      mob.totalXP = tonumber(mob.totalXP) or 0
-      mob.sessionXP = tonumber(mob.sessionXP) or 0
-      mob.sessionXPKnown = mob.sessionXPKnown == true
 
       local contextCount = 0
       local oldestKey, oldestSeen
@@ -268,6 +329,31 @@ function XPTooltip:Prune()
     end
   end
   db.totals.uniqueMobs = actual
+  self:TrimLevelHistory()
+  self:NormalizeRates()
+  if type(self.NormalizeDeaths) == "function" then
+    self:NormalizeDeaths()
+  end
+  if type(self.NormalizeRespawns) == "function" then
+    self:NormalizeRespawns()
+  end
+  if type(self.NormalizeHeatmaps) == "function" then
+    self:NormalizeHeatmaps()
+  end
+
+  -- Respawn watches are transient GetTime() sightings; anything older than an
+  -- hour is no longer a credible respawn.
+  local watches = self.respawnWatches
+  if type(watches) == "table" then
+    local watchNow = Now()
+    for key, watch in pairs(watches) do
+      local at = type(watch) == "table" and tonumber(watch.at) or nil
+      if not at or (watchNow - at) > 3600 then
+        watches[key] = nil
+      end
+    end
+  end
+
   if self.ui and self.ui:IsShown() then
     self:RequestUIUpdate()
   end

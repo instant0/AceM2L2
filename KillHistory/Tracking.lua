@@ -8,10 +8,10 @@ local XPTooltip = AceM2L2.KillHistory
 local Util = XPTooltip.Util
 local Formula = XPTooltip.Formula
 
-local floor, min, max = math.floor, math.min, math.max
 local MAX_PENDING_DEATHS = Util.MAX_PENDING_DEATHS
 local IsSecret = Util.IsSecret
 local SafeCall = Util.SafeCall
+local SafeNumber = Util.SafeNumber
 local SafeString = Util.SafeString
 local SafeBool = Util.SafeBool
 local Lower = Util.Lower
@@ -24,6 +24,70 @@ local CHAT_MATCH_WINDOW = 3.0
 local PENDING_CHAT_WINDOW = 4.5
 local PENDING_CHAT_COMMIT_DELAY = 5.0
 local LATE_CHAT_WINDOW = 6.0
+local LOOT_DUPLICATE_WINDOW = 0.25
+local LOOT_RECENT_TTL = 3.0
+
+-- Equip locations map to inventory slot IDs. FINGER and TRINKET have two slots
+-- and are compared against whichever equipped slot is weaker.
+local GEAR_SLOTS = {
+  INVTYPE_HEAD = { 1 },
+  INVTYPE_NECK = { 2 },
+  INVTYPE_SHOULDER = { 3 },
+  INVTYPE_BODY = { 5 },
+  INVTYPE_CHEST = { 5 },
+  INVTYPE_ROBE = { 5 },
+  INVTYPE_WAIST = { 6 },
+  INVTYPE_LEGS = { 7 },
+  INVTYPE_FEET = { 8 },
+  INVTYPE_WRIST = { 9 },
+  INVTYPE_HAND = { 10 },
+  INVTYPE_FINGER = { 11, 12 },
+  INVTYPE_TRINKET = { 13, 14 },
+  INVTYPE_CLOAK = { 15 },
+  INVTYPE_2HWEAPON = { 16 },
+  INVTYPE_WEAPON = { 16 },
+  INVTYPE_WEAPONMAINHAND = { 16 },
+  INVTYPE_WEAPONOFFHAND = { 17 },
+  INVTYPE_SHIELD = { 17 },
+  INVTYPE_HOLDABLE = { 17 },
+  INVTYPE_RANGED = { 18 },
+  INVTYPE_RANGEDRIGHT = { 18 },
+  INVTYPE_TABARD = { 19 },
+}
+
+local GEAR_SLOT_NAMES = {
+  [1] = "Head",
+  [2] = "Neck",
+  [3] = "Shoulder",
+  [5] = "Chest",
+  [6] = "Waist",
+  [7] = "Legs",
+  [8] = "Feet",
+  [9] = "Wrist",
+  [10] = "Hands",
+  [11] = "Finger",
+  [12] = "Finger",
+  [13] = "Trinket",
+  [14] = "Trinket",
+  [15] = "Back",
+  [16] = "Main Hand",
+  [17] = "Off Hand",
+  [18] = "Ranged",
+  [19] = "Tabard",
+}
+
+-- Ensures the dungeon bucket exists with its five fields. Values are kept as
+-- numbers; unknown keys are left untouched (Data.lua normalizes on load).
+local function EnsureDungeonBucket(db)
+  local dungeon = type(db.dungeon) == "table" and db.dungeon or {}
+  db.dungeon = dungeon
+  dungeon.xp = tonumber(dungeon.xp) or 0
+  dungeon.kills = tonumber(dungeon.kills) or 0
+  dungeon.sessionXP = tonumber(dungeon.sessionXP) or 0
+  dungeon.sessionKills = tonumber(dungeon.sessionKills) or 0
+  dungeon.lastInstance = tonumber(dungeon.lastInstance) or 0
+  return dungeon
+end
 
 --[[--------------------------------------------------------------------------------
   Buffs and rest
@@ -37,6 +101,12 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
   local db = self.char
   local playerLevel = info.playerLevel or self:GetPlayerLevel() or 0
   local mapID = info.mapID or self:GetMapID() or 0
+  local inDungeon = info.inDungeon
+  if inDungeon == nil then
+    inDungeon = self:IsInDungeon()
+  end
+  info.inDungeon = inDungeon
+  local dungeon = EnsureDungeonBucket(db)
   local mobKey = info.mobKey or self:GetMobKey(info.name, info.npcID)
   local lowerName = Lower(info.name)
   local nameKey = lowerName and ("name:" .. lowerName) or nil
@@ -65,6 +135,12 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
   mob.kills = (tonumber(mob.kills) or 0) + 1
   mob.sessionKills = (tonumber(mob.sessionKills) or 0) + 1
   mob.lastSeen = now
+  if type(self.RecordRespawnDeath) == "function" then
+    local ok, err = pcall(self.RecordRespawnDeath, self, info.npcID, info.guid, mapID)
+    if not ok then
+      self:ReportError("RecordRespawnDeath", err, false)
+    end
+  end
   if playerLevel > 0 then
     local levelKey = tostring(playerLevel)
     mob.killsAtLevel[levelKey] = (tonumber(mob.killsAtLevel[levelKey]) or 0) + 1
@@ -91,14 +167,37 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
     end
   end
 
+  -- RecordKill is the sole heatmap accounting point: pending-death commits, late
+  -- chat XP, and nameplates do not write here.
+  if type(self.RecordHeatmapKill) == "function" then
+    local ok, err = pcall(self.RecordHeatmapKill, self, info.mapID or mapID, info.x, info.y)
+    if not ok then
+      self:ReportError("RecordHeatmapKill", err, false)
+    end
+  end
+
   db.totals.kills = (tonumber(db.totals.kills) or 0) + 1
   db.session.kills = (tonumber(db.session.kills) or 0) + 1
+  if inDungeon then
+    dungeon.kills = (tonumber(dungeon.kills) or 0) + 1
+    dungeon.sessionKills = (tonumber(dungeon.sessionKills) or 0) + 1
+    if mapID > 0 then
+      dungeon.lastInstance = mapID
+    end
+  end
+  self:AddLevelHistoryKill()
   if totalXP and supportsPerMobXP then
     mob.totalXP = (tonumber(mob.totalXP) or 0) + totalXP
     mob.sessionXP = (tonumber(mob.sessionXP) or 0) + totalXP
     mob.sessionXPKnown = true
     db.totals.xp = (tonumber(db.totals.xp) or 0) + totalXP
     db.session.xp = (tonumber(db.session.xp) or 0) + totalXP
+    if inDungeon then
+      dungeon.xp = (tonumber(dungeon.xp) or 0) + totalXP
+      dungeon.sessionXP = (tonumber(dungeon.sessionXP) or 0) + totalXP
+    end
+    self:AddLevelHistoryXP(totalXP)
+    self:RecordRateSample(totalXP, "kill")
   end
 
   if rawBase and rawBase > 0 and not skipObservation and supportsPerMobXP then
@@ -142,6 +241,21 @@ function XPTooltip:AddKillXP(entry, info, totalXP, rawBase, buffedXP, skipObserv
   mob.lastSeen = Epoch()
   db.totals.xp = (tonumber(db.totals.xp) or 0) + totalXP
   db.session.xp = (tonumber(db.session.xp) or 0) + totalXP
+  self:AddLevelHistoryXP(totalXP)
+  self:RecordRateSample(totalXP, "kill")
+
+  local dungeonFlag = entry.dungeon
+  if dungeonFlag == nil then
+    dungeonFlag = info.inDungeon
+  end
+  if dungeonFlag == nil then
+    dungeonFlag = self:IsInDungeon()
+  end
+  if dungeonFlag then
+    local dungeon = EnsureDungeonBucket(db)
+    dungeon.xp = (tonumber(dungeon.xp) or 0) + totalXP
+    dungeon.sessionXP = (tonumber(dungeon.sessionXP) or 0) + totalXP
+  end
 
   if rawBase and rawBase > 0 and not skipObservation then
     self:RecordObservation(mob, info, rawBase, buffedXP, totalXP)
@@ -403,7 +517,6 @@ function XPTooltip:HandleXPChat(message)
   end
 
   local now = Now()
-  self.lastXPChatAt = now
   local poolAfter = self:GetRestedPool()
   local poolBefore = self.poolBeforeKill or self.lastPool or poolAfter
   self.poolBeforeKill = nil
@@ -471,7 +584,9 @@ function XPTooltip:HandleXPChat(message)
   end
   local classification = info.classification or "normal"
   local groupSize = self:GetGroupSize()
-  local mapID = self:GetMapID()
+  -- A stored death entry keeps the kill-time map so chat XP cannot pair with a
+  -- different zone after a quick zone change.
+  local mapID = info.mapID or self:GetMapID()
   local buffSignature = self:GetBuffSignature()
   if buffSignature ~= "none" then
     skipObservation = true
@@ -559,9 +674,7 @@ function XPTooltip:HandlePlayerXPUpdate()
     return
   end
 
-  self.lastXP = current
   self.lastPool = self:GetRestedPool()
-  self.lastXPUpdateAt = Now()
 end
 
 function XPTooltip:FindDeathCandidate(guid)
@@ -776,9 +889,232 @@ function XPTooltip:CommitPendingDeath(entry)
       info.playerLevel, info.level, info.groupSize, info.mapID, info.classification, info.buffSignature
     )
     local _, resolvedKey = self:RecordKill(info, nil, nil, nil, "death")
+    entry.dungeon = info.inDungeon == true
     entry.recordedKill = true
     entry.recordedAt = now
     entry.resolvedMobKey = resolvedKey or info.mobKey
     self.poolBeforeKill = nil
   end
+end
+
+--[[--------------------------------------------------------------------------------
+  Loot, money, and gear upgrades
+------------------------------------------------------------------------------------]]
+
+-- GetItemInfo returns more values than SafeCall captures (it stops at five), so
+-- read the whole result here and keep only the readable fields we use.
+local function SafeItemInfo(item)
+  local getInfo = GetItemInfo
+  if type(getInfo) ~= "function" and type(C_Item) == "table" then
+    getInfo = C_Item.GetItemInfo
+  end
+  if type(getInfo) ~= "function" then
+    return nil
+  end
+  local ok, name, link, _, itemLevel, _, _, _, _, equipLoc = pcall(getInfo, item)
+  if not ok then
+    return nil
+  end
+  return {
+    name = SafeString(name),
+    link = SafeString(link),
+    itemLevel = SafeNumber(itemLevel),
+    equipLoc = SafeString(equipLoc),
+  }
+end
+
+local function ReadPrimaryStat(link, statKey)
+  if not link or not statKey then
+    return nil
+  end
+  local getStats = GetItemStats
+  if type(getStats) ~= "function" and type(C_Item) == "table" then
+    getStats = C_Item.GetItemStats
+  end
+  if type(getStats) ~= "function" then
+    return nil
+  end
+  local stats = SafeCall(getStats, link)
+  if type(stats) ~= "table" then
+    return nil
+  end
+  local ok, value = pcall(function()
+    return stats[statKey]
+  end)
+  if not ok or IsSecret(value) then
+    return nil
+  end
+  return SafeNumber(value)
+end
+
+function XPTooltip:HandleLootMessage(message, sender)
+  if not self:IsActive() then
+    return
+  end
+  if not self:Supports("hasLootValue") then
+    return
+  end
+  if not self.lootEventAvailable then
+    return
+  end
+  if IsSecret(message) then
+    return
+  end
+  local text = SafeString(message)
+  if not text then
+    return
+  end
+
+  local safeSender = SafeString(sender)
+  local playerName = SafeString(SafeCall(UnitName, "player"))
+  if safeSender and playerName then
+    local senderKey = Lower(safeSender)
+    local playerKey = Lower(playerName)
+    if senderKey and playerKey and senderKey ~= playerKey then
+      return
+    end
+  end
+
+  local itemID = tonumber(text:match("|Hitem:(%d+):"))
+  if not itemID or itemID <= 0 then
+    return
+  end
+  local quantity = tonumber(text:match("|hx(%d+)"))
+    or tonumber(text:match("x(%d+)%s*[%.,]?$"))
+    or 1
+
+  local now = Now()
+  local recent = self.recentLoot
+  if type(recent) ~= "table" then
+    recent = {}
+    self.recentLoot = recent
+  end
+  local last = tonumber(recent[text])
+  if last and (now - last) <= LOOT_DUPLICATE_WINDOW then
+    return
+  end
+  recent[text] = now
+  for key, at in pairs(recent) do
+    if (now - (tonumber(at) or 0)) > LOOT_RECENT_TTL then
+      recent[key] = nil
+    end
+  end
+
+  self:RecordLoot(itemID, quantity)
+  if self.settings and self.settings.showGearUpgrades and self:Supports("hasGearCompare") then
+    self:CheckGearUpgrade(itemID)
+  end
+end
+
+function XPTooltip:HandleMoneyChanged()
+  local current = self:GetMoney()
+  if current == nil then
+    return
+  end
+  self:RecordMoney(current)
+end
+
+function XPTooltip:GetPlayerPrimaryStatKey()
+  if type(UnitStat) ~= "function" then
+    return nil
+  end
+  local candidates = {
+    { 1, "ITEM_MOD_STRENGTH_SHORT" },
+    { 2, "ITEM_MOD_AGILITY_SHORT" },
+    { 4, "ITEM_MOD_INTELLECT_SHORT" },
+  }
+  local bestKey, bestValue
+  for index = 1, #candidates do
+    local value = SafeNumber(SafeCall(UnitStat, "player", candidates[index][1]))
+    if value and value >= 0 and (bestValue == nil or value > bestValue) then
+      bestKey = candidates[index][2]
+      bestValue = value
+    end
+  end
+  return bestKey
+end
+
+function XPTooltip:CheckGearUpgrade(itemID)
+  if not self:Supports("hasGearCompare") then
+    return
+  end
+
+  local newItem = SafeItemInfo(itemID)
+  if not newItem or not newItem.name or not newItem.equipLoc then
+    return
+  end
+  local newLevel = newItem.itemLevel
+  if not newLevel or newLevel <= 0 then
+    return
+  end
+  local slots = GEAR_SLOTS[newItem.equipLoc]
+  if not slots then
+    return
+  end
+
+  local slotIndex, equippedLevel, equippedLink
+  if #slots == 1 then
+    slotIndex = slots[1]
+    equippedLink = SafeCall(GetInventoryItemLink, "player", slotIndex)
+    if not equippedLink then
+      -- Empty or unreadable single slot; nothing to compare against.
+      return
+    end
+    local equippedItem = SafeItemInfo(equippedLink)
+    if not equippedItem or not equippedItem.itemLevel or equippedItem.itemLevel <= 0 then
+      return
+    end
+    equippedLevel = equippedItem.itemLevel
+  else
+    -- Rings and trinkets: an empty slot is the weakest possible slot, so it is
+    -- eligible for an upgrade; otherwise compare against the weaker item.
+    local emptySlot
+    local weakestSlot, weakestLevel, weakestLink
+    for index = 1, #slots do
+      local slot = slots[index]
+      local link = SafeCall(GetInventoryItemLink, "player", slot)
+      if not link then
+        emptySlot = emptySlot or slot
+      else
+        local equippedItem = SafeItemInfo(link)
+        if not equippedItem or not equippedItem.itemLevel or equippedItem.itemLevel <= 0 then
+          return
+        end
+        if not weakestLevel or equippedItem.itemLevel < weakestLevel then
+          weakestSlot = slot
+          weakestLevel = equippedItem.itemLevel
+          weakestLink = link
+        end
+      end
+    end
+    if emptySlot then
+      slotIndex, equippedLevel, equippedLink = emptySlot, 0, nil
+    else
+      slotIndex, equippedLevel, equippedLink = weakestSlot, weakestLevel, weakestLink
+    end
+  end
+
+  if not slotIndex or not equippedLevel then
+    return
+  end
+  if newLevel <= equippedLevel then
+    return
+  end
+
+  local statKey = self:GetPlayerPrimaryStatKey()
+  local newPrimary = statKey and ReadPrimaryStat(newItem.link, statKey) or nil
+  local equippedPrimary = statKey and equippedLink and ReadPrimaryStat(equippedLink, statKey) or nil
+  if newPrimary and equippedPrimary then
+    if newPrimary < equippedPrimary then
+      return
+    end
+  elseif newLevel < equippedLevel + 3 then
+    return
+  end
+
+  local slotName = GEAR_SLOT_NAMES[slotIndex] or ("slot " .. tostring(slotIndex))
+  AceM2L2:SafePrint(string.format(
+    "Kill History: upgrade for %s: %s (iLvl %d > %d)",
+    slotName, newItem.name, math.floor(newLevel), math.floor(equippedLevel)
+  ))
 end

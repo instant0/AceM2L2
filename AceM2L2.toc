@@ -4,7 +4,7 @@
 ## Author: faslkjd56
 ## Category: Quests & Leveling
 ## X-Category: Quests & Leveling
-## Version: 1.12.0
+## Version: 2.0.0
 ## SavedVariables: AceM2L2DB
 ## SavedVariablesPerCharacter: AceM2L2CharDB
 ## AddonCompartmentFunc: AceM2L2_OnCompartmentClick
@@ -29,9 +29,13 @@ KillHistory/Formula.lua
 KillHistory/Data.lua
 KillHistory/Calibration.lua
 KillHistory/Tracking.lua
+KillHistory/World.lua
+KillHistory/Heatmap.lua
 KillHistory/Tooltip.lua
 KillHistory/UI/Theme.lua
 KillHistory/UI/Widgets.lua
+KillHistory/UI/Nameplates.lua
+KillHistory/UI/Heatmap.lua
 KillHistory/UI/List.lua
 KillHistory/UI/Detail.lua
 KillHistory/UI/Overview.lua

@@ -23,11 +23,19 @@ mapfile -t LUA_FILES < <(
 )
 "$LUAC_BIN" -p "${LUA_FILES[@]}"
 
+echo "== Test stats =="
+python3 tests/test_stats.py
+
+if [[ "${SNAPSHOT:-0}" == "1" ]]; then
+  echo "== Behavior snapshot =="
+  "$LUA_BIN" tests/snapshot.lua forever
+fi
+
 echo "== Smoke test (Forever) =="
-"$LUA_BIN" tests/xptooltip_smoke.lua forever
+"$LUA_BIN" tests/smoke.lua forever
 for scenario in midnight midnight_missing midnight_secret_identity midnight_secret_booleans midnight_secret_name unknown; do
   echo "== Smoke test ($scenario) =="
-  "$LUA_BIN" tests/xptooltip_smoke.lua "$scenario"
+  "$LUA_BIN" tests/smoke.lua "$scenario"
 done
 
 echo "== Embedded library smoke test =="
@@ -35,10 +43,10 @@ echo "== Embedded library smoke test =="
 
 if command -v luajit >/dev/null 2>&1; then
   echo "== Smoke test (LuaJIT, Forever) =="
-  luajit tests/xptooltip_smoke.lua forever
+  luajit tests/smoke.lua forever
   for scenario in midnight midnight_missing midnight_secret_identity midnight_secret_booleans midnight_secret_name unknown; do
     echo "== Smoke test (LuaJIT, $scenario) =="
-    luajit tests/xptooltip_smoke.lua "$scenario"
+    luajit tests/smoke.lua "$scenario"
   done
 else
   echo "WARNING: luajit not found; skipped LuaJIT smoke test."
@@ -63,11 +71,11 @@ if [[ "${BUILD_RELEASE:-0}" == "1" ]]; then
   python3 tests/build_release.py
 fi
 
-if [[ "${SKIP_RELEASE:-0}" != "1" ]]; then
+if [[ "${CHECK_RELEASE:-0}" == "1" && "${SKIP_RELEASE:-0}" != "1" ]]; then
   echo "== Release validation =="
   python3 tests/check_release.py
 else
-  echo "WARNING: SKIP_RELEASE=1; skipped release zip validation."
+  echo "Release validation skipped; set CHECK_RELEASE=1 when preparing a release."
 fi
 
 echo "All offline checks passed."

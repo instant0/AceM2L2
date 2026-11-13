@@ -12,10 +12,6 @@ local XPTooltip = AceM2L2.KillHistory
 local Client = XPTooltip.Client
 local Defaults = AceM2L2.Defaults or {}
 
-local function Round(value)
-  return math.floor((tonumber(value) or 0) + 0.5)
-end
-
 local Profile = {
   id = "midnight",
   name = "Midnight",
@@ -26,6 +22,12 @@ local Profile = {
     hasNameIdentity = true,
     hasGUIDIdentity = true,
     hasMapIdentity = true,
+    hasInstanceInfo = true,
+    hasMapPosition = true,
+    hasNamePlateAPI = true,
+    hasMoney = true,
+    hasLootValue = true,
+    hasGearCompare = true,
     hasPlayerXPState = false,
     hasLevelXPState = true,
     hasXPFormula = false,
@@ -80,7 +82,7 @@ function Profile:GetBaseXP()
 end
 
 function Profile:Round(value)
-  return Round(value)
+  return XPTooltip.Formula.Round(value)
 end
 
 function Profile:GetGroupPrior()

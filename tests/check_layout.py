@@ -181,6 +181,59 @@ def validate_lua_files(
             )
 
 
+LOAD_ORDER_RULES = (
+    ("Core/Defaults.lua", "KillHistory/Client.lua"),
+    ("Core/Defaults.lua", "KillHistory/Clients/Forever.lua"),
+    ("Core/Defaults.lua", "KillHistory/Clients/Midnight.lua"),
+    ("Core/Defaults.lua", "KillHistory/Util.lua"),
+    ("KillHistory/Module.lua", "KillHistory/Client.lua"),
+    ("KillHistory/Client.lua", "KillHistory/Clients/Forever.lua"),
+    ("KillHistory/Client.lua", "KillHistory/Clients/Midnight.lua"),
+    ("KillHistory/Util.lua", "KillHistory/Data.lua"),
+    ("KillHistory/Util.lua", "KillHistory/Calibration.lua"),
+    ("KillHistory/Util.lua", "KillHistory/Tracking.lua"),
+    ("KillHistory/Util.lua", "KillHistory/Tooltip.lua"),
+    ("KillHistory/Util.lua", "KillHistory/UI/Theme.lua"),
+    ("KillHistory/Util.lua", "KillHistory/UI/Window.lua"),
+    ("KillHistory/Util.lua", "KillHistory/Commands.lua"),
+    ("KillHistory/Util.lua", "KillHistory/Events.lua"),
+    ("KillHistory/Formula.lua", "KillHistory/Calibration.lua"),
+    ("KillHistory/Formula.lua", "KillHistory/Tracking.lua"),
+    ("KillHistory/Formula.lua", "KillHistory/Tooltip.lua"),
+    ("KillHistory/UI/Widgets.lua", "KillHistory/UI/Window.lua"),
+)
+
+
+def validate_load_order(
+    references: list[tuple[str, int]],
+    errors: list[str],
+) -> int:
+    positions: dict[str, int] = {}
+    for index, (reference, _line_number) in enumerate(references):
+        positions[reference.replace("\\", "/")] = index
+
+    checked = 0
+    for before, after in LOAD_ORDER_RULES:
+        if before not in positions or after not in positions:
+            continue
+        checked += 1
+        if positions[before] > positions[after]:
+            errors.append(
+                f"{TOC_NAME}: load order: {before} must load before {after}"
+            )
+
+    module_position = positions.get("KillHistory/Module.lua")
+    if module_position is not None:
+        for reference, position in positions.items():
+            if reference.startswith("KillHistory/") and reference != "KillHistory/Module.lua":
+                checked += 1
+                if module_position > position:
+                    errors.append(
+                        f"{TOC_NAME}: load order: KillHistory/Module.lua must load before {reference}"
+                    )
+    return checked
+
+
 def validate_bindings(root: Path, resolved: set[Path], errors: list[str]) -> None:
     bindings_xml = root / "Bindings.xml"
     bindings_lua = root / "Bindings.lua"
@@ -231,6 +284,7 @@ def main() -> int:
 
     references, metadata = read_toc(root, errors)
     validate_metadata(metadata, errors)
+    load_order_checked = validate_load_order(references, errors)
     resolved = validate_references(root, references, errors)
     validate_lua_files(root, resolved, errors)
     validate_bindings(root, resolved, errors)
@@ -241,6 +295,7 @@ def main() -> int:
     print(f"Addon root: {root}")
     print(f"TOC: {TOC_NAME}")
     print(f"TOC references checked: {len(references)}")
+    print(f"Load-order rules checked: {load_order_checked}")
     print(f"Resolved files/XML paths: {len(resolved)}")
 
     for warning in warnings:

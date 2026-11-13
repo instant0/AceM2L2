@@ -33,17 +33,45 @@ function AceM2L2:CreateOptionsPanel()
     return
   end
 
-  local category = Settings.RegisterVerticalLayoutCategory("Ace Mobs 2 Level 2")
+  local category, layout = Settings.RegisterVerticalLayoutCategory("Ace Mobs 2 Level 2")
+  Settings.RegisterAddOnCategory(category)
   self.optionSettings = {}
 
   local module = self:GetXPTooltipModule()
   local function supports(capability)
-    return module and module.Supports and module:Supports(capability)
+    if not module then
+      return false
+    end
+    if not module.clientProfile and type(module.RefreshClient) == "function" then
+      pcall(module.RefreshClient, module)
+    end
+    return module.Supports and module:Supports(capability)
+  end
+
+  -- Settings are registered into `page`. Switching to a native subcategory
+  -- keeps the tooltip controls on their own page while the main page stays
+  -- focused on chat output and module controls.
+  local page, pageLayout = category, layout
+
+  local function addHeader(text)
+    if not pageLayout or type(CreateSettingsListSectionHeaderInitializer) ~= "function" then
+      return
+    end
+    local ok, initializer = pcall(CreateSettingsListSectionHeaderInitializer, text)
+    if ok and initializer and type(pageLayout.AddInitializer) == "function" then
+      pcall(pageLayout.AddInitializer, pageLayout, initializer)
+    end
+  end
+
+  local function addSearchTags(initializer, ...)
+    if initializer and type(initializer.AddSearchTags) == "function" then
+      pcall(initializer.AddSearchTags, initializer, ...)
+    end
   end
 
   local function addSetting(name, variable, defaultValue, getter, setter)
     local setting = Settings.RegisterProxySetting(
-      category,
+      page,
       variable,
       type(defaultValue),
       name,
@@ -57,7 +85,7 @@ function AceM2L2:CreateOptionsPanel()
 
   local function addCheckbox(name, variable, defaultValue, getter, setter, tooltip)
     local setting = addSetting(name, variable, defaultValue, getter, setter)
-    Settings.CreateCheckbox(category, setting, tooltip)
+    return Settings.CreateCheckbox(page, setting, tooltip)
   end
 
   local function addSlider(name, variable, defaultValue, minValue, maxValue, step, getter, setter, tooltip)
@@ -67,8 +95,28 @@ function AceM2L2:CreateOptionsPanel()
       and options and type(options.SetLabelFormatter) == "function" then
       pcall(options.SetLabelFormatter, options, MinimalSliderWithSteppersMixin.Label.Right)
     end
-    Settings.CreateSlider(category, setting, options, tooltip)
+    return Settings.CreateSlider(page, setting, options, tooltip)
   end
+
+  local function useSubcategory(name)
+    if type(Settings.RegisterVerticalLayoutSubcategory) ~= "function" then
+      return false
+    end
+    local ok, subcategory, sublayout = pcall(
+      Settings.RegisterVerticalLayoutSubcategory, category, name
+    )
+    if not ok or not subcategory then
+      return false
+    end
+    local registered = pcall(Settings.RegisterAddOnCategory, subcategory)
+    if not registered then
+      return false
+    end
+    page, pageLayout = subcategory, sublayout
+    return true
+  end
+
+  addHeader("Chat messages")
 
   addCheckbox(
     "Enable XP messages",
@@ -169,8 +217,10 @@ function AceM2L2:CreateOptionsPanel()
     "Do not print the reputation estimate below this remaining value."
   )
 
+  addHeader("Kill History")
+
   addCheckbox(
-    "Enable Kill History module",
+    "Enable Kill History",
     "ACEM2L2_XPTOOLTIP_ENABLED",
     true,
     function() return self.db.xpTooltip.enabled end,
@@ -181,11 +231,11 @@ function AceM2L2:CreateOptionsPanel()
         pcall(module.SetUserEnabled, module, self.db.xpTooltip.enabled)
       end
     end,
-    "Show XP, kills-to-level, and per-mob kill history on unit tooltips."
+    "Track kills and show Kill History tooltip lines."
   )
 
   addCheckbox(
-    "Kill History: show minimap icon",
+    "Show minimap icon",
     "ACEM2L2_XPTOOLTIP_MINIMAP",
     true,
     function()
@@ -205,82 +255,10 @@ function AceM2L2:CreateOptionsPanel()
     "Show the AceM2L2 launcher icon around the minimap."
   )
 
-  if supports("hasTooltipXP") then
-    addCheckbox(
-      "Kill History: show XP",
-      "ACEM2L2_XPTOOLTIP_SHOW_XP",
-      true,
-      function() return self.db.xpTooltip.showXP end,
-      function(value) self.db.xpTooltip.showXP = SanitizeBoolean(value, true) end,
-      "Show the estimated XP value on the mob tooltip."
-    )
-
-    addCheckbox(
-      "Kill History: show percent of level",
-      "ACEM2L2_XPTOOLTIP_SHOW_PERCENT",
-      true,
-      function() return self.db.xpTooltip.showPercent end,
-      function(value) self.db.xpTooltip.showPercent = SanitizeBoolean(value, true) end,
-      "Show how much of the current level one kill is worth."
-    )
-
-  end
-
-  if supports("hasKillsToLevel") then
-    addCheckbox(
-      "Kill History: show kills to level",
-      "ACEM2L2_XPTOOLTIP_SHOW_KILLS",
-      true,
-      function() return self.db.xpTooltip.showKillsToLevel end,
-      function(value) self.db.xpTooltip.showKillsToLevel = SanitizeBoolean(value, true) end,
-      "Show how many kills of this mob remain to level."
-    )
-  end
+  addHeader("Diagnostics")
 
   addCheckbox(
-    "Kill History: show kill count",
-    "ACEM2L2_XPTOOLTIP_SHOW_KILL_COUNT",
-    true,
-    function() return self.db.xpTooltip.showKillCount end,
-    function(value) self.db.xpTooltip.showKillCount = SanitizeBoolean(value, true) end,
-    "Show how many of this mob you have already killed."
-  )
-
-  if supports("hasRestedPool") then
-    addCheckbox(
-      "Kill History: show rested",
-      "ACEM2L2_XPTOOLTIP_SHOW_RESTED",
-      true,
-      function() return self.db.xpTooltip.showRested end,
-      function(value) self.db.xpTooltip.showRested = SanitizeBoolean(value, true) end,
-      "Show rested XP bonus and rested kill counts."
-    )
-  end
-
-  if supports("hasTooltipXP") then
-    addCheckbox(
-      "Kill History: show unknown mobs",
-      "ACEM2L2_XPTOOLTIP_SHOW_UNKNOWN",
-      true,
-      function() return self.db.xpTooltip.showUnknown end,
-      function(value) self.db.xpTooltip.showUnknown = SanitizeBoolean(value, true) end,
-      "Show an estimate/unknown line for mobs that have not been observed yet."
-    )
-  end
-
-  if supports("hasPerMobXP") then
-    addCheckbox(
-      "Kill History: count zero-XP kills",
-      "ACEM2L2_XPTOOLTIP_COUNT_ZERO",
-      true,
-      function() return self.db.xpTooltip.countZeroXPMobs end,
-      function(value) self.db.xpTooltip.countZeroXPMobs = SanitizeBoolean(value, true) end,
-      "Count gray/trivial kills when a readable UNIT_DIED event is available."
-    )
-  end
-
-  addCheckbox(
-    "Kill History: debug output",
+    "Debug output",
     "ACEM2L2_XPTOOLTIP_DEBUG",
     false,
     function() return self.db.xpTooltip.debug end,
@@ -288,21 +266,306 @@ function AceM2L2:CreateOptionsPanel()
     "Print Kill History XP and kill-identification diagnostics to chat."
   )
 
-  if supports("hasXPFormula") then
-    addSlider(
-      "Kill History: manual XP bonus (%)",
-      "ACEM2L2_XPTOOLTIP_MANUAL_BONUS",
-      0,
-      0,
-      100,
-      1,
-      function() return self.db.xpTooltip.manualXPBonus or 0 end,
-      function(value) self.db.xpTooltip.manualXPBonus = SanitizeInteger(value, 0, 0, 100) end,
-      "Extra XP bonus for buffs the addon does not recognize."
+  local function addTooltipOptions()
+    addHeader("XP lines")
+
+    if supports("hasTooltipXP") then
+      addCheckbox(
+        "Show XP estimate",
+        "ACEM2L2_XPTOOLTIP_SHOW_XP",
+        true,
+        function() return self.db.xpTooltip.showXP end,
+        function(value) self.db.xpTooltip.showXP = SanitizeBoolean(value, true) end,
+        "Show the estimated XP value on the mob tooltip."
+      )
+
+      addCheckbox(
+        "Show percent of level",
+        "ACEM2L2_XPTOOLTIP_SHOW_PERCENT",
+        true,
+        function() return self.db.xpTooltip.showPercent end,
+        function(value) self.db.xpTooltip.showPercent = SanitizeBoolean(value, true) end,
+        "Show how much of the current level one kill is worth."
+      )
+
+      addCheckbox(
+        "Show XP remaining",
+        "ACEM2L2_XPTOOLTIP_SHOW_XP_REMAINING",
+        true,
+        function() return self.db.xpTooltip.showXPRemaining end,
+        function(value) self.db.xpTooltip.showXPRemaining = SanitizeBoolean(value, true) end,
+        "Show XP remaining to the next level on tooltips and the overview."
+      )
+    end
+
+    if supports("hasKillsToLevel") then
+      addCheckbox(
+        "Show kills to level",
+        "ACEM2L2_XPTOOLTIP_SHOW_KILLS",
+        true,
+        function() return self.db.xpTooltip.showKillsToLevel end,
+        function(value) self.db.xpTooltip.showKillsToLevel = SanitizeBoolean(value, true) end,
+        "Show how many kills of this mob remain to level."
+      )
+    end
+
+    addHeader("Kill lines")
+
+    addCheckbox(
+      "Show kill count",
+      "ACEM2L2_XPTOOLTIP_SHOW_KILL_COUNT",
+      true,
+      function() return self.db.xpTooltip.showKillCount end,
+      function(value) self.db.xpTooltip.showKillCount = SanitizeBoolean(value, true) end,
+      "Show how many of this mob you have already killed."
     )
+
+    local mobLevelCheckbox = addCheckbox(
+      "Show mob level",
+      "ACEM2L2_XPTOOLTIP_SHOW_MOB_LEVEL",
+      true,
+      function() return self.db.xpTooltip.showMobLevel end,
+      function(value) self.db.xpTooltip.showMobLevel = SanitizeBoolean(value, true) end,
+      "Show the target creature's level. Turn this off to hide the Level line."
+    )
+    addSearchTags(mobLevelCheckbox, "mob level", "creature level", "target level")
+
+    if supports("hasPerMobXP") then
+      addHeader("XP rate")
+
+      addCheckbox(
+        "Show XP rate",
+        "ACEM2L2_XPTOOLTIP_SHOW_XP_RATE",
+        true,
+        function() return self.db.xpTooltip.showXPRate end,
+        function(value) self.db.xpTooltip.showXPRate = SanitizeBoolean(value, true) end,
+        "Show XP per hour and per minute in the overview."
+      )
+
+      addCheckbox(
+        "Show time to level",
+        "ACEM2L2_XPTOOLTIP_SHOW_TIME_TO_LEVEL",
+        true,
+        function() return self.db.xpTooltip.showTimeToLevel end,
+        function(value) self.db.xpTooltip.showTimeToLevel = SanitizeBoolean(value, true) end,
+        "Show the estimated time to the next level in the overview."
+      )
+
+      addSlider(
+        "XP rate window (minutes)",
+        "ACEM2L2_XPTOOLTIP_RATE_WINDOW",
+        10,
+        1,
+        60,
+        1,
+        function() return self.db.xpTooltip.rateWindowMinutes or 10 end,
+        function(value) self.db.xpTooltip.rateWindowMinutes = SanitizeInteger(value, 10, 1, 60) end,
+        "Recent minutes of XP data used for the rate and time-to-level estimates."
+      )
+    end
+
+    if supports("hasInstanceInfo") then
+      addHeader("Dungeon")
+
+      addCheckbox(
+        "Show dungeon activity",
+        "ACEM2L2_XPTOOLTIP_SHOW_DUNGEON",
+        true,
+        function() return self.db.xpTooltip.showDungeonXP end,
+        function(value) self.db.xpTooltip.showDungeonXP = SanitizeBoolean(value, true) end,
+        "Show dungeon kills and XP in the overview."
+      )
+    end
+
+    local hasWorldGrinding = supports("hasPerMobXP")
+    local hasWorldHeatmap = supports("hasMapPosition")
+    local hasWorldNameplates = supports("hasNamePlateAPI")
+    if hasWorldGrinding or hasWorldHeatmap or hasWorldNameplates then
+      addHeader("World")
+
+      if hasWorldHeatmap then
+        addCheckbox(
+          "Show heatmap tab",
+          "ACEM2L2_XPTOOLTIP_SHOW_HEATMAP",
+          true,
+          function() return self.db.xpTooltip.showHeatmap end,
+          function(value)
+            local showHeatmap = SanitizeBoolean(value, true)
+            self.db.xpTooltip.showHeatmap = showHeatmap
+            if not module then
+              return
+            end
+            if not showHeatmap and module.tab == "heatmap" and type(module.SetTab) == "function" then
+              pcall(module.SetTab, module, "overview")
+            end
+            if type(module.RefreshUI) == "function" then
+              pcall(module.RefreshUI, module)
+            end
+            if type(module.UpdateTabs) == "function" then
+              pcall(module.UpdateTabs, module)
+            end
+          end,
+          "Show the Heatmap tab in the Kill History window. Heatmap data is always recorded."
+        )
+      end
+
+      if hasWorldGrinding then
+        addCheckbox(
+          "Show grinding spot",
+          "ACEM2L2_XPTOOLTIP_SHOW_GRINDING_SPOT",
+          true,
+          function() return self.db.xpTooltip.showGrindingSpot end,
+          function(value) self.db.xpTooltip.showGrindingSpot = SanitizeBoolean(value, true) end,
+          "Show the best current grinding spot in the overview."
+        )
+      end
+
+      if hasWorldNameplates then
+        addCheckbox(
+          "Show nameplate levels",
+          "ACEM2L2_XPTOOLTIP_SHOW_NAMEPLATE_LEVEL",
+          false,
+          function() return self.db.xpTooltip.showNameplateLevel end,
+          function(value)
+            self.db.xpTooltip.showNameplateLevel = SanitizeBoolean(value, false)
+            if module and type(module.RefreshNameplateLevels) == "function" then
+              pcall(module.RefreshNameplateLevels, module)
+            end
+          end,
+          "Show the level above nearby nameplates."
+        )
+      end
+    end
+
+    if supports("hasLevelXPState") then
+      addHeader("Leveling goal")
+
+      addCheckbox(
+        "Show leveling goal",
+        "ACEM2L2_XPTOOLTIP_SHOW_GOAL",
+        true,
+        function() return self.db.xpTooltip.showGoal end,
+        function(value) self.db.xpTooltip.showGoal = SanitizeBoolean(value, true) end,
+        "Show your leveling goal progress in the overview."
+      )
+    end
+
+    if supports("hasLevelXPState") then
+      addHeader("Level splits")
+
+      addCheckbox(
+        "Show level splits",
+        "ACEM2L2_XPTOOLTIP_SHOW_SPLITS",
+        true,
+        function() return self.db.xpTooltip.showSplits end,
+        function(value) self.db.xpTooltip.showSplits = SanitizeBoolean(value, true) end,
+        "Show your last level split in the overview."
+      )
+    end
+
+    addHeader("Economy")
+
+    if supports("hasLootValue") then
+      addCheckbox(
+        "Show session loot",
+        "ACEM2L2_XPTOOLTIP_SHOW_ECONOMY",
+        true,
+        function() return self.db.xpTooltip.showEconomy end,
+        function(value) self.db.xpTooltip.showEconomy = SanitizeBoolean(value, true) end,
+        "Show session loot value in the overview."
+      )
+    end
+
+    if supports("hasMoney") then
+      addCheckbox(
+        "Show gold per hour",
+        "ACEM2L2_XPTOOLTIP_SHOW_GOLD_PER_HOUR",
+        true,
+        function() return self.db.xpTooltip.showGoldPerHour end,
+        function(value) self.db.xpTooltip.showGoldPerHour = SanitizeBoolean(value, true) end,
+        "Show gold per hour in the overview."
+      )
+    end
+
+    if supports("hasGearCompare") then
+      addCheckbox(
+        "Show gear upgrades",
+        "ACEM2L2_XPTOOLTIP_SHOW_GEAR_UPGRADES",
+        true,
+        function() return self.db.xpTooltip.showGearUpgrades end,
+        function(value) self.db.xpTooltip.showGearUpgrades = SanitizeBoolean(value, true) end,
+        "Show gear upgrade notifications for looted items."
+      )
+    end
+
+    addHeader("Rested and bonuses")
+
+    if supports("hasRestedPool") then
+      addCheckbox(
+        "Show rested bonus",
+        "ACEM2L2_XPTOOLTIP_SHOW_RESTED",
+        true,
+        function() return self.db.xpTooltip.showRested end,
+        function(value) self.db.xpTooltip.showRested = SanitizeBoolean(value, true) end,
+        "Show rested XP bonus and rested kill counts."
+      )
+    end
+
+    if supports("hasXPFormula") then
+      addCheckbox(
+        "Show XP bonuses",
+        "ACEM2L2_XPTOOLTIP_SHOW_XP_BONUSES",
+        true,
+        function() return self.db.xpTooltip.showXPBonuses end,
+        function(value) self.db.xpTooltip.showXPBonuses = SanitizeBoolean(value, true) end,
+        "Show the XP bonuses applied to tooltip and overview estimates."
+      )
+
+      addSlider(
+        "Manual XP bonus (%)",
+        "ACEM2L2_XPTOOLTIP_MANUAL_BONUS",
+        0,
+        0,
+        100,
+        1,
+        function() return self.db.xpTooltip.manualXPBonus or 0 end,
+        function(value) self.db.xpTooltip.manualXPBonus = SanitizeInteger(value, 0, 0, 100) end,
+        "Extra XP bonus for buffs the addon does not recognize."
+      )
+    end
+
+    addHeader("Edge cases")
+
+    if supports("hasTooltipXP") then
+      addCheckbox(
+        "Show unknown mobs",
+        "ACEM2L2_XPTOOLTIP_SHOW_UNKNOWN",
+        true,
+        function() return self.db.xpTooltip.showUnknown end,
+        function(value) self.db.xpTooltip.showUnknown = SanitizeBoolean(value, true) end,
+        "Show an estimate/unknown line for mobs that have not been observed yet."
+      )
+    end
+
+    if supports("hasPerMobXP") then
+      addCheckbox(
+        "Count zero-XP kills",
+        "ACEM2L2_XPTOOLTIP_COUNT_ZERO",
+        true,
+        function() return self.db.xpTooltip.countZeroXPMobs end,
+        function(value) self.db.xpTooltip.countZeroXPMobs = SanitizeBoolean(value, true) end,
+        "Count gray/trivial kills when a readable UNIT_DIED event is available."
+      )
+    end
   end
 
-  Settings.RegisterAddOnCategory(category)
+  if useSubcategory("Tooltip") then
+    addTooltipOptions()
+  else
+    addHeader("Tooltip")
+    addTooltipOptions()
+  end
+
   self.optionsCategory = category
 end
 

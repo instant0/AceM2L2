@@ -44,14 +44,8 @@ local function GrayLevel(playerLevel)
 end
 
 local function RoundForever(value)
-  local base = floor(value)
-  local fraction = value - base
-  if fraction > 0.5 + 1e-9 then
-    return base + 1
-  elseif fraction >= 0.5 - 1e-9 and base % 2 == 1 then
-    return base + 1
-  end
-  return base
+  -- Formula.lua loads after Clients in the TOC; resolve at runtime.
+  return XPTooltip.Formula.Round(value)
 end
 
 local function ClassificationMultiplier(classification)
@@ -104,6 +98,12 @@ local Profile = {
     hasNameIdentity = true,
     hasGUIDIdentity = true,
     hasMapIdentity = true,
+    hasInstanceInfo = true,
+    hasMapPosition = true,
+    hasNamePlateAPI = false,
+    hasMoney = true,
+    hasLootValue = true,
+    hasGearCompare = true,
     hasPlayerXPState = true,
     hasLevelXPState = true,
     hasXPFormula = true,

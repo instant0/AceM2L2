@@ -14,6 +14,43 @@ local FormatNumber = Util.FormatNumber
 local FormatDate = Util.FormatDate
 local FormatAgo = Util.FormatAgo
 
+local function TopMobsByField(db, field, key, limit)
+  local top = {}
+  for _, mob in pairs(db.mobs or {}) do
+    if type(mob) == "table" and type(mob[field]) == "table" then
+      local value = tonumber(mob[field][key]) or 0
+      if value > 0 then
+        top[#top + 1] = { name = mob.name or "Unknown", kills = value }
+      end
+    end
+  end
+  table.sort(top, function(a, b)
+    if a.kills == b.kills then
+      return tostring(a.name) < tostring(b.name)
+    end
+    return a.kills > b.kills
+  end)
+  return top, limit
+end
+
+local function LevelRange(areaLevels)
+  local minLevel, maxLevel
+  if type(areaLevels) == "table" then
+    for levelKey, count in pairs(areaLevels) do
+      local level = tonumber(levelKey)
+      if level and (tonumber(count) or 0) > 0 then
+        if not minLevel or level < minLevel then
+          minLevel = level
+        end
+        if not maxLevel or level > maxLevel then
+          maxLevel = level
+        end
+      end
+    end
+  end
+  return minLevel, maxLevel
+end
+
 function XPTooltip:ShowModel(npcID)
   if not self.ui or not self.ui.model or not self.ui.modelFallback then
     return
@@ -204,38 +241,15 @@ function XPTooltip:UpdateAreaDetail(mapKey)
     "Kills: " .. FormatNumber(kills) .. "  ·  " .. string.format("%.1f%%", percent) .. " of total"
   )
 
-  local top = {}
-  for _, mob in pairs(db.mobs) do
-    if type(mob) == "table" and type(mob.killsByMap) == "table" then
-      local value = tonumber(mob.killsByMap[mapKey]) or 0
-      if value > 0 then
-        top[#top + 1] = { name = mob.name or "Unknown", kills = value }
-      end
-    end
-  end
-  table.sort(top, function(a, b) return a.kills > b.kills end)
-
+  local top = TopMobsByField(db, "killsByMap", mapKey)
   local lines = {}
   lines[#lines + 1] = "Top mobs:"
   for index = 1, min(#top, 6) do
     lines[#lines + 1] = "  " .. tostring(top[index].name) .. " - " .. FormatNumber(top[index].kills) .. " kills"
   end
 
-  local minLevel, maxLevel
   local areaLevels = db.areaLevels and db.areaLevels[mapKey]
-  if type(areaLevels) == "table" then
-    for levelKey, count in pairs(areaLevels) do
-      local level = tonumber(levelKey)
-      if level and (tonumber(count) or 0) > 0 then
-        if not minLevel or level < minLevel then
-          minLevel = level
-        end
-        if not maxLevel or level > maxLevel then
-          maxLevel = level
-        end
-      end
-    end
-  end
+  local minLevel, maxLevel = LevelRange(areaLevels)
   if minLevel then
     lines[#lines + 1] = "Level range: " .. tostring(minLevel) .. "-" .. tostring(maxLevel)
   end
@@ -253,17 +267,7 @@ function XPTooltip:UpdateLevelDetail(levelKey)
     "Kills: " .. FormatNumber(kills) .. "  ·  " .. string.format("%.1f%%", percent) .. " of total"
   )
 
-  local top = {}
-  for _, mob in pairs(db.mobs) do
-    if type(mob) == "table" and type(mob.killsAtLevel) == "table" then
-      local value = tonumber(mob.killsAtLevel[levelKey]) or 0
-      if value > 0 then
-        top[#top + 1] = { name = mob.name or "Unknown", kills = value }
-      end
-    end
-  end
-  table.sort(top, function(a, b) return a.kills > b.kills end)
-
+  local top = TopMobsByField(db, "killsAtLevel", levelKey)
   local lines = {}
   lines[#lines + 1] = "Top mobs:"
   for index = 1, min(#top, 8) do

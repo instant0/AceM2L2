@@ -222,15 +222,6 @@ function XPTooltip:ApplyTheme()
   self:UpdateRows()
 end
 
-function XPTooltip:RegisterPanel(panel, kind)
-  if not self.ui then
-    return
-  end
-  panel.xpTooltipKind = kind or "panel"
-  self.ui.panels[#self.ui.panels + 1] = panel
-  self:StylePanel(panel, kind)
-end
-
 function XPTooltip:CreateAmbient(frame)
   local theme = self:GetTheme()
 

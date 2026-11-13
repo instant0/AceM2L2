@@ -94,6 +94,22 @@ function XPTooltip:AddTooltipKillCount(tooltip, mob, playerLevel, settings)
   return true
 end
 
+function XPTooltip:AddTooltipMobLevel(tooltip, level, settings)
+  if not settings or not settings.showMobLevel then
+    return false
+  end
+  local text
+  if level == -1 then
+    text = "??"
+  elseif level and level > 0 then
+    text = tostring(level)
+  else
+    return false
+  end
+  tooltip:AddDoubleLine("|cffaaaaaaLevel:|r", "|cffffffff" .. text .. "|r")
+  return true
+end
+
 function XPTooltip.AddTooltipLines(self, tooltip, data)
   local unit
   if tooltip and type(tooltip.GetUnit) == "function" then
@@ -137,6 +153,7 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
     killsAtLevel = tonumber(mob.killsAtLevel[tostring(playerLevel)]) or 0
   end
 
+  local rawMobLevel = SafeNumber(SafeCall(UnitLevel, unit))
   local supportsXP = self:Supports("hasTooltipXP")
   local xpMax = supportsXP and self:GetXPMax() or nil
   local xpCurrent = supportsXP and self:GetXP() or nil
@@ -149,17 +166,18 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
   if not xpAvailable then
     local signature = table.concat({
       tostring(unit), tostring(guid or ""), tostring(playerLevel),
+      tostring(rawMobLevel), tostring(settings.showMobLevel),
       "counts", tostring(killsTotal), tostring(killsAtLevel),
     }, ":")
     if tooltip.xpTooltipSignature == signature then
       return
     end
     tooltip.xpTooltipSignature = signature
+    self:AddTooltipMobLevel(tooltip, rawMobLevel, settings)
     self:AddTooltipKillCount(tooltip, mob, playerLevel, settings)
     return
   end
 
-  local rawMobLevel = SafeNumber(SafeCall(UnitLevel, unit))
   local mobLevel
   if rawMobLevel == nil or rawMobLevel == 0 then
     mobLevel = playerLevel
@@ -198,13 +216,17 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
   end
 
   local signature = tostring(unit) .. ":" .. tostring(guid or "") .. ":" .. tostring(playerLevel)
-    .. ":" .. tostring(mobLevel) .. ":" .. tostring(estimate) .. ":" .. tostring(soloEstimate)
+    .. ":" .. tostring(mobLevel) .. ":" .. tostring(rawMobLevel) .. ":" .. tostring(settings.showMobLevel)
+    .. ":" .. tostring(settings.showXPBonuses)
+    .. ":" .. tostring(estimate) .. ":" .. tostring(soloEstimate)
     .. ":" .. tostring(groupSize) .. ":" .. tostring(buffSignature)
     .. ":" .. tostring(killsTotal) .. ":" .. tostring(killsAtLevel)
   if tooltip.xpTooltipSignature == signature then
     return
   end
   tooltip.xpTooltipSignature = signature
+
+  self:AddTooltipMobLevel(tooltip, rawMobLevel, settings)
 
   if not estimate or estimate <= 0 then
     if settings.showUnknown then
@@ -231,6 +253,25 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
       value = value .. " |cffaaaaaa(group share; solo " .. prefix .. FormatNumber(soloEstimate) .. ")|r"
     end
     tooltip:AddDoubleLine("|cffaaaaaaXP:|r", "|cffffffff" .. value .. "|r")
+  end
+
+  if settings.showXPBonuses then
+    local bonuses, _, totalPercent = self:GetActiveXPBonuses()
+    local bonusText = self:FormatXPBonuses(bonuses, totalPercent)
+    if bonusText then
+      tooltip:AddDoubleLine("|cffaaaaaaXP bonuses:|r", "|cff55ff55" .. bonusText .. "|r")
+    end
+  end
+
+  if settings.showXPRemaining then
+    local _, _, remainingXP, remainingPercent = self:GetXPProgress()
+    if remainingXP then
+      tooltip:AddDoubleLine(
+        "|cffaaaaaaXP remaining:|r",
+        "|cffffffff" .. FormatNumber(remainingXP) .. "|r |cffaaaaaa("
+          .. FormatPercent(remainingPercent) .. ")|r"
+      )
+    end
   end
 
   if settings.showRested and pool > 0 and restedBonus > 0 then

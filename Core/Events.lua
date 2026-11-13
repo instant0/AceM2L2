@@ -86,6 +86,9 @@ function AceM2L2:OnInitialize()
   self.lastChatXPAmount = nil
   self.questXPWindowUntil = 0
   self.questXPAmount = nil
+  self.pendingQuestID = nil
+  self.pendingQuestName = nil
+  self.pendingQuestAt = 0
   self.useStandingEvent = false
   self.optionsFailed = false
 
@@ -117,6 +120,9 @@ function AceM2L2:OnEnable()
   self.lastChatXPAmount = nil
   self.questXPWindowUntil = 0
   self.questXPAmount = nil
+  self.pendingQuestID = nil
+  self.pendingQuestName = nil
+  self.pendingQuestAt = 0
   self:SafeInvoke("RefreshFactionBaseline", "RefreshFactionBaseline")
 
   if not self.optionsCategory then
@@ -157,6 +163,9 @@ function AceM2L2:HandleEnteringWorld()
   self.lastChatXPAmount = nil
   self.questXPWindowUntil = 0
   self.questXPAmount = nil
+  self.pendingQuestID = nil
+  self.pendingQuestName = nil
+  self.pendingQuestAt = 0
   self.factionCache = nil
   self:SafeInvoke("RefreshFactionBaseline", "RefreshFactionBaseline")
 end
@@ -175,4 +184,7 @@ function AceM2L2:HandleLevelUp()
   self.lastChatXPAmount = nil
   self.questXPWindowUntil = 0
   self.questXPAmount = nil
+  self.pendingQuestID = nil
+  self.pendingQuestName = nil
+  self.pendingQuestAt = 0
 end

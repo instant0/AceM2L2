@@ -14,6 +14,28 @@ XPTooltip.UI = XPTooltip.UI or {}
 
 local Util = XPTooltip.Util
 
+-- Nameplate text lives in UI/Nameplates.lua. The refresh/clear hooks are
+-- optional so a missing file or a client without nameplates stays harmless.
+local function RefreshNameplateTexts(self)
+  if type(self.RefreshNameplateLevels) ~= "function" then
+    return
+  end
+  local ok, err = pcall(self.RefreshNameplateLevels, self)
+  if not ok then
+    self:ReportError("RefreshNameplateLevels", err, false)
+  end
+end
+
+local function ClearNameplateTexts(self)
+  if type(self.ClearNameplateLevels) ~= "function" then
+    return
+  end
+  local ok, err = pcall(self.ClearNameplateLevels, self)
+  if not ok then
+    self:ReportError("ClearNameplateLevels", err, false)
+  end
+end
+
 function XPTooltip:GetSettings()
   if type(AceM2L2DB) ~= "table" then
     AceM2L2DB = {}
@@ -92,13 +114,15 @@ function XPTooltip:OnInitialize()
   self.recentChatKills = {}
   self.pendingChatXP = {}
   self.deletedMobKeys = {}
-  self.lastXP = nil
+  self.respawnWatches = {}
+  self.lootEventAvailable = false
+  self.moneyEventAvailable = false
+  self.namePlateEventAvailable = false
+  self.recentLoot = {}
   self.lastPool = nil
   self.poolBeforeKill = nil
   self.lastTarget = nil
   self.lastMouseover = nil
-  self.lastXPChatAt = 0
-  self.lastXPUpdateAt = 0
   self.buffCacheTime = 0
   self.modelYaw = 0
   self.ui = nil
@@ -132,6 +156,7 @@ function XPTooltip:InvalidatePendingWork(reason, full)
   self.pendingDeaths = {}
   self.recentChatKills = {}
   self.pendingChatXP = {}
+  self.respawnWatches = {}
   if full then
     self.lastTarget = nil
     self.lastMouseover = nil
@@ -149,7 +174,9 @@ function XPTooltip:OnDisable()
     pcall(self.UnregisterAllEvents, self)
     self.installed = false
   end
+  self.namePlateEventAvailable = false
   self:InvalidatePendingWork("module disabled", true)
+  ClearNameplateTexts(self)
   self:CloseUI()
   self:HideMinimapIcon()
 end
@@ -163,6 +190,7 @@ function XPTooltip:Refresh()
     self.autoDisabled = true
     self.autoDisableReason = "settings unavailable"
     self:InvalidatePendingWork("settings unavailable", true)
+    ClearNameplateTexts(self)
     return
   end
 
@@ -174,7 +202,9 @@ function XPTooltip:Refresh()
       pcall(self.UnregisterAllEvents, self)
       self.installed = false
     end
+    self.namePlateEventAvailable = false
     self:InvalidatePendingWork("schema blocked", true)
+    ClearNameplateTexts(self)
     self:CloseUI()
     self:HideMinimapIcon()
     return
@@ -192,7 +222,9 @@ function XPTooltip:Refresh()
       pcall(self.UnregisterAllEvents, self)
       self.installed = false
     end
+    self.namePlateEventAvailable = false
     self:InvalidatePendingWork("unsupported client", true)
+    ClearNameplateTexts(self)
     self:CloseUI()
     self:HideMinimapIcon()
     return
@@ -207,7 +239,9 @@ function XPTooltip:Refresh()
       pcall(self.UnregisterAllEvents, self)
       self.installed = false
     end
+    self.namePlateEventAvailable = false
     self:InvalidatePendingWork("user disabled", true)
+    ClearNameplateTexts(self)
     self:CloseUI()
     self:HideMinimapIcon()
     return
@@ -215,6 +249,7 @@ function XPTooltip:Refresh()
 
   self:Install()
   self.active = true
+  RefreshNameplateTexts(self)
   self:InitializeMinimap()
   self:RefreshUI()
 end
@@ -224,6 +259,8 @@ function XPTooltip:Install()
     return
   end
   self.installed = true
+  self.lootEventAvailable = false
+  self.moneyEventAvailable = false
 
   local events = {
     { "CHAT_MSG_COMBAT_XP_GAIN", "OnXPChat" },
@@ -238,16 +275,50 @@ function XPTooltip:Install()
     { "ENABLE_XP_GAIN", "OnXPGainEnabled" },
     { "DISABLE_XP_GAIN", "OnXPGainDisabled" },
     { "PLAYER_MAX_LEVEL_UPDATE", "OnMaxLevelUpdate" },
+    { "CHAT_MSG_LOOT", "OnLootMessage" },
+    { "PLAYER_MONEY", "OnMoneyChanged" },
+    { "PLAYER_DEAD", "OnPlayerDied" },
   }
   for _, entry in ipairs(events) do
     local ok, err = pcall(self.RegisterEvent, self, entry[1], entry[2])
     if not ok then
       self:ReportError("RegisterEvent " .. tostring(entry[1]), err, false)
+    elseif entry[1] == "CHAT_MSG_LOOT" then
+      self.lootEventAvailable = true
+    elseif entry[1] == "PLAYER_MONEY" then
+      self.moneyEventAvailable = true
+    end
+  end
+
+  -- Nameplates also feed respawn sightings, so these events are registered even
+  -- when the level display is off. Both registrations must succeed; a partial
+  -- pair is rolled back to keep the availability flag truthful.
+  self.namePlateEventAvailable = false
+  local hasNamePlateAPI = self:Supports("hasNamePlateAPI")
+    and type(C_NamePlate) == "table"
+    and type(C_NamePlate.GetNamePlateForUnit) == "function"
+  if hasNamePlateAPI then
+    local addedOK, addedErr = pcall(self.RegisterEvent, self, "NAME_PLATE_UNIT_ADDED", "OnNamePlateAdded")
+    local removedOK, removedErr = pcall(self.RegisterEvent, self, "NAME_PLATE_UNIT_REMOVED", "OnNamePlateRemoved")
+    if addedOK and removedOK then
+      self.namePlateEventAvailable = true
+    else
+      if addedOK then
+        pcall(self.UnregisterEvent, self, "NAME_PLATE_UNIT_ADDED")
+      end
+      if removedOK then
+        pcall(self.UnregisterEvent, self, "NAME_PLATE_UNIT_REMOVED")
+      end
+      if not addedOK then
+        self:ReportError("RegisterEvent NAME_PLATE_UNIT_ADDED", addedErr, false)
+      end
+      if not removedOK then
+        self:ReportError("RegisterEvent NAME_PLATE_UNIT_REMOVED", removedErr, false)
+      end
     end
   end
 
   self:InstallTooltipHook()
-  self.lastXP = self:GetXP()
   self.lastPool = self:GetRestedPool()
   self.lastTarget = self:CaptureUnit("target")
 end
@@ -297,7 +368,9 @@ function XPTooltip:ReportError(context, err, countTowardCircuit)
     self.autoDisableReason = "handler errors"
     pcall(self.UnregisterAllEvents, self)
     self.installed = false
+    self.namePlateEventAvailable = false
     self:InvalidatePendingWork("handler errors", true)
+    ClearNameplateTexts(self)
     self:CloseUI()
     self:HideMinimapIcon()
   end

@@ -11,7 +11,11 @@ local Util = XPTooltip.Util
 local floor, min, max = math.floor, math.min, math.max
 local CreateBackdropFrame = UI.CreateBackdropFrame
 local FormatNumber = Util.FormatNumber
+local FormatPercent = Util.FormatPercent
 local FormatAgo = Util.FormatAgo
+local FormatDuration = Util.FormatDuration
+local FormatMoney = Util.FormatMoney
+local Epoch = Util.Epoch
 
 function XPTooltip:CreateOverviewPanel(frame)
   local panel = CreateBackdropFrame(frame)
@@ -193,6 +197,168 @@ function XPTooltip:RefreshOverview()
     levelLines[#levelLines + 1] = "Most kills: level " .. tostring(topLevel) .. " (" .. FormatNumber(topLevelKills) .. ")"
   else
     levelLines[#levelLines + 1] = "No level data yet."
+  end
+  local questGains, questXP = self:GetQuestSummary()
+  if questGains > 0 then
+    levelLines[#levelLines + 1] = "Quest XP: " .. FormatNumber(questXP)
+      .. " from " .. FormatNumber(questGains) .. " gains"
+  end
+  local settings = self:GetSettings()
+  if settings and settings.showXPBonuses then
+    local bonuses, _, totalPercent = self:GetActiveXPBonuses()
+    local bonusText = self:FormatXPBonuses(bonuses, totalPercent)
+    if bonusText then
+      levelLines[#levelLines + 1] = "XP bonuses: " .. bonusText
+    end
+  end
+  local _, _, remainingXP, remainingPercent = self:GetXPProgress()
+  if remainingXP then
+    levelLines[#levelLines + 1] = "XP remaining: " .. FormatNumber(remainingXP)
+      .. " (" .. FormatPercent(remainingPercent) .. ")"
+  end
+
+  local rateWindow = (tonumber(settings and settings.rateWindowMinutes) or 10) * 60
+  if settings and settings.showXPRate and type(self.GetXPRate) == "function" then
+    local ok, xpPerHour, xpPerMinute = pcall(self.GetXPRate, self, rateWindow)
+    if ok and xpPerHour then
+      levelLines[#levelLines + 1] = "XP rate: " .. FormatNumber(xpPerHour) .. "/hr ("
+        .. FormatNumber(xpPerMinute) .. "/min)"
+    end
+  end
+  if settings and settings.showTimeToLevel and type(self.GetTimeToLevel) == "function" then
+    local ok, seconds = pcall(self.GetTimeToLevel, self, rateWindow)
+    if ok and seconds then
+      levelLines[#levelLines + 1] = "Time to level: " .. FormatDuration(seconds)
+    end
+  end
+
+  if settings and settings.showGrindingSpot and type(self.GetGrindingSpots) == "function" then
+    local ok, spots = pcall(self.GetGrindingSpots, self, 1)
+    local spot = ok and type(spots) == "table" and spots[1] or nil
+    if type(spot) == "table" then
+      local level = floor(tonumber(spot.level) or 0)
+      local zone = type(spot.zone) == "string" and spot.zone or nil
+      if not zone and type(spot.mapName) == "string" then
+        zone = spot.mapName
+      end
+      if not zone and tonumber(spot.mapID) then
+        zone = self:GetMapName(spot.mapID)
+      end
+      local xpPerHour = tonumber(spot.xpPerHour) or tonumber(spot.rate) or 0
+      if zone and level > 0 then
+        levelLines[#levelLines + 1] = "Grinding spot: " .. zone .. " (level " .. tostring(level)
+          .. "), " .. FormatNumber(xpPerHour) .. "/hr"
+      end
+    end
+  end
+
+  local history = self:NormalizeLevelHistory()
+  local now = Epoch()
+  local supportsXP = self:Supports("hasPerMobXP")
+
+  if settings and settings.showDungeonXP then
+    local dungeon = db.dungeon
+    if type(dungeon) == "table" then
+      local dungeonXP = tonumber(dungeon.xp) or 0
+      local dungeonKills = tonumber(dungeon.kills) or 0
+      local sessionKills = tonumber(dungeon.sessionKills) or 0
+      if dungeonKills > 0 or (supportsXP and dungeonXP > 0) then
+        local text
+        if supportsXP then
+          text = "Dungeon: " .. FormatNumber(dungeonXP) .. " XP"
+          local totalXP = (tonumber(db.totals.xp) or 0) + (tonumber(questXP) or 0)
+          if totalXP > 0 then
+            text = text .. " (" .. FormatPercent(dungeonXP / totalXP * 100) .. " of total)"
+          end
+          text = text .. ", " .. FormatNumber(dungeonKills) .. " kills ("
+            .. FormatNumber(sessionKills) .. " this session)"
+        else
+          text = "Dungeon: " .. FormatNumber(dungeonKills) .. " kills ("
+            .. FormatNumber(sessionKills) .. " this session)"
+        end
+        levelLines[#levelLines + 1] = text
+      end
+    end
+  end
+
+  local economy = db.economy
+  if settings and settings.showEconomy and self:Supports("hasLootValue") and self.lootEventAvailable
+    and type(economy) == "table" and (tonumber(economy.sessionItems) or 0) > 0 then
+    levelLines[#levelLines + 1] = "Loot: " .. FormatMoney(economy.sessionLootValue)
+      .. " (" .. FormatNumber(economy.sessionItems) .. " items)"
+  end
+  if settings and settings.showGoldPerHour and type(self.GetGoldPerHour) == "function" then
+    local ok, goldPerHour = pcall(self.GetGoldPerHour, self)
+    if ok and type(goldPerHour) == "number" then
+      levelLines[#levelLines + 1] = "Gold/hour: " .. FormatMoney(goldPerHour * 10000)
+    end
+  end
+
+  if settings and settings.showGoal then
+    local goal = db.goal
+    local targetLevel = type(goal) == "table" and (tonumber(goal.targetLevel) or 0) or 0
+    if targetLevel > 0 then
+      local currentLevel = self:GetPlayerLevel() or 0
+      local levelsToGo = max(0, targetLevel - currentLevel)
+      local text = "Goal: level " .. tostring(targetLevel)
+      if levelsToGo <= 0 then
+        text = text .. " (reached)"
+      else
+        text = text .. " (" .. tostring(levelsToGo) .. " levels to go)"
+      end
+      if supportsXP then
+        local sinceSet = max(0, (tonumber(db.totals.xp) or 0) - (tonumber(goal.targetXP) or 0))
+        text = text .. ", " .. FormatNumber(sinceSet) .. " XP since set"
+        local _, _, remaining = self:GetXPProgress()
+        if remaining then
+          text = text .. ", " .. FormatNumber(remaining) .. " XP to next level"
+        end
+      end
+      levelLines[#levelLines + 1] = text
+    end
+  end
+
+  if settings and settings.showSplits then
+    for index = #history, 1, -1 do
+      local record = history[index]
+      local level = tonumber(record.level) or 0
+      if level > 0 then
+        local duration = tonumber(record.duration) or 0
+        if (tonumber(record.endedAt) or 0) == 0 then
+          duration = max(0, now - (tonumber(record.startedAt) or now))
+        end
+        local text = "Last level: L" .. tostring(level) .. " " .. FormatDuration(duration)
+        if supportsXP then
+          text = text .. ", " .. FormatNumber(record.xpGained) .. " XP"
+        end
+        text = text .. ", " .. FormatNumber(record.kills) .. " kills"
+        levelLines[#levelLines + 1] = text
+        break
+      end
+    end
+  end
+
+  if #history > 0 then
+    levelLines[#levelLines + 1] = ""
+    levelLines[#levelLines + 1] = "Level history:"
+    local shown = 0
+    for index = #history, 1, -1 do
+      if shown >= 3 then
+        break
+      end
+      local record = history[index]
+      local duration = tonumber(record.duration) or 0
+      if (tonumber(record.endedAt) or 0) == 0 then
+        duration = max(0, now - (tonumber(record.startedAt) or now))
+      end
+      local text = "  L" .. tostring(record.level) .. " " .. FormatDuration(duration)
+      if supportsXP then
+        text = text .. ", " .. FormatNumber(record.xpGained) .. " XP"
+      end
+      text = text .. ", " .. FormatNumber(record.kills) .. " kills"
+      levelLines[#levelLines + 1] = text
+      shown = shown + 1
+    end
   end
   levelLines[#levelLines + 1] = ""
   levelLines[#levelLines + 1] = "Use the tabs above to browse mobs, areas, and levels."

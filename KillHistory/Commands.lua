@@ -18,8 +18,11 @@ local IsSecret = Util.IsSecret
 local SafeCall = Util.SafeCall
 local SafeBool = Util.SafeBool
 local FormatNumber = Util.FormatNumber
+local FormatPercent = Util.FormatPercent
 local FormatAgo = Util.FormatAgo
+local FormatDuration = Util.FormatDuration
 local FormatDate = Util.FormatDate
+local FormatMoney = Util.FormatMoney
 local CopyTable = Util.CopyTable
 local Epoch = Util.Epoch
 
@@ -74,6 +77,8 @@ local function ProbeValue(label, value)
 end
 
 function XPTooltip:PrintProbe()
+  local db = self.char
+  local economy = db and type(db.economy) == "table" and db.economy or {}
   local profile = self:GetClientProfile()
   AceM2L2:SafePrint("Kill History probe:")
   ProbeValue("projectID", self:GetProjectID())
@@ -125,6 +130,7 @@ function XPTooltip:PrintProbe()
   end
   ProbeValue("mapID", self:GetMapID())
   ProbeValue("mapName", self:GetMapName(self:GetMapID()))
+  ProbeValue("isInDungeon", self:IsInDungeon())
   ProbeValue("groupSize", self:GetGroupSize())
   ProbeValue("maxLevel", self:GetMaxLevel())
   ProbeValue("xp", self:GetXP())
@@ -132,6 +138,47 @@ function XPTooltip:PrintProbe()
   ProbeValue("xpRawDiagnostic", SafeCall(UnitXP, "player"))
   ProbeValue("xpMaxRawDiagnostic", SafeCall(UnitXPMax, "player"))
   ProbeValue("restedPool", self:GetRestedPool())
+  ProbeValue("money", self:GetMoney())
+  ProbeValue("moneyKnown", economy.moneyKnown)
+  ProbeValue("sessionLootValue", economy.sessionLootValue)
+  ProbeValue("goldPerHour", self:GetGoldPerHour())
+  ProbeValue("lootEventAvailable", self.lootEventAvailable)
+  ProbeValue("moneyEventAvailable", self.moneyEventAvailable)
+  local deaths = db and type(db.deaths) == "table" and db.deaths or {}
+  local respawns = db and type(db.respawns) == "table" and db.respawns or {}
+  ProbeValue("deathCount", #deaths)
+  local mapPosition
+  if type(self.GetPlayerMapPosition) == "function" then
+    local ok, _, x, y = pcall(self.GetPlayerMapPosition, self)
+    x, y = tonumber(x), tonumber(y)
+    if ok and x and y then
+      mapPosition = string.format("%.0f,%.0f", x * 100, y * 100)
+    end
+  end
+  ProbeValue("mapPosition", mapPosition)
+  local hasMapPositionAPI = false
+  if type(self.HasMapPositionAPI) == "function" then
+    local ok, value = pcall(self.HasMapPositionAPI, self)
+    hasMapPositionAPI = ok and value and true or false
+  end
+  ProbeValue("hasMapPositionAPI", hasMapPositionAPI)
+  local respawnNpcCount = 0
+  for _ in pairs(respawns) do
+    respawnNpcCount = respawnNpcCount + 1
+  end
+  ProbeValue("respawnNpcCount", respawnNpcCount)
+  local heatmaps = db and type(db.heatmaps) == "table" and db.heatmaps or {}
+  local heatmapMaps, heatmapKills = 0, 0
+  for _, zone in pairs(heatmaps) do
+    if type(zone) == "table" then
+      heatmapMaps = heatmapMaps + 1
+      heatmapKills = heatmapKills + (tonumber(zone.total) or 0)
+    end
+  end
+  ProbeValue("heatmapMaps", heatmapMaps)
+  ProbeValue("heatmapKills", heatmapKills)
+  ProbeValue("hasNamePlateAPI", self:Supports("hasNamePlateAPI"))
+  ProbeValue("namePlateEventAvailable", self.namePlateEventAvailable)
 end
 
 function XPTooltip:PrintKills(filter)
@@ -184,6 +231,213 @@ function XPTooltip:PrintKills(filter)
     AceM2L2:SafePrint(string.format(
       "  %-24s %8s%s  (%s)", tostring(mob.name or "Unknown"), FormatNumber(mob.kills), avg, FormatAgo(mob.lastSeen)
     ))
+  end
+end
+
+function XPTooltip:PrintQuests()
+  if not self:Supports("hasPerMobXP") then
+    AceM2L2:SafePrint("Kill History: quest XP tracking is unavailable on this client.")
+    return
+  end
+  local db = self.char
+  if not db then
+    return
+  end
+  local list = {}
+  for key, quest in pairs(db.quests or {}) do
+    if type(quest) == "table" and (tonumber(quest.count) or 0) > 0 then
+      list[#list + 1] = { key = key, quest = quest }
+    end
+  end
+  if #list == 0 then
+    AceM2L2:SafePrint("Kill History: no quest XP recorded yet.")
+    return
+  end
+  table.sort(list, function(a, b)
+    local ax = tonumber(a.quest.totalXP) or 0
+    local bx = tonumber(b.quest.totalXP) or 0
+    if ax == bx then
+      return (tonumber(a.quest.count) or 0) > (tonumber(b.quest.count) or 0)
+    end
+    return ax > bx
+  end)
+  local count, xp = self:GetQuestSummary()
+  AceM2L2:SafePrint("Quest XP: " .. FormatNumber(count) .. " gains, "
+    .. FormatNumber(xp) .. " XP")
+  for index = 1, min(#list, 15) do
+    local entry = list[index]
+    local quest = entry.quest
+    AceM2L2:SafePrint(string.format(
+      "  %-30s %6s gains  %10s XP  (%s)",
+      tostring(quest.name or entry.key),
+      FormatNumber(quest.count or 0),
+      FormatNumber(quest.totalXP or 0),
+      FormatAgo(quest.lastSeen)
+    ))
+  end
+end
+
+function XPTooltip:PrintHistory(filter)
+  local db = self.char
+  if not db then
+    return
+  end
+  local levelFilter = tonumber(filter)
+  local records = self:NormalizeLevelHistory()
+  local list = {}
+  for _, record in ipairs(records) do
+    if not levelFilter or record.level == levelFilter then
+      list[#list + 1] = record
+    end
+  end
+  if #list == 0 then
+    AceM2L2:SafePrint("Kill History: no level history recorded yet.")
+    return
+  end
+  local supportsXP = self:Supports("hasPerMobXP")
+  local now = Epoch()
+  AceM2L2:SafePrint("Level history"
+    .. (levelFilter and (" (level " .. tostring(levelFilter) .. ")") or "") .. ":")
+  for index = #list, 1, -1 do
+    local record = list[index]
+    local duration = tonumber(record.duration) or 0
+    if (tonumber(record.endedAt) or 0) == 0 then
+      duration = max(0, now - (tonumber(record.startedAt) or now))
+    end
+    local parts = {
+      "Level " .. tostring(record.level),
+      FormatDuration(duration),
+    }
+    if supportsXP then
+      parts[#parts + 1] = FormatNumber(record.xpGained) .. " XP"
+    end
+    parts[#parts + 1] = FormatNumber(record.kills) .. " kills"
+    local suffix = (tonumber(record.endedAt) or 0) == 0 and " (current)" or ""
+    AceM2L2:SafePrint("  " .. table.concat(parts, " | ") .. suffix)
+  end
+end
+
+function XPTooltip:PrintSplits()
+  local db = self.char
+  if not db then
+    return
+  end
+  local supportsXP = self:Supports("hasPerMobXP")
+  local now = Epoch()
+  local eligible = {}
+  for _, record in ipairs(self:NormalizeLevelHistory()) do
+    local level = tonumber(record.level) or 0
+    if level > 0 then
+      local endedAt = tonumber(record.endedAt) or 0
+      local duration = tonumber(record.duration) or 0
+      local isCurrent = endedAt == 0
+      if isCurrent then
+        duration = max(0, now - (tonumber(record.startedAt) or now))
+      end
+      eligible[#eligible + 1] = {
+        level = level,
+        duration = max(0, duration),
+        kills = tonumber(record.kills) or 0,
+        xpGained = tonumber(record.xpGained) or 0,
+        isCurrent = isCurrent,
+      }
+    end
+  end
+
+  if #eligible == 0 then
+    AceM2L2:SafePrint("Kill History: no level splits recorded yet.")
+    return
+  end
+
+  AceM2L2:SafePrint("Kill History level splits:")
+  local shown = 0
+  for index = #eligible, 1, -1 do
+    if shown >= 10 then
+      break
+    end
+    local record = eligible[index]
+    local text = "L" .. tostring(record.level) .. "  " .. FormatDuration(record.duration)
+    if supportsXP then
+      text = text .. ", " .. FormatNumber(record.xpGained) .. " XP"
+    end
+    text = text .. ", " .. FormatNumber(record.kills) .. " kills"
+    local suffix = record.isCurrent and " (current)" or ""
+    AceM2L2:SafePrint("  " .. text .. suffix)
+    shown = shown + 1
+  end
+
+  local latest = eligible[#eligible]
+  if latest.duration <= 0 then
+    AceM2L2:SafePrint("  No completed time to compare yet.")
+    return
+  end
+
+  local bestDuration
+  for index = 1, #eligible - 1 do
+    local record = eligible[index]
+    if record.level == latest.level and not record.isCurrent and record.duration > 0 then
+      if not bestDuration or record.duration < bestDuration then
+        bestDuration = record.duration
+      end
+    end
+  end
+  if not bestDuration then
+    AceM2L2:SafePrint("  No previous level " .. tostring(latest.level) .. " record to compare.")
+    return
+  end
+
+  local delta = latest.duration - bestDuration
+  local comparison = "matched"
+  if delta < 0 then
+    comparison = "faster"
+    delta = -delta
+  elseif delta > 0 then
+    comparison = "slower"
+  else
+    delta = 0
+  end
+  AceM2L2:SafePrint("  Best previous at level " .. tostring(latest.level) .. ": "
+    .. FormatDuration(bestDuration) .. " (" .. FormatDuration(delta) .. " " .. comparison .. ")")
+end
+
+function XPTooltip:PrintEconomy()
+  local db = self.char
+  if not db then
+    return
+  end
+  local supportsLoot = self:Supports("hasLootValue")
+  local supportsMoney = self:Supports("hasMoney")
+  if not supportsLoot and not supportsMoney then
+    AceM2L2:SafePrint("Kill History: economy tracking is unavailable on this client.")
+    return
+  end
+  local economy = type(db.economy) == "table" and db.economy or {}
+  AceM2L2:SafePrint("Kill History economy:")
+  if supportsLoot then
+    if self.lootEventAvailable then
+      AceM2L2:SafePrint("  Session loot: " .. FormatMoney(economy.sessionLootValue)
+        .. " (" .. FormatNumber(economy.sessionItems or 0) .. " items)")
+      AceM2L2:SafePrint("  Lifetime loot: " .. FormatMoney(economy.lootValue)
+        .. " (" .. FormatNumber(economy.items or 0) .. " items)")
+    else
+      AceM2L2:SafePrint("  Loot tracking: unavailable on this client.")
+    end
+  end
+  if supportsMoney then
+    if economy.moneyKnown ~= true then
+      AceM2L2:SafePrint("  Money: unavailable on this client.")
+    else
+      local goldPerHour, net, elapsed = self:GetGoldPerHour()
+      if goldPerHour then
+        AceM2L2:SafePrint("  Gold/hour: " .. FormatMoney(goldPerHour * 10000)
+          .. " (net " .. FormatMoney(net) .. ", " .. FormatDuration(elapsed) .. ")")
+      else
+        AceM2L2:SafePrint("  Gold/hour: not enough session time yet.")
+      end
+    end
+  end
+  if not self:Supports("hasGearCompare") then
+    AceM2L2:SafePrint("  Gear upgrades: unavailable on this client.")
   end
 end
 
@@ -251,6 +505,138 @@ function XPTooltip:PrintSession()
   AceM2L2:SafePrint("  Started: " .. FormatAgo(db.session.startedAt or 0))
 end
 
+function XPTooltip:PrintDungeon()
+  if not self:Supports("hasInstanceInfo") then
+    AceM2L2:SafePrint("Kill History: dungeon detection is unavailable on this client.")
+    return
+  end
+  local db = self.char
+  if not db then
+    return
+  end
+  local dungeon = type(db.dungeon) == "table" and db.dungeon or {}
+  local supportsXP = self:Supports("hasPerMobXP")
+  local kills = tonumber(dungeon.kills) or 0
+  local xp = tonumber(dungeon.xp) or 0
+  if kills <= 0 and (not supportsXP or xp <= 0) then
+    AceM2L2:SafePrint("Kill History: no dungeon activity recorded yet.")
+    return
+  end
+  AceM2L2:SafePrint("Kill History dungeon:")
+  AceM2L2:SafePrint("  Kills: " .. FormatNumber(kills)
+    .. " (" .. FormatNumber(dungeon.sessionKills or 0) .. " this session)")
+  if supportsXP then
+    AceM2L2:SafePrint("  XP: " .. FormatNumber(xp)
+      .. " (" .. FormatNumber(dungeon.sessionXP or 0) .. " this session)")
+    local _, questXP = self:GetQuestSummary()
+    local totalXP = (tonumber(db.totals and db.totals.xp) or 0)
+      + (tonumber(questXP) or 0)
+    if totalXP > 0 then
+      AceM2L2:SafePrint("  Share of XP: "
+        .. FormatPercent(xp / totalXP * 100) .. " of total")
+    end
+  end
+  local lastInstance = tonumber(dungeon.lastInstance) or 0
+  if lastInstance > 0 then
+    AceM2L2:SafePrint("  Last instance: " .. self:GetMapName(lastInstance))
+  end
+end
+
+function XPTooltip:PrintGoal(rest)
+  local db = self.char
+  if not db then
+    return
+  end
+  local action, value = (rest or ""):match("^(%S*)%s*(.-)$")
+  action = Lower(action) or ""
+  value = Trim(value)
+
+  if action == "" then
+    local goal = type(db.goal) == "table" and db.goal or {}
+    local targetLevel = tonumber(goal.targetLevel) or 0
+    if targetLevel <= 0 then
+      AceM2L2:SafePrint("Kill History: no leveling goal set. Use /acem2l2 xpt goal set <level>.")
+      return
+    end
+    local currentLevel = self:GetPlayerLevel() or 0
+    local levelsToGo = max(0, targetLevel - currentLevel)
+    AceM2L2:SafePrint("Kill History leveling goal:")
+    AceM2L2:SafePrint("  Target level: " .. FormatNumber(targetLevel))
+    AceM2L2:SafePrint("  Current level: " .. FormatNumber(currentLevel))
+    if levelsToGo <= 0 then
+      AceM2L2:SafePrint("  Levels to go: goal reached")
+    else
+      AceM2L2:SafePrint("  Levels to go: " .. FormatNumber(levelsToGo))
+    end
+    AceM2L2:SafePrint("  Set: " .. FormatAgo(goal.createdAt or 0))
+    if self:Supports("hasPerMobXP") then
+      local totalXP = tonumber(db.totals and db.totals.xp) or 0
+      local targetXP = tonumber(goal.targetXP) or 0
+      AceM2L2:SafePrint("  XP since goal: " .. FormatNumber(max(0, totalXP - targetXP)))
+      local _, _, remaining = self:GetXPProgress()
+      if remaining then
+        AceM2L2:SafePrint("  XP to next level: " .. FormatNumber(remaining))
+      end
+    end
+    return
+  end
+
+  if action == "clear" then
+    db.goal = { targetLevel = 0, targetXP = 0, createdAt = 0 }
+    AceM2L2:SafePrint("Kill History: leveling goal cleared.")
+    return
+  end
+
+  if action == "set" then
+    local currentLevel = self:GetPlayerLevel()
+    local lowerBound = (currentLevel and currentLevel > 0) and floor(currentLevel) or 1
+    local maxLevel = self:GetMaxLevel() or 60
+    local level = tonumber(value)
+    if level then
+      level = floor(level)
+    end
+    if not level or level < lowerBound or level > maxLevel then
+      AceM2L2:SafePrint("Kill History: goal level must be between "
+        .. FormatNumber(lowerBound) .. " and " .. FormatNumber(maxLevel) .. ".")
+      return
+    end
+    db.goal = {
+      targetLevel = level,
+      targetXP = tonumber(db.totals and db.totals.xp) or 0,
+      createdAt = Epoch(),
+    }
+    AceM2L2:SafePrint("Kill History: leveling goal set to level " .. FormatNumber(level) .. ".")
+    return
+  end
+
+  AceM2L2:SafePrint("Usage: /acem2l2 xpt goal [set <level>|clear]")
+end
+
+function XPTooltip:PrintRate(filter)
+  if not self:Supports("hasPerMobXP") then
+    AceM2L2:SafePrint("Kill History: XP rate is unavailable on this client.")
+    return
+  end
+  local settings = self:GetSettings()
+  local minutes = tonumber(filter) or tonumber(settings.rateWindowMinutes) or 10
+  minutes = floor(max(1, min(60, minutes)))
+  local xpPerHour, xpPerMinute, elapsed, count = self:GetXPRate(minutes * 60)
+  if not xpPerHour then
+    AceM2L2:SafePrint("Kill History: not enough XP samples yet.")
+    return
+  end
+  AceM2L2:SafePrint(string.format(
+    "Kill History XP rate (%d min window): %s XP/hr (%s XP/min)",
+    minutes, FormatNumber(xpPerHour), FormatNumber(xpPerMinute)
+  ))
+  AceM2L2:SafePrint("  Sample window: " .. FormatDuration(elapsed or 0)
+    .. " over " .. FormatNumber(count or 0) .. " samples")
+  local seconds = self:GetTimeToLevel(minutes * 60)
+  if seconds then
+    AceM2L2:SafePrint("  Time to level: " .. FormatDuration(seconds))
+  end
+end
+
 function XPTooltip:PrintStats()
   self:PrintStatus()
   local db = self.char
@@ -302,6 +688,14 @@ function XPTooltip:PrintStats()
   if topMap then
     AceM2L2:SafePrint("  Top area: " .. self:GetMapName(topMap) .. " (" .. FormatNumber(topMapKills) .. ")")
   end
+
+  local deathCount = #(type(db.deaths) == "table" and db.deaths or {})
+  local respawnCount = 0
+  for _ in pairs(type(db.respawns) == "table" and db.respawns or {}) do
+    respawnCount = respawnCount + 1
+  end
+  AceM2L2:SafePrint("  Deaths: " .. FormatNumber(deathCount)
+    .. ", respawns: " .. FormatNumber(respawnCount))
 end
 
 function XPTooltip:PrintDump()
@@ -383,6 +777,7 @@ function XPTooltip:ResetKills()
   end
   self:InvalidatePendingWork("reset kills", false)
   db.mobs = {}
+  db.quests = {}
   db.areas = {}
   db.levels = {}
   db.areaLevels = {}
@@ -390,6 +785,29 @@ function XPTooltip:ResetKills()
   db.calibrationVersion = CALIBRATION_VERSION
   db.totals = { kills = 0, xp = 0, uniqueMobs = 0 }
   db.session = { startedAt = Epoch(), kills = 0, xp = 0 }
+  db.dungeon = { xp = 0, kills = 0, sessionXP = 0, sessionKills = 0, lastInstance = 0 }
+  db.goal = { targetLevel = 0, targetXP = 0, createdAt = 0 }
+  db.levelHistory = {}
+  db.deaths = {}
+  db.respawns = {}
+  if type(self.ResetHeatmaps) == "function" then
+    self:ResetHeatmaps()
+  end
+  self.respawnWatches = {}
+  db.economy = {
+    lootValue = 0,
+    sessionLootValue = 0,
+    items = 0,
+    sessionItems = 0,
+    goldStart = 0,
+    goldGained = 0,
+    goldSpent = 0,
+    lastMoney = 0,
+    moneyKnown = false,
+  }
+  self:ResetRates()
+  self:RecordMoney(self:GetMoney())
+  self:EnsureLevelHistory()
   AceM2L2:SafePrint("Kill History reset.")
   self:RefreshUI()
 end
@@ -534,15 +952,26 @@ function XPTooltip:PrintHelp()
   AceM2L2:SafePrint("/acem2l2 xpt probe")
   AceM2L2:SafePrint("/acem2l2 xpt ui")
   AceM2L2:SafePrint("/acem2l2 xpt kills [name]")
+  AceM2L2:SafePrint("/acem2l2 xpt deaths [count]")
+  AceM2L2:SafePrint("/acem2l2 xpt respawns [name]")
+  AceM2L2:SafePrint("/acem2l2 xpt spots")
+  AceM2L2:SafePrint("/acem2l2 xpt quests")
+  AceM2L2:SafePrint("/acem2l2 xpt history [level]")
+  AceM2L2:SafePrint("/acem2l2 xpt splits")
+  AceM2L2:SafePrint("/acem2l2 xpt economy")
   AceM2L2:SafePrint("/acem2l2 xpt areas")
+  AceM2L2:SafePrint("/acem2l2 xpt heatmap [zone]")
   AceM2L2:SafePrint("/acem2l2 xpt levels")
   AceM2L2:SafePrint("/acem2l2 xpt session")
+  AceM2L2:SafePrint("/acem2l2 xpt dungeon")
+  AceM2L2:SafePrint("/acem2l2 xpt goal [set <level>|clear]")
+  AceM2L2:SafePrint("/acem2l2 xpt rate [minutes]")
   AceM2L2:SafePrint("/acem2l2 xpt stats")
   AceM2L2:SafePrint("/acem2l2 xpt dump")
   AceM2L2:SafePrint("/acem2l2 xpt table")
   AceM2L2:SafePrint("/acem2l2 xpt theme aether|dark|midnight|class|contrast")
   AceM2L2:SafePrint("/acem2l2 xpt scale 80-120")
-  AceM2L2:SafePrint("/acem2l2 xpt starttab overview|mobs|areas|levels")
+  AceM2L2:SafePrint("/acem2l2 xpt starttab overview|mobs|areas|levels|heatmap")
   AceM2L2:SafePrint("/acem2l2 xpt minimap on|off|reset|status")
   AceM2L2:SafePrint("/acem2l2 xpt debug on|off")
   AceM2L2:SafePrint("/acem2l2 xpt recalibrate confirm")
@@ -575,12 +1004,34 @@ function XPTooltip:HandleCommand(input)
     self:OpenUI()
   elseif command == "kills" then
     self:PrintKills(rest)
+  elseif command == "deaths" then
+    self:PrintDeaths(rest)
+  elseif command == "respawns" then
+    self:PrintRespawns(rest)
+  elseif command == "spots" then
+    self:PrintSpots()
+  elseif command == "quests" then
+    self:PrintQuests()
+  elseif command == "history" then
+    self:PrintHistory(rest)
   elseif command == "areas" then
     self:PrintAreas()
+  elseif command == "heatmap" then
+    self:PrintHeatmap(rest)
   elseif command == "levels" then
     self:PrintLevels()
   elseif command == "session" then
     self:PrintSession()
+  elseif command == "dungeon" then
+    self:PrintDungeon()
+  elseif command == "goal" then
+    self:PrintGoal(rest)
+  elseif command == "splits" then
+    self:PrintSplits()
+  elseif command == "economy" then
+    self:PrintEconomy()
+  elseif command == "rate" then
+    self:PrintRate(rest)
   elseif command == "stats" then
     self:PrintStats()
   elseif command == "dump" then
@@ -614,7 +1065,8 @@ function XPTooltip:HandleCommand(input)
     end
   elseif command == "starttab" then
     local tab = Lower(rest) or ""
-    if tab == "overview" or tab == "mobs" or tab == "areas" or tab == "levels" then
+    if tab == "overview" or tab == "mobs" or tab == "areas" or tab == "levels"
+      or tab == "heatmap" then
       local settings = self:GetSettings()
       settings.startTab = tab
       if self.ui and self.ui:IsShown() then
@@ -622,7 +1074,7 @@ function XPTooltip:HandleCommand(input)
       end
       AceM2L2:SafePrint("Kill History start tab: " .. tab)
     else
-      AceM2L2:SafePrint("Start tabs: overview, mobs, areas, levels")
+      AceM2L2:SafePrint("Start tabs: overview, mobs, areas, levels, heatmap")
     end
   elseif command == "minimap" then
     local action = Lower(rest) or ""

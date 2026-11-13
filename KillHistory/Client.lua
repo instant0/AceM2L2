@@ -22,6 +22,12 @@ Client.CAPABILITIES = {
   "hasNameIdentity",
   "hasGUIDIdentity",
   "hasMapIdentity",
+  "hasInstanceInfo",
+  "hasMapPosition",
+  "hasNamePlateAPI",
+  "hasMoney",
+  "hasLootValue",
+  "hasGearCompare",
   "hasPlayerXPState",
   "hasLevelXPState",
   "hasXPFormula",
@@ -46,6 +52,12 @@ Client.CAPABILITY_LABELS = {
   hasNameIdentity = "nameIdentity",
   hasGUIDIdentity = "guidIdentity",
   hasMapIdentity = "mapIdentity",
+  hasInstanceInfo = "instanceInfo",
+  hasMapPosition = "mapPosition",
+  hasNamePlateAPI = "namePlateAPI",
+  hasMoney = "money",
+  hasLootValue = "lootValue",
+  hasGearCompare = "gearCompare",
   hasPlayerXPState = "playerXPState",
   hasLevelXPState = "levelXPState",
   hasXPFormula = "formula",
@@ -88,11 +100,6 @@ end
 function Client:GetProfile()
   return self:Detect(self:GetProjectID())
 end
-
-Client.PROJECT_IDS = {
-  forever = CAMELOT_PROJECT_ID,
-  midnight = MAINLINE_PROJECT_ID,
-}
 
 --[[--------------------------------------------------------------------------------
   Module helpers

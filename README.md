@@ -2,10 +2,10 @@
 
 AceM2L2 is a World of Warcraft addon that reports XP and reputation progress
 and provides a **Kill History** browser for Forever 1.60.1 and Midnight 12.1.5.
-Forever gets the full XP/tooltip experience; Midnight gets counts-only kill,
-area, level, and session history until its XP data is live-verified.
+Forever gets the full XP/tooltip experience; Midnight gets counts-focused
+history plus the non-XP features until its XP data is live-verified.
 
-- **Version:** 1.12.0
+- **Version:** 2.0.0
 - **Author:** faslkjd56
 - **Interfaces:** Midnight `120105`, Forever `16001`
 - **Clients:** Midnight 12.1.5 and Forever 1.60.1
@@ -22,11 +22,11 @@ AceM2L2 has two layers:
    reputation-to-next-rank messages for both Midnight and Forever.
 2. **Kill History module** (`KillHistory/`) — per-character kill tracking on
    both clients, with tooltip estimates and calibration on Forever and
-   counts-only tracking on Midnight.
+   counts-focused tracking on Midnight.
 
 The Kill History module auto-disables for unknown clients or when the active
 client's required APIs are unavailable. Forever requires its XP APIs; the
-Midnight counts-only profile needs only minimal identity/level APIs. A missing
+Midnight counts-focused profile needs only minimal identity/level APIs. A missing
 tooltip hook disables tooltip lines without disabling the tracker or the
 window.
 
@@ -35,7 +35,7 @@ window.
 | Client | Project ID | Interface | Core addon | Kill History |
 |---|---:|---:|---|---|
 | Forever 1.60.1 | `18` | `16001` | Supported | Full |
-| Midnight 12.1.5 | `1` | `120105` | Supported | Counts-only |
+| Midnight 12.1.5 | `1` | `120105` | Supported | Counts-focused |
 
 The TOC intentionally lists both interface versions:
 
@@ -75,24 +75,38 @@ model. Client-specific policy lives only in `KillHistory/Client.lua` and
 
 **Forever 1.60.1 — full mode**
 
-- Tooltip lines for estimated XP, percent of level, kills-to-level, rested
-  bonus, and per-mob kill counts.
-- Forever XP formula with Well Fed (+5%), Well-Rested (+1% per stack, up to
-  +3%), and the rested total-pool model.
+- Tooltip lines for estimated XP, percent of level, XP remaining, mob level,
+  kills-to-level, rested bonus, XP bonuses, and per-mob kill counts.
+- Forever XP formula with Well Fed XP Boost food (`1243969`, +5% kill XP),
+  Well-Rested (`429959`, +1% per stack, up to +3%), and the rested total-pool
+  model. The active bonus breakdown matches the multiplier actually applied.
+  The Cozy Sleeping Bag uses the same Well-Rested aura; Camp Tent `1307230`
+  tops up the rested pool and is shown through the rested line.
 - Per-character tracking by mob, player level, and area.
-- Overview, Mobs, Areas, and Levels tabs.
+- Quest XP ledger with totals, per-quest rewards, `/xpt quests`, and an Overview
+  summary; quest XP never enters the kill average.
+- Leveling history with per-level duration, XP, and kills, shown in the Overview
+  and with `/xpt history [level]`.
+- XP/hour, XP/minute, and time-to-level from measured gains.
+- Dungeon XP, leveling goals, and speedrun splits.
+- Session loot value, gold/hour, and clear gear-upgrade notifications.
+- Death locations, respawn intervals, and grinding-spot recommendations.
+- Overview, Mobs, Areas, Levels, and Heatmap tabs.
+- Per-zone 16x16 kill heatmap with optional zone-map art.
 - Search, filters, sort modes, relative bars, and a 3D model hero card.
 - Aether Blue default theme plus dark, midnight, class-color, and
   high-contrast themes.
 - Minimap launcher, addon-compartment entry, and `Ctrl+Shift+X` keybind.
 - Single-entry deletion and Unknown-only cleanup.
 
-**Midnight 12.1.5 — counts-only mode**
+**Midnight 12.1.5 — counts-focused mode**
 
 - Tracks kills by mob, player level, area, and session.
 - Shows kill counts, the mob list, areas, levels, and the 3D model or fallback.
-- Tooltips show the kill-count line only; no XP, percent, or kills-to-level
-  claims.
+- Tracks dungeon kills, leveling goals, duration/kill splits, loot, gold,
+  death locations, respawns, and zone heatmaps without XP claims.
+- Tooltips show the kill-count line and target level only; no XP, percent,
+  kills-to-level, or XP-bonus claims.
 - Formula estimates, calibration, rested/buff models, and group learning stay
   off until live probes prove the Midnight data is readable and attributable.
 - `/acem2l2 xpt probe` prints the client capabilities and secret-value status
@@ -100,6 +114,21 @@ model. Client-specific policy lives only in `KillHistory/Client.lua` and
 
 Midnight and Forever data are stored separately per project ID. Forever
 observations and calibration can never seed Midnight data.
+
+### Settings layout
+
+The Settings panel uses native section headers and a dedicated **Tooltip**
+subpage:
+
+- **Chat messages** — XP/reputation toggles, output frequency, rolling average,
+  precision, and minimums.
+- **Kill History** — module enable and minimap icon.
+- **Diagnostics** — debug output.
+- **Tooltip** subpage — XP lines, kill lines, rested/bonuses, and edge cases.
+
+The **Show mob level** checkbox in the Tooltip page controls the `Level: <n>`
+line on eligible unit tooltips. It is enabled by default and can be turned off
+without disabling Kill History.
 
 ## Kill Tracking Model
 
@@ -132,7 +161,7 @@ Each mob entry stores:
 - first and last seen timestamps,
 - NPC ID and classification.
 
-Midnight counts-only entries store the same kill/level/area fields without XP
+Midnight counts-focused entries store the same kill/level/area fields without XP
 samples or calibration contexts.
 
 ### XP formula
@@ -243,6 +272,8 @@ Common commands:
 /acem2l2 xpt status
 /acem2l2 xpt probe
 /acem2l2 xpt kills [name]
+/acem2l2 xpt quests
+/acem2l2 xpt history [level]
 /acem2l2 xpt areas
 /acem2l2 xpt levels
 /acem2l2 xpt session
@@ -290,26 +321,13 @@ Libs/                LibStub, CallbackHandler, Ace3, LibDataBroker, LibDBIcon
 tests/               Offline smoke tests, layout checker, release validator, and build script
 README.txt           Player-facing readme
 README.md            Project/developer readme (this file)
-dev/DOCS_INDEX.md   Documentation status/ownership index
-dev/IN_GAME_VERIFICATION.md  Live-client verification checklist
-dev/UPGRADE_PLAN.md  Release notes and upgrade history
-dev/TASKS.md         Current open-work tracker (ignored by Git)
-dev/IMPROVEMENT_PLAN_2026-11-13.md  Post-1.12 closeout plan
-dev/DETAILED_EXECUTION_PLAN_2026-11-13.md  Implementation-level closeout detail
-dev/REFACTOR_AND_CLEANUP_PLAN_2026-11-13.md  1.13.0 refactor/test/doc cleanup plan
-dev/MIDNIGHT_KILL_HISTORY_PLAN.md  Shipped 1.12.0 Midnight design record
-dev/CODE_REVIEW_2026-11-12.md  Historical 1.11.3 code/doc review
-dev/archive/         Historical task logs and retired source copies
-dev/BLUE_UI_REDESIGN_PLAN.md  Historical/partial Aether Blue design notes
-dev/FILENAME_COMPLIANCE_AND_REFACTOR_PLAN.md  Executed naming/refactor record
-dev/UI_EXECUTION_PLAN.md / dev/UI_POLISH_PLAN.md / dev/XPTTOOLTIP_PLAN.md  Historical planning docs
+dev/TASKS.md         Current task tracker (ignored by Git)
+dev/PLAN.md          Refactor, test, release, and maintenance plan
 ```
 
 Development-only documents under `dev/` are ignored by Git (see `.gitignore`).
-They are local working documents and may not exist in a fresh clone. Current
-open work is tracked in `dev/TASKS.md`; the current improvement plan is
-`dev/IMPROVEMENT_PLAN_2026-11-13.md`; document status is listed in
-`dev/DOCS_INDEX.md`.
+They are local working documents and may not exist in a fresh clone. Keep the
+developer docs to these two files plus the two READMEs.
 
 ## Development
 
@@ -332,30 +350,36 @@ From the repository root:
 The runner covers syntax, all seven client scenarios (`forever`, `midnight`,
 `midnight_missing`, `midnight_secret_identity`, `midnight_secret_booleans`,
 `midnight_secret_name`, and `unknown`), the real embedded-library load test,
-XML validation, layout validation, and release zip validation.
+XML validation, and layout validation. Release zip validation is opt-in with
+`CHECK_RELEASE=1` and should be used only when preparing a release.
+
+Use `SNAPSHOT=1 ./tests/run_all.sh` to print the deterministic behavior
+snapshot, or run it directly with `lua tests/snapshot.lua forever`.
 
 Individual checks can also be run directly:
 
 ```bash
 luac -p ACEM2L2.lua Bindings.lua Core/*.lua KillHistory/*.lua KillHistory/Clients/*.lua KillHistory/UI/*.lua
-lua tests/xptooltip_smoke.lua forever
-lua tests/xptooltip_smoke.lua midnight
-lua tests/xptooltip_smoke.lua midnight_missing
-lua tests/xptooltip_smoke.lua midnight_secret_identity
-lua tests/xptooltip_smoke.lua midnight_secret_booleans
-lua tests/xptooltip_smoke.lua midnight_secret_name
-lua tests/xptooltip_smoke.lua unknown
+lua tests/snapshot.lua forever
+lua tests/smoke.lua forever
+lua tests/smoke.lua midnight
+lua tests/smoke.lua midnight_missing
+lua tests/smoke.lua midnight_secret_identity
+lua tests/smoke.lua midnight_secret_booleans
+lua tests/smoke.lua midnight_secret_name
+lua tests/smoke.lua unknown
 lua tests/libs_smoke.lua
 xmllint --noout embeds.xml Bindings.xml
 python3 tests/check_layout.py
-python3 tests/check_release.py
+python3 tests/check_release.py   # release-time only
 ```
 
-The smoke test is not a WoW client. It catches Lua errors, nil-method calls,
-formula regressions, project-ID selection, per-client data migration and
-isolation, counts-only behavior, secret-value fallbacks, missing-API behavior,
-group handling, UI behavior, theme switching, minimap registration, duplicate
-merging, and delete accounting.
+The focused smoke suite (`tests/smoke.lua` + `tests/fixtures.lua`) is not a WoW
+client. It catches Lua errors, nil-method calls, formula/quest regressions,
+project-ID selection, per-client data migration and isolation, counts-focused
+behavior, secret-value fallbacks, missing-API behavior, reconciliation, group
+handling, UI behavior, minimap registration, merge/prune/delete accounting, and
+schema blocking.
 
 `tests/check_layout.py` validates the shipping layout:
 
@@ -371,8 +395,8 @@ archive must contain `AceM2L2/`. Use `--strict-root` in release/CI checks.
 
 ### Live checks
 
-Use [`dev/IN_GAME_VERIFICATION.md`](dev/IN_GAME_VERIFICATION.md). The main outstanding
-areas are:
+Use the release gate in [`dev/TASKS.md`](dev/TASKS.md) or
+[`dev/PLAN.md`](dev/PLAN.md). The main outstanding areas are:
 
 - tooltip hook availability and `GameTooltip:GetUnit`,
 - exact XP chat semantics for groups and dungeons,
@@ -380,7 +404,7 @@ areas are:
 - 3D model rotation and fallback,
 - theme/scale rendering at 80/100/120%,
 - minimap compatibility with ElvUI/Leatrix/SexyMap,
-- Midnight counts-only tracking, secret-value behavior, and tooltip/model
+- Midnight counts-focused tracking, secret-value behavior, and tooltip/model
   fallbacks,
 - clean install from the release zip.
 
@@ -409,14 +433,16 @@ python3 tests/build_release.py
 ```
 
 The script derives the version from `AceM2L2.toc`, writes
-`dist/AceM2L2-<version>.zip`, and enforces the packaged allowlist. Copy it to
-`/mnt/r/` when preparing a local release.
+`dist/AceM2L2-<version>.zip`, and enforces the packaged allowlist. Do not rebuild
+the zip for normal code changes; build only when preparing a release. Offline
+checks skip release validation unless `CHECK_RELEASE=1`.
 
 Current release artifacts:
 
 ```text
-dist/AceM2L2-1.12.0.zip
-/mnt/r/AceM2L2-1.12.0.zip
+dist/AceM2L2-2.0.0.zip
+/mnt/r/AceM2L2-2.0.0.zip
+SHA-256: 6058ef4816e23bb8dfda061169317a05ef95e6f090bd97adc3a4f08b23f5ce9e
 ```
 
 Both copies are validated when present. Copy the `dist/` zip to `/mnt/r/` when
@@ -440,20 +466,23 @@ Bindings, Libs, `README.txt`, or `LICENSE`).
   reported as a mob kill.
 - Group and dungeon XP chat amounts are not yet verified live, so group-ratio
   learning remains disabled.
-- Midnight runs in counts-only mode. XP estimates, calibration, kills-to-level,
-  rested/buff models, and observed XP remain off until live probes validate the
-  Midnight data. `/acem2l2 xpt probe` exists for that verification.
+- Midnight runs in counts-focused mode. XP estimates, calibration,
+  kills-to-level, rested/buff models, and observed XP remain off until live
+  probes validate the Midnight data. Non-XP features still work.
+  `/acem2l2 xpt probe` exists for that verification.
 - If Midnight hides target/death identity, the kill is skipped rather than
   recorded as a fake Unknown entry.
 - Area and level rows are derived views; deletion is offered only for mob rows.
 - Kill History keeps at most 2000 mob entries per client. Older entries can be
   pruned in long sessions; re-check totals after very large histories.
+- Well Fed XP Boost (`1243969`), Well-Rested/Cozy Sleeping Bag (`429959`), and
+  Camp Tent (`1307230`) are mapped to the existing bonus/rested display.
+  Camp Tent is a rested-pool top-up, not a separate XP multiplier.
 - Midnight observed XP, calibrated estimates, kills-to-level, rested/buffs, and
-  group learning are **not available in 1.12.0**. No setting or command enables
+  group learning are **not available in 2.0.0**. No setting or command enables
   them; they stay behind the live probe gates.
-- Current open work is tracked in `dev/TASKS.md` and
-  `dev/IMPROVEMENT_PLAN_2026-11-13.md`. The 1.11.3 review in
-  `dev/CODE_REVIEW_2026-11-12.md` is historical.
+- Current open work is tracked in `dev/TASKS.md`; the maintenance plan is
+  `dev/PLAN.md`.
 
 ## License
 

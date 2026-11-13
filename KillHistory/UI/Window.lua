@@ -111,6 +111,7 @@ function XPTooltip:CreateUI()
     { key = "overview", label = "Overview" },
     { key = "mobs", label = "Mobs" },
     { key = "areas", label = "Areas" },
+    { key = "heatmap", label = "Heatmap" },
     { key = "levels", label = "Levels" },
   }
   local x = 0
@@ -400,6 +401,13 @@ function XPTooltip:CreateUI()
 
   self:CreateOverviewPanel(frame)
 
+  if type(self.CreateHeatmapPanel) == "function" then
+    local heatmapOK, heatmapErr = pcall(self.CreateHeatmapPanel, self, frame)
+    if not heatmapOK then
+      self:ReportError("CreateHeatmapPanel", heatmapErr)
+    end
+  end
+
   local footer = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   footer:SetPoint("BOTTOMLEFT", 16, 16)
   footer:SetPoint("BOTTOMRIGHT", -16, 16)
@@ -433,7 +441,12 @@ function XPTooltip:SaveUIPosition()
 end
 
 function XPTooltip:SetTab(tab)
-  if tab ~= "overview" and tab ~= "mobs" and tab ~= "areas" and tab ~= "levels" then
+  if tab ~= "overview" and tab ~= "mobs" and tab ~= "areas" and tab ~= "levels"
+    and tab ~= "heatmap" then
+    tab = "overview"
+  end
+  local settings = self:GetSettings()
+  if tab == "heatmap" and settings and settings.showHeatmap == false then
     tab = "overview"
   end
   self.tab = tab
@@ -449,6 +462,8 @@ function XPTooltip:SetTab(tab)
     pcall(self.ui.scrollFrame.SetVerticalScroll, self.ui.scrollFrame, 0)
   end
 
+  local isHeatmap = self.tab == "heatmap"
+
   if self.ui and self.ui.overview then
     if self.tab == "overview" then
       self.ui.overview.panel:Show()
@@ -457,14 +472,14 @@ function XPTooltip:SetTab(tab)
     end
   end
   if self.ui and self.ui.listPanel then
-    if self.tab == "overview" then
+    if self.tab == "overview" or isHeatmap then
       self.ui.listPanel:Hide()
     else
       self.ui.listPanel:Show()
     end
   end
   if self.ui and self.ui.detailPanel then
-    if self.tab == "overview" then
+    if self.tab == "overview" or isHeatmap then
       self.ui.detailPanel:Hide()
     else
       self.ui.detailPanel:Show()
@@ -477,9 +492,20 @@ function XPTooltip:SetTab(tab)
       self.ui.filterBar:Hide()
     end
   end
+  if self.ui and self.ui.heatmap and self.ui.heatmap.panel then
+    if isHeatmap then
+      self.ui.heatmap.panel:Show()
+    else
+      self.ui.heatmap.panel:Hide()
+    end
+  end
 
   if self.tab == "overview" then
     self:RefreshOverview()
+  elseif isHeatmap then
+    if type(self.RefreshHeatmap) == "function" then
+      pcall(self.RefreshHeatmap, self)
+    end
   else
     self:BuildList()
     self:UpdateRows()
@@ -493,6 +519,22 @@ end
 
 function XPTooltip:UpdateTabs()
   if not self.tabs then
+    return
+  end
+  local settings = self:GetSettings()
+  local showHeatmap = not (settings and settings.showHeatmap == false)
+  local heatmapTab = self.tabs.heatmap
+  if heatmapTab then
+    if heatmapTab.SetShown then
+      heatmapTab:SetShown(showHeatmap)
+    elseif showHeatmap then
+      heatmapTab:Show()
+    else
+      heatmapTab:Hide()
+    end
+  end
+  if not showHeatmap and self.tab == "heatmap" then
+    self:SetTab("overview")
     return
   end
   for key, button in pairs(self.tabs) do
@@ -576,6 +618,10 @@ function XPTooltip:RefreshUI()
   end
   if self.tab == "overview" then
     self:RefreshOverview()
+  elseif self.tab == "heatmap" then
+    if type(self.RefreshHeatmap) == "function" then
+      pcall(self.RefreshHeatmap, self)
+    end
   else
     self:BuildList()
     self:UpdateRows()

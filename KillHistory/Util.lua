@@ -17,38 +17,15 @@ local CONTEXT_MAX_AGE = 120 * 86400
 local ROW_HEIGHT = 28
 local VISIBLE_ROWS = 13
 
-local DEFAULT_SETTINGS = {
-  enabled = true,
-  showXP = true,
-  showPercent = true,
-  showKillsToLevel = true,
-  showKillCount = true,
-  showRested = true,
-  showUnknown = true,
-  countZeroXPMobs = true,
-  manualXPBonus = 0,
-  debug = false,
-  theme = "aether",
-  scale = 1.0,
-  startTab = "overview",
-  sound = true,
-}
-
-local DEFAULT_UI = {
-  point = "CENTER",
-  relativePoint = "CENTER",
-  x = 0,
-  y = 0,
-  width = 1000,
-  height = 680,
-  sort = "kills",
-}
-
-local DEFAULT_MINIMAP = {
-  hide = false,
-  minimapPos = 200,
-  lock = false,
-}
+local Defaults = AceM2L2.Defaults or {}
+local DEFAULT_SETTINGS = {}
+for key, value in pairs(Defaults.XPTOOLTIP_DEFAULTS or {}) do
+  if key ~= "ui" and key ~= "minimap" then
+    DEFAULT_SETTINGS[key] = value
+  end
+end
+local DEFAULT_UI = Defaults.XPTOOLTIP_UI_DEFAULTS or {}
+local DEFAULT_MINIMAP = Defaults.XPTOOLTIP_MINIMAP_DEFAULTS or {}
 
 --[[--------------------------------------------------------------------------------
   Defensive helpers
@@ -135,6 +112,8 @@ local function CopyInfo(source)
     classification = source.classification,
     mobKey = source.mobKey,
     mapID = source.mapID,
+    x = source.x,
+    y = source.y,
     at = source.at,
   }
 end
@@ -195,6 +174,26 @@ local function FormatAgo(epoch)
   return floor(delta / 86400) .. "d ago"
 end
 
+local function FormatDuration(seconds)
+  local value = tonumber(seconds) or 0
+  if value < 0 then
+    value = 0
+  end
+  if value < 60 then
+    return floor(value) .. "s"
+  elseif value < 3600 then
+    return floor(value / 60) .. "m"
+  end
+  local hours = floor(value / 3600)
+  local minutes = floor((value % 3600) / 60)
+  if hours >= 24 then
+    return floor(hours / 24) .. "d " .. (hours % 24) .. "h"
+  elseif minutes > 0 then
+    return hours .. "h " .. minutes .. "m"
+  end
+  return hours .. "h"
+end
+
 local function FormatDate(epoch)
   local value = tonumber(epoch) or 0
   if value <= 0 or type(date) ~= "function" then
@@ -205,6 +204,30 @@ local function FormatDate(epoch)
     return text
   end
   return "unknown"
+end
+
+local function FormatMoney(copper)
+  local raw = tonumber(copper) or 0
+  local negative = raw < 0
+  local value = floor(math.abs(raw))
+  local gold = floor(value / 10000)
+  local silver = floor((value % 10000) / 100)
+  local remainder = value % 100
+  local parts = {}
+  if gold > 0 then
+    parts[#parts + 1] = gold .. "g"
+  end
+  if silver > 0 then
+    parts[#parts + 1] = silver .. "s"
+  end
+  if remainder > 0 or #parts == 0 then
+    parts[#parts + 1] = remainder .. "c"
+  end
+  local text = table.concat(parts, " ")
+  if negative then
+    return "-" .. text
+  end
+  return text
 end
 
 --[[--------------------------------------------------------------------------------
@@ -243,7 +266,9 @@ Util.Clamp = Clamp
 Util.FormatNumber = FormatNumber
 Util.FormatPercent = FormatPercent
 Util.FormatAgo = FormatAgo
+Util.FormatDuration = FormatDuration
 Util.FormatDate = FormatDate
+Util.FormatMoney = FormatMoney
 Util.EnsureNumberMap = EnsureNumberMap
 
 
@@ -253,7 +278,28 @@ local WELL_FED_SPELL_IDS = {}
 for spellID = 19705, 19740 do
   WELL_FED_SPELL_IDS[spellID] = true
 end
+-- Forever food grants "Well Fed XP Boost" (1243969, +5% kill XP) rather than
+-- only the vanilla Well Fed stat buffs. Match it by spell ID because the aura
+-- name differs from "Well Fed" on some clients.
+WELL_FED_SPELL_IDS[1243969] = true
 local WELL_RESTED_SPELL_IDS = { [429959] = true }
+
+-- Verified 2026-11-13 against Wowhead Forever, ForeverDB, and Azeroth Pilot
+-- Reloaded data:
+--   Well Fed XP Boost 1243969: +5% kill XP from qualifying food.
+--   Well-Rested 429959: +1% XP per stack, max 3; granted by inns and the
+--     Cozy Sleeping Bag, so there is no separate bag aura to count.
+--   Camp Tent 1307230: raises the rested pool to 5% of a level. It is a
+--     rested-pool top-up, not an XP multiplier; the pool is already shown by
+--     the rested line/tooltip.
+--   Boosted Rest 1229451: 1-hour Camp Tent lockout, not an XP bonus.
+local VERIFIED_BUFF_IDS = {
+  wellFedXP = 1243969,
+  wellRested = 429959,
+  campTent = 1307230,
+  boostedRest = 1229451,
+}
+Util.VERIFIED_BUFF_IDS = VERIFIED_BUFF_IDS
 
 local function MatchesAura(aura, name, spellIDs)
   if type(aura) ~= "table" or IsSecret(aura) then
@@ -328,6 +374,19 @@ function XPTooltip:GetXPMax()
   return SafeNumber(SafeCall(UnitXPMax, "player"))
 end
 
+function XPTooltip:GetXPProgress()
+  local current = self:GetXP()
+  local max = self:GetXPMax()
+  if not current or not max or max <= 0 then
+    return nil
+  end
+  local remaining = max - current
+  if remaining < 0 then
+    remaining = 0
+  end
+  return current, max, remaining, remaining / max * 100
+end
+
 function XPTooltip:GetMaxLevel()
   local profile = self.clientProfile or self:GetClientProfile()
   if profile and profile.GetMaxLevel then
@@ -352,6 +411,13 @@ function XPTooltip:IsXPDisabled()
     disabled = SafeBool(SafeCall(IsXPUserDisabled))
   end
   return disabled == true
+end
+
+function XPTooltip:GetMoney()
+  if not self:Supports("hasMoney") then
+    return nil
+  end
+  return SafeNumber(SafeCall(GetMoney))
 end
 
 function XPTooltip:GetRestedPool()
@@ -381,6 +447,26 @@ function XPTooltip:GetMapID()
   end
   local mapID = SafeNumber(SafeCall(GetCurrentMapAreaID))
   return mapID or 0
+end
+
+function XPTooltip:IsInDungeon()
+  if not self:Supports("hasInstanceInfo") or type(IsInInstance) ~= "function" then
+    return false
+  end
+  local ok, isInInstance, instanceType = pcall(IsInInstance)
+  if not ok then
+    return false
+  end
+  local inInstance = SafeBool(isInInstance)
+  if inInstance == nil and type(isInInstance) == "number" and not IsSecret(isInInstance) then
+    -- Some 1.12-era clients return 1/0 instead of a boolean.
+    inInstance = isInInstance ~= 0
+  end
+  if inInstance ~= true then
+    return false
+  end
+  local kind = SafeString(instanceType)
+  return kind == "party" or kind == "raid" or kind == "scenario"
 end
 
 function XPTooltip:GetMapName(mapID)
@@ -525,16 +611,36 @@ function XPTooltip:CaptureUnit(unit)
     -- label so DeleteUnknownEntries does not treat a real NPC as Unknown.
     name = "NPC " .. tostring(npcID)
   end
-  return {
+  local mapID = self:GetMapID()
+  local x, y
+  if type(self.GetPlayerMapPosition) == "function" then
+    local positionMapID, positionX, positionY = self:GetPlayerMapPosition()
+    if positionMapID then
+      mapID = positionMapID
+    end
+    if positionX and positionY then
+      x, y = positionX, positionY
+    end
+  end
+  local result = {
     name = name,
     guid = guid,
     level = level,
     classification = classification,
     npcID = npcID,
     mobKey = self:GetMobKey(name, npcID),
-    mapID = self:GetMapID(),
+    mapID = mapID,
+    x = x,
+    y = y,
+    inDungeon = self:IsInDungeon(),
     at = Now(),
   }
+  -- World.lua owns respawn watch logic; this is the only sighting path for
+  -- target, mouseover, and nameplate captures. Do not duplicate it here.
+  if type(self.ObserveRespawn) == "function" then
+    self:ObserveRespawn(result)
+  end
+  return result
 end
 
 function XPTooltip:CanDetectBuffs()
@@ -554,8 +660,13 @@ function XPTooltip:GetBuffInfo()
     return self.buffCacheWellFed, self.buffCacheWellRested,
       self.buffCacheCanDetect, self.buffCacheWellRestedStacks
   end
-  local wellFedAura = canDetect and self:Supports("hasWellFed")
-    and FindAura("Well Fed", WELL_FED_SPELL_IDS) or nil
+  local wellFedAura
+  if canDetect and self:Supports("hasWellFed") then
+    -- The Forever food buff is "Well Fed XP Boost"; older clients expose only
+    -- the by-name aura API, so try both labels before falling back to spell ID.
+    wellFedAura = FindAura("Well Fed", WELL_FED_SPELL_IDS)
+      or FindAura("Well Fed XP Boost", WELL_FED_SPELL_IDS)
+  end
   local restedAura = canDetect and self:Supports("hasWellRestedAura")
     and FindAura("Well-Rested", WELL_RESTED_SPELL_IDS) or nil
   local wellFed = wellFedAura ~= nil
@@ -613,4 +724,55 @@ function XPTooltip:GetBuffMultiplier(wellFed, wellRested, wellRestedStacks)
     multiplier = multiplier * (1 + manual / 100)
   end
   return multiplier
+end
+
+-- Known XP bonuses only. This intentionally does not scan arbitrary buffs:
+-- every entry must match a source the estimator actually applies.
+function XPTooltip:GetActiveXPBonuses()
+  local bonuses = {}
+  if not self:Supports("hasXPFormula") then
+    return bonuses, 1, 0
+  end
+  local settings = self.settings or self:GetSettings()
+  local wellFed, wellRested, canDetect, stacks = self:GetBuffInfo()
+  local multiplier = 1
+
+  if canDetect and wellFed and self:Supports("hasWellFed") then
+    bonuses[#bonuses + 1] = { id = "wellFed", label = "Well Fed", percent = 5 }
+    multiplier = multiplier * 1.05
+  end
+  if canDetect and wellRested and self:Supports("hasWellRestedAura") then
+    local count = math.max(1, math.min(3, tonumber(stacks) or 1))
+    bonuses[#bonuses + 1] = {
+      id = "wellRested", label = "Well-Rested", percent = count, stacks = count,
+    }
+    multiplier = multiplier * (1 + 0.01 * count)
+  end
+  local manual = settings and tonumber(settings.manualXPBonus) or 0
+  if manual and manual > 0 then
+    bonuses[#bonuses + 1] = { id = "manual", label = "Manual bonus", percent = manual }
+    multiplier = multiplier * (1 + manual / 100)
+  end
+
+  return bonuses, multiplier, (multiplier - 1) * 100
+end
+
+function XPTooltip:FormatXPBonuses(bonuses, totalPercent)
+  if type(bonuses) ~= "table" or #bonuses == 0 then
+    return nil
+  end
+  local parts = {}
+  for _, bonus in ipairs(bonuses) do
+    local percent = tonumber(bonus.percent) or 0
+    local text = tostring(bonus.label or bonus.id or "Bonus") .. " +" .. FormatNumber(percent) .. "%"
+    if (tonumber(bonus.stacks) or 0) > 1 then
+      text = text .. " (" .. bonus.stacks .. " stacks)"
+    end
+    parts[#parts + 1] = text
+  end
+  local text = table.concat(parts, ", ")
+  if #bonuses > 1 then
+    text = text .. " (total +" .. FormatPercent(tonumber(totalPercent) or 0) .. ")"
+  end
+  return text
 end

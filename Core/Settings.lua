@@ -42,6 +42,21 @@ function AceM2L2:SanitizeXPTooltipSettings()
   settings.enabled = SanitizeBoolean(settings.enabled, true)
   settings.showXP = SanitizeBoolean(settings.showXP, true)
   settings.showPercent = SanitizeBoolean(settings.showPercent, true)
+  settings.showXPRemaining = SanitizeBoolean(settings.showXPRemaining, true)
+  settings.showXPRate = SanitizeBoolean(settings.showXPRate, true)
+  settings.showTimeToLevel = SanitizeBoolean(settings.showTimeToLevel, true)
+  settings.rateWindowMinutes = SanitizeInteger(settings.rateWindowMinutes, 10, 1, 60)
+  settings.showDungeonXP = SanitizeBoolean(settings.showDungeonXP, true)
+  settings.showGoal = SanitizeBoolean(settings.showGoal, true)
+  settings.showSplits = SanitizeBoolean(settings.showSplits, true)
+  settings.showEconomy = SanitizeBoolean(settings.showEconomy, true)
+  settings.showGoldPerHour = SanitizeBoolean(settings.showGoldPerHour, true)
+  settings.showGearUpgrades = SanitizeBoolean(settings.showGearUpgrades, true)
+  settings.showGrindingSpot = SanitizeBoolean(settings.showGrindingSpot, true)
+  settings.showHeatmap = SanitizeBoolean(settings.showHeatmap, true)
+  settings.showNameplateLevel = SanitizeBoolean(settings.showNameplateLevel, false)
+  settings.showMobLevel = SanitizeBoolean(settings.showMobLevel, true)
+  settings.showXPBonuses = SanitizeBoolean(settings.showXPBonuses, true)
   settings.showKillsToLevel = SanitizeBoolean(settings.showKillsToLevel, true)
   settings.showKillCount = SanitizeBoolean(settings.showKillCount, true)
   settings.showRested = SanitizeBoolean(settings.showRested, true)
@@ -67,7 +82,7 @@ function AceM2L2:SanitizeXPTooltipSettings()
   settings.scale = tonumber(settings.scale) or 1.0
   settings.scale = math.max(0.8, math.min(1.2, settings.scale))
 
-  local validStartTabs = { overview = true, mobs = true, areas = true, levels = true }
+  local validStartTabs = { overview = true, mobs = true, areas = true, levels = true, heatmap = true }
   settings.startTab = SafeString(settings.startTab) or "overview"
   if not validStartTabs[settings.startTab] then
     settings.startTab = "overview"

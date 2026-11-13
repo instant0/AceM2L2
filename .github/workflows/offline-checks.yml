@@ -24,4 +24,5 @@ jobs:
           LUA_BIN: lua5.1
           LUAC_BIN: luac5.1
           STRICT_ROOT: "1"
+          CHECK_RELEASE: "1"
         run: ./tests/run_all.sh

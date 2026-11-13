@@ -7,6 +7,7 @@ local AceM2L2 = AceM2L2
 local Util = AceM2L2.Util
 
 local SafeNumber = Util.SafeNumber
+local SafeCall = Util.SafeCall
 local IsSecretValue = Util.IsSecretValue
 local Trim = Util.Trim
 local StripColorCodes = Util.StripColorCodes
@@ -209,6 +210,13 @@ end
 function AceM2L2:OnQuestTurnedIn(event, questID, xpReward)
   local now = GetSafeTime()
   local reward = SafeNumber(xpReward)
+  local questName
+  if questID and C_QuestLog and type(C_QuestLog.GetTitleForQuestID) == "function" then
+    questName = Trim(SafeCall(C_QuestLog.GetTitleForQuestID, questID))
+  end
+  self.pendingQuestID = tonumber(questID)
+  self.pendingQuestName = questName
+  self.pendingQuestAt = now
   self.questXPWindowUntil = now + 5
   self.questXPAmount = reward and reward > 0 and reward or nil
   self.lastCreatureName = nil
@@ -347,6 +355,33 @@ function AceM2L2:OnPlayerXPUpdate()
   self:SafeInvoke("PLAYER_XP_UPDATE", "HandlePlayerXPUpdate")
 end
 
+function AceM2L2:RecordQuestGain(xp)
+  local now = GetSafeTime()
+  local questID = self.pendingQuestID
+  local questName = self.pendingQuestName
+  local pendingAt = tonumber(self.pendingQuestAt) or 0
+  if pendingAt == 0 or (now - pendingAt) > 5 then
+    -- Drop stale turn-in metadata instead of attributing a later gain to it.
+    questID, questName = nil, nil
+  end
+  self.pendingQuestID = nil
+  self.pendingQuestName = nil
+  self.pendingQuestAt = 0
+  local kh = self.KillHistory
+  if kh and type(kh.RecordQuestXP) == "function" and kh:IsActive() then
+    kh:RecordQuestXP(questID, questName, xp)
+    if type(kh.AddLevelHistoryXP) == "function" then
+      kh:AddLevelHistoryXP(xp)
+    end
+    if type(kh.RecordRateSample) == "function" then
+      kh:RecordRateSample(xp, "quest")
+    end
+    if type(kh.RecordDungeonXP) == "function" then
+      kh:RecordDungeonXP(xp)
+    end
+  end
+end
+
 function AceM2L2:HandlePlayerXPUpdate()
   local current = GetUnitXP()
   if not current then
@@ -376,6 +411,7 @@ function AceM2L2:HandlePlayerXPUpdate()
       self.lastXPSource = nil
       self.lastXPInfoTime = 0
       self.lastChatXPAmount = nil
+      self:RecordQuestGain(questXP)
       self:HandleXPGain(nil, questXP, true)
       return
     end
@@ -411,6 +447,7 @@ function AceM2L2:HandlePlayerXPUpdate()
   self.lastChatXPAmount = nil
   if isQuest then
     self:ClearQuestXPWindow()
+    self:RecordQuestGain(delta)
   end
 
   self:HandleXPGain(name, delta, isQuest)
