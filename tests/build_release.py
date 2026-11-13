@@ -17,7 +17,7 @@ ROOT_FILES = (
     "README.txt",
     "LICENSE",
 )
-TREES = ("Core", "KillHistory", "Libs")
+TREES = ("Core", "KillHistory", "Libs", "Textures")
 VERSION_RE = re.compile(r"^## Version:\s*(\S+)\s*$", re.MULTILINE)
 
 

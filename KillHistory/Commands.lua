@@ -128,8 +128,21 @@ function XPTooltip:PrintProbe()
   else
     AceM2L2:SafePrint("  unit=<none>")
   end
-  ProbeValue("mapID", self:GetMapID())
-  ProbeValue("mapName", self:GetMapName(self:GetMapID()))
+  local currentMapID = self:GetMapID()
+  local mapInfo = C_Map and type(C_Map.GetMapInfo) == "function"
+    and SafeCall(C_Map.GetMapInfo, currentMapID) or nil
+  local mapArtLayers = 0
+  if C_Map and type(C_Map.GetMapArtLayers) == "function" then
+    local ok, layers = pcall(C_Map.GetMapArtLayers, currentMapID)
+    if ok and type(layers) == "table" then
+      mapArtLayers = #layers
+    end
+  end
+  ProbeValue("mapID", currentMapID)
+  ProbeValue("mapName", self:GetMapName(currentMapID))
+  ProbeValue("mapType", type(mapInfo) == "table" and mapInfo.mapType or nil)
+  ProbeValue("parentMapID", type(mapInfo) == "table" and mapInfo.parentMapID or nil)
+  ProbeValue("mapArtLayers", mapArtLayers)
   ProbeValue("isInDungeon", self:IsInDungeon())
   ProbeValue("groupSize", self:GetGroupSize())
   ProbeValue("maxLevel", self:GetMaxLevel())

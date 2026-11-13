@@ -4,7 +4,7 @@ Ace Mobs 2 Level 2 (AceM2L2)
 XP, reputation, and Kill Story
 
 Author:     faslkjd56
-Version:    2.1.0
+Version:    2.1.6
 GameVer.:   Midnight 12.1.5 (Retail) / Forever 1.60.1 (Classic+)
 _____________________________________________________________________________________
 
@@ -33,7 +33,10 @@ Kill Story window
 - Dungeon XP, leveling goals, and speedrun splits.
 - Loot value, gold/hour, and clear gear-upgrade notifications.
 - Death locations, respawn intervals, and grinding-spot suggestions.
-- Per-zone kill heatmap with a 16x16 density grid.
+- Per-zone kill heatmap with a 32x32 density grid and static zone-map art
+  underneath it.
+
+- Resizable window with a larger default size.
 - 3D mob model, search, filters, sort modes, and multiple themes.
 - Minimap icon, addon-compartment entry, and Ctrl+Shift+X keybind.
 
@@ -100,7 +103,7 @@ Window tabs:
   economy, world data, and recent level history.
 - Mobs — search, filter, sort, remove one mob, or clean Unknown rows.
 - Areas — where you have been killing.
-- Heatmap — switch zones, inspect a 16x16 kill-density grid, and see the zone
+- Heatmap — switch zones, inspect a 32x32 kill-density grid, and see the zone
   total. Map art is optional; the grid works without it.
 - Levels — kill and XP performance by player level.
 
@@ -116,7 +119,7 @@ ________________________________________________________________________________
 	KNOWN LIMITATIONS
 _____________________________________________________________________________________
 
-- Heatmaps keep up to 40 zones; each zone is a 16x16 grid.
+- Heatmaps keep up to 40 zones; each zone is a 32x32 grid.
 - Death history keeps 100 deaths; respawn tracking keeps 300 NPCs with up to
   20 samples each.
 - Quest history keeps 200 quests; level history keeps 200 records; rate history
@@ -124,6 +127,7 @@ ________________________________________________________________________________
 - Heatmaps, death locations, respawns, and nameplate levels need the client's
   map-position and nameplate APIs. Missing or secret values limit those features
   without stopping normal kill tracking.
+- Heatmaps use stored kill data and static zone art, not a live map or minimap.
 - Grinding spots need at least 5 kill-XP samples over 120 seconds, so short
   sessions may not produce a recommendation.
 - Midnight XP estimates, calibration, kills-to-level, rested, and buffs stay
@@ -136,6 +140,21 @@ ________________________________________________________________________________
 	CHANGELOG
 _____________________________________________________________________________________
 
+2.1.6 — Lifted the zone-map art above the grid backdrop so it no longer looks
+        faded or blue-tinted; map tiles render at full opacity.
+2.1.5 — Increased the heatmap to a 32x32 grid, migrated legacy 16x16 cells,
+        and strengthened heat-cell colors for better contrast.
+2.1.4 — Hardened the tiled zone-map renderer with cached art and conservative
+        tile/layer limits, keeping the detailed zone map visible during refresh
+        and resize.
+2.1.3 — Fixed the heatmap to use the correct tiled zone map, resolved zone map
+        IDs instead of continent/world maps, and hid empty cells so the zone art
+        stays visible.
+2.1.2 — Improved the heatmap with static zone-map art beneath the kill grid,
+        hid empty cells so the map remains visible, enlarged the default window
+        by about 15%, and added safe window resizing.
+2.1.1 — Added the Kill Story logo to the addon/minimap icon, window header,
+        and Settings branding; rebuilt the user guide.
 2.1.0 — User-facing documentation refresh, Kill Story naming throughout, and
         reliability fixes for settings ranges, world/economy normalization,
         tooltip hooks, debug output, migration, and restricted API data.

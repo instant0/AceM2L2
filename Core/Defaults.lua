@@ -15,8 +15,8 @@ local XPTOOLTIP_UI_DEFAULTS = {
   relativePoint = "CENTER",
   x = 0,
   y = 0,
-  width = 1000,
-  height = 680,
+  width = 1150,
+  height = 780,
   sort = "kills",
 }
 

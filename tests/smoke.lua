@@ -696,7 +696,7 @@ local savedSettings = AceM2L2DB.profile.xpTooltip
 AceM2L2DB.profile.xpTooltip = { theme = "dark" }
 module.settings = nil
 local mergedSettings = module:GetSettings()
-assert(mergedSettings.enabled == true and mergedSettings.ui.width == 1000,
+assert(mergedSettings.enabled == true and mergedSettings.ui.width == 1150,
   "partial settings did not merge defaults")
 assert(type(mergedSettings.minimap) == "table" and mergedSettings.minimap.hide == false,
   "partial settings did not merge minimap defaults")
@@ -772,7 +772,7 @@ AceM2L2.optionSettings = nil
 AceM2L2.optionsFailed = false
 AceM2L2:CreateOptionsPanel()
 local mainCategory = settingsMock.categories[1]
-assert(mainCategory and mainCategory.name == "Ace Mobs 2 Level 2", "options main category missing")
+assert(mainCategory and mainCategory.name == "Ace Mobs 2 Level 2 - Kill Story", "options main category missing")
 assert(AceM2L2.optionsCategory == mainCategory, "options category not stored")
 local tooltipCategory
 for _, category in ipairs(settingsMock.categories) do

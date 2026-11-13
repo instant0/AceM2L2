@@ -438,15 +438,79 @@ function XPTooltip:CanReadRested()
   return ok and not IsSecret(value)
 end
 
+local function ReadMapPosition(mapID)
+  if not C_Map or type(C_Map.GetPlayerMapPosition) ~= "function" then
+    return nil
+  end
+  local position = SafeCall(C_Map.GetPlayerMapPosition, mapID, "player")
+  if type(position) ~= "table" then
+    return nil
+  end
+  local ok, x, y = pcall(function()
+    if type(position.GetXY) == "function" then
+      return position:GetXY()
+    end
+    return position.x, position.y
+  end)
+  x, y = SafeNumber(x), SafeNumber(y)
+  if not x or not y or x < 0 or x > 1 or y < 0 or y > 1 then
+    return nil
+  end
+  return x, y
+end
+
+local function ResolveZoneMapID(mapID)
+  local id = SafeNumber(mapID)
+  if not id or id <= 0 then
+    return 0
+  end
+  if not C_Map or type(C_Map.GetMapInfo) ~= "function" then
+    return id
+  end
+  local info = SafeCall(C_Map.GetMapInfo, id)
+  if type(info) ~= "table" then
+    return id
+  end
+  local mapType = SafeNumber(info.mapType)
+  if mapType ~= 1 and mapType ~= 2 then
+    return id
+  end
+  if type(C_Map.GetMapInfoAtPosition) ~= "function" then
+    return id
+  end
+  local x, y = ReadMapPosition(id)
+  if not x or not y then
+    return id
+  end
+  local child = SafeCall(C_Map.GetMapInfoAtPosition, id, x, y)
+  if type(child) ~= "table" then
+    return id
+  end
+  local childID = SafeNumber(child.mapID)
+  local childType = SafeNumber(child.mapType)
+  if childID and (childType == 3 or childType == 4) then
+    return childID
+  end
+  return id
+end
+
 function XPTooltip:GetMapID()
-  if C_Map and C_Map.GetBestMapForUnit then
-    local mapID = SafeNumber(SafeCall(C_Map.GetBestMapForUnit, "player"))
-    if mapID then
-      return mapID
+  local mapID
+  if type(MapUtil) == "table" and type(MapUtil.GetDisplayableMapForPlayer) == "function" then
+    mapID = SafeNumber(SafeCall(MapUtil.GetDisplayableMapForPlayer))
+  end
+  if not mapID or mapID <= 0 then
+    if C_Map and C_Map.GetBestMapForUnit then
+      mapID = SafeNumber(SafeCall(C_Map.GetBestMapForUnit, "player"))
     end
   end
-  local mapID = SafeNumber(SafeCall(GetCurrentMapAreaID))
-  return mapID or 0
+  if not mapID or mapID <= 0 then
+    mapID = SafeNumber(SafeCall(GetCurrentMapAreaID))
+  end
+  if not mapID or mapID <= 0 then
+    return 0
+  end
+  return ResolveZoneMapID(mapID)
 end
 
 function XPTooltip:IsInDungeon()

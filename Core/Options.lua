@@ -33,9 +33,22 @@ function AceM2L2:CreateOptionsPanel()
     return
   end
 
-  local category, layout = Settings.RegisterVerticalLayoutCategory("Ace Mobs 2 Level 2")
+  local category, layout = Settings.RegisterVerticalLayoutCategory("Ace Mobs 2 Level 2 - Kill Story")
   Settings.RegisterAddOnCategory(category)
   self.optionSettings = {}
+
+  local addonVersion
+  if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
+    local ok, value = pcall(C_AddOns.GetAddOnMetadata, "AceM2L2", "Version")
+    if ok then
+      addonVersion = value
+    end
+  elseif type(GetAddOnMetadata) == "function" then
+    local ok, value = pcall(GetAddOnMetadata, "AceM2L2", "Version")
+    if ok then
+      addonVersion = value
+    end
+  end
 
   local module = self:GetXPTooltipModule()
   local function supports(capability)
@@ -116,6 +129,7 @@ function AceM2L2:CreateOptionsPanel()
     return true
   end
 
+  addHeader(addonVersion and ("Kill Story " .. addonVersion) or "Kill Story")
   addHeader("Chat messages")
 
   addCheckbox(

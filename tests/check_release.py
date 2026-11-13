@@ -29,7 +29,7 @@ ROOT_FILES = (
     "README.txt",
     "LICENSE",
 )
-TREES = ("Core", "KillHistory", "Libs")
+TREES = ("Core", "KillHistory", "Libs", "Textures")
 FORBIDDEN_PREFIXES = ("dev/", "dist/", "tests/", ".git/")
 FORBIDDEN_SUFFIXES = (".pyc", ".pyo", ".log", ".bak", ".swp")
 FORBIDDEN_NAMES = {".DS_Store", "Thumbs.db", "luac.out", "README.md", ".gitignore"}

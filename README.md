@@ -5,7 +5,7 @@ and provides a **Kill Story** browser for Forever 1.60.1 and Midnight 12.1.5.
 Forever gets the full XP/tooltip experience; Midnight gets counts-focused
 history plus the non-XP features until its XP data is live-verified.
 
-- **Version:** 2.1.0
+- **Version:** 2.1.6
 - **Author:** faslkjd56
 - **Interfaces:** Midnight `120105`, Forever `16001`
 - **Clients:** Midnight 12.1.5 and Forever 1.60.1
@@ -13,6 +13,10 @@ history plus the non-XP features until its XP data is live-verified.
 
 The player-facing guide is [`README.txt`](README.txt). This document covers the
 project structure, tracking model, development workflow, and release packaging.
+Promotional artwork and the CurseForge-style brochure are in
+[`BROCHURE.md`](BROCHURE.md).
+
+[![AceM2L2 promotional banner](assets/AceM2L2-brochure.png)](BROCHURE.md)
 
 ## Overview
 
@@ -113,7 +117,10 @@ model. Client-specific policy lives only in `KillHistory/Client.lua` and
 - Death locations, respawn intervals, and grinding-spot recommendations.
 - Overview, Mobs, Areas, Heatmap, and Levels tabs. The Heatmap tab can be
   hidden while heatmap data keeps recording.
-- Per-zone 16x16 kill heatmap with optional zone-map art.
+- Per-zone 32x32 kill heatmap with tiled zone-map art beneath the grid; empty
+  cells stay hidden so the map remains visible.
+- Resizable window with a larger default size.
+
 - Search, filters, sort modes, relative bars, and a 3D model hero card.
 - Aether Blue default theme plus dark, midnight, class-color, and
   high-contrast themes.
@@ -208,8 +215,8 @@ Each client namespace stores:
 - `deaths` — time-ordered `{ at, mapID, x, y }`, oldest first.
 - `respawns` — `[npcID] = { name, intervals = { seconds, ... }, lastSeen,
   lastDeath }`.
-- `heatmaps` — `[tostring(mapID)] = { cells = { [1..256] = count }, total,
-  lastSeen }` for the 16x16 grid.
+- `heatmaps` — `[tostring(mapID)] = { cells = { [1..1024] = count }, total,
+  lastSeen }` for the 32x32 grid.
 - `areas` — `[mapID] = kills`; `levels` — `[playerLevel] = kills`;
   `areaLevels` — `[mapID] = { [playerLevel] = kills }`.
 - `calibration` — `zones`, `levels`, `groups`, `classes`, and `mobs` ratio
@@ -420,7 +427,7 @@ KillHistory/Client.lua     Client profile registry and capability queries
 KillHistory/Clients/       Forever and Midnight profile policy
 KillHistory/Data.lua       Character store, mob identity, merge, and accounting
 KillHistory/World.lua      Map position, deaths, respawns, and grinding spots
-KillHistory/Heatmap.lua    Per-zone 16x16 kill grid data and capture
+KillHistory/Heatmap.lua    Per-zone 32x32 kill grid data and capture
 KillHistory/Calibration.lua  XP correction stores and observations
 KillHistory/Tracking.lua     Kill recording, chat/death matching, and pruning
 KillHistory/Tooltip.lua      Tooltip hook and line rendering
@@ -442,8 +449,10 @@ tests/check_layout.py      Shipping-layout validator
 tests/check_release.py     Release-zip validator
 tests/build_release.py     Release-zip builder
 tests/run_all.sh           Offline check runner
+assets/                    Logo and brochure artwork (not packaged)
 README.txt                 Player-facing readme
 README.md                  Project/developer readme (this file)
+BROCHURE.md                CurseForge-style promotional brochure
 ```
 
 `README.txt` is the in-game/player guide; this file is the developer reference.
@@ -519,7 +528,7 @@ The main outstanding areas are:
 - tooltip hook availability and `GameTooltip:GetUnit`,
 - exact XP chat semantics for groups and dungeons,
 - rested pool behavior,
-- heatmap recording, the 16x16 grid, and map-art fallback,
+- heatmap recording, the 32x32 grid, and map-art fallback,
 - death locations and respawn intervals against live map-position and nameplate
   visibility,
 - grinding-spot recommendations reaching the 5-sample/120-second threshold,
@@ -565,9 +574,9 @@ checks skip release validation unless `CHECK_RELEASE=1`.
 Current release artifacts:
 
 ```text
-dist/AceM2L2-2.1.0.zip
-/mnt/r/AceM2L2-2.1.0.zip
-SHA-256: 28073f46b45d14567761a2d17c884b5c4c996380b8e4160a7bb23298492a2409
+dist/AceM2L2-2.1.6.zip
+/mnt/r/AceM2L2-2.1.6.zip
+SHA-256: b11def6043feb7a66d58af61bb461084df1ff48df905b0ce47ca2246cc68acff
 ```
 
 Both copies are validated when present. Copy the `dist/` zip to `/mnt/r/` when
@@ -601,7 +610,7 @@ Bindings, Libs, `README.txt`, or `LICENSE`).
 - Area and level rows are derived views; deletion is offered only for mob rows.
 - Per-client caps: 2000 mobs, 200 quests, 200 `levelHistory` records, 240 rate
   samples, 100 deaths, 300 respawn NPCs (20 intervals each), 40 heatmap zones
-  (16x16 cells each), and 12 calibration contexts per mob (pruned after 120
+  (32x32 cells each), and 12 calibration contexts per mob (pruned after 120
   days). Older entries are pruned by recency.
 - Heatmap recording and death locations need a readable map-position API
   (`C_Map.GetPlayerMapPosition` or `GetPlayerMapPosition`). Respawn intervals
@@ -609,8 +618,9 @@ Bindings, Libs, `README.txt`, or `LICENSE`).
   those features are unavailable.
 - Nameplate levels need `C_NamePlate` and are available only on Midnight.
 - Heatmap zone art is best-effort through `C_Map.GetMapArtLayers`,
-  `C_Map.GetMapArtLayerTextures`, or legacy `GetMapInfo`; the 16x16 grid still
-  renders when art is unavailable.
+  `C_Map.GetMapArtLayerTextures`, or legacy `GetMapInfo`; the 32x32 grid still
+  renders when art is unavailable. This is stored zone art with kill cells, not
+  a live map or minimap.
 - Grinding spots need at least 5 rate samples spanning 120 seconds and are
   Forever-only. Midnight never recommends one.
 - Well Fed XP Boost (`1243969`), Well-Rested/Cozy Sleeping Bag (`429959`), and

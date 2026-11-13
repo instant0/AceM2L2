@@ -1,6 +1,6 @@
 --[[---------------------------------------------------------------------------------
   KillHistory/UI/Heatmap.lua
-  Zone kill heatmap panel, 16x16 cell grid, zone pager, legend, and map art.
+  Zone kill heatmap panel, 32x32 cell grid, zone pager, legend, and map art.
 ------------------------------------------------------------------------------------]]
 
 local AceM2L2 = AceM2L2
@@ -9,12 +9,15 @@ local UI = XPTooltip.UI
 local Util = XPTooltip.Util
 
 local floor, min, max = math.floor, math.min, math.max
+local ceil = math.ceil
 local CreateBackdropFrame = UI.CreateBackdropFrame
 local CreateTextButton = UI.CreateTextButton
 local FormatNumber = Util.FormatNumber
 
-local GRID_SIZE = 16
+local GRID_SIZE = 32
 local GRID_CELLS = GRID_SIZE * GRID_SIZE
+local MAX_ART_LAYERS = 8
+local MAX_ART_TILES = 256
 
 --[[--------------------------------------------------------------------------------
   Defensive readers
@@ -90,6 +93,149 @@ local function Color(texture, color, alpha)
   texture:SetColorTexture(color[1] or 0, color[2] or 0, color[3] or 0, alpha or color[4] or 1)
 end
 
+local function ReadMapArtLayers(mapID)
+  local id = tonumber(mapID)
+  if not id or not C_Map or type(C_Map.GetMapArtLayers) ~= "function" then
+    return nil
+  end
+  local ok, layers = pcall(C_Map.GetMapArtLayers, id)
+  if not ok or type(layers) ~= "table" then
+    return nil
+  end
+  local countOK, count = pcall(function()
+    return #layers
+  end)
+  if not countOK or type(count) ~= "number" then
+    return nil
+  end
+
+  local result = {}
+  for layerIndex = 1, min(count, MAX_ART_LAYERS) do
+    local layerOK, layer = pcall(function()
+      return layers[layerIndex]
+    end)
+    if layerOK and type(layer) == "table" then
+      local layerWidth = tonumber(layer.layerWidth) or 0
+      local layerHeight = tonumber(layer.layerHeight) or 0
+      local tileWidth = tonumber(layer.tileWidth) or 0
+      local tileHeight = tonumber(layer.tileHeight) or 0
+      if layerWidth > 0 and layerHeight > 0 and tileWidth > 0 and tileHeight > 0
+        and type(C_Map.GetMapArtLayerTextures) == "function" then
+        local texturesOK, textures = pcall(C_Map.GetMapArtLayerTextures, id, layerIndex)
+        if texturesOK and type(textures) == "table" then
+          local texturesCountOK, texturesCount = pcall(function()
+            return #textures
+          end)
+          if texturesCountOK and type(texturesCount) == "number" and texturesCount > 0 then
+            result[#result + 1] = {
+              index = layerIndex,
+              width = layerWidth,
+              height = layerHeight,
+              tileWidth = tileWidth,
+              tileHeight = tileHeight,
+              textures = textures,
+            }
+          end
+        end
+      end
+    end
+  end
+  if #result == 0 then
+    return nil
+  end
+  return result
+end
+
+local function HideHeatmapArt(heatmap)
+  heatmap.artKey = nil
+  heatmap.artReady = false
+  for _, tile in ipairs(heatmap.artTiles or {}) do
+    if tile and tile.Hide then
+      tile:Hide()
+    end
+  end
+end
+
+local function GetArtTile(heatmap, index, layerIndex)
+  local tile = heatmap.artTiles[index]
+  if not tile then
+    tile = heatmap.grid:CreateTexture(nil, "BACKGROUND")
+    heatmap.artTiles[index] = tile
+  end
+  if tile.SetDrawLayer then
+    -- Keep map art above the grid backdrop but below the ARTWORK heat cells.
+    -- Negative BACKGROUND sublevels sit behind the frame backdrop and give the
+    -- map a faded blue tint.
+    pcall(tile.SetDrawLayer, tile, "BACKGROUND", min(layerIndex, 7))
+  end
+  if tile.SetAlpha then
+    pcall(tile.SetAlpha, tile, 1.0)
+  end
+  if tile.SetVertexColor then
+    pcall(tile.SetVertexColor, tile, 1.0, 1.0, 1.0)
+  end
+  return tile
+end
+
+local function BuildHeatmapArt(heatmap, mapID, side, offsetX, offsetY)
+  local key = tostring(mapID) .. ":" .. tostring(side) .. ":"
+    .. tostring(offsetX) .. ":" .. tostring(offsetY)
+  if heatmap.artKey == key and heatmap.artReady then
+    return true
+  end
+
+  local layers = ReadMapArtLayers(mapID)
+  if not layers then
+    HideHeatmapArt(heatmap)
+    return false
+  end
+
+  local tileIndex = 0
+  for _, layer in ipairs(layers) do
+    local columns = ceil(layer.width / layer.tileWidth)
+    local rows = ceil(layer.height / layer.tileHeight)
+    if columns > 0 and rows > 0 then
+      local scaleX = side / layer.width
+      local scaleY = side / layer.height
+      for column = 1, columns do
+        for row = 1, rows do
+          local texture = layer.textures[(row - 1) * columns + column]
+          if texture ~= nil and tileIndex < MAX_ART_TILES then
+            tileIndex = tileIndex + 1
+            local tile = GetArtTile(heatmap, tileIndex, layer.index)
+            tile:ClearAllPoints()
+            tile:SetPoint("TOPLEFT", heatmap.grid, "TOPLEFT",
+              offsetX + (column - 1) * layer.tileWidth * scaleX,
+              -(offsetY + (row - 1) * layer.tileHeight * scaleY))
+            tile:SetSize(
+              max(1, layer.tileWidth * scaleX),
+              max(1, layer.tileHeight * scaleY)
+            )
+            tile:SetTexture(texture)
+            tile:Show()
+          end
+        end
+      end
+    end
+  end
+
+  for index = tileIndex + 1, #heatmap.artTiles do
+    local tile = heatmap.artTiles[index]
+    if tile and tile.Hide then
+      tile:Hide()
+    end
+  end
+
+  if tileIndex == 0 then
+    heatmap.artKey = nil
+    heatmap.artReady = false
+    return false
+  end
+  heatmap.artKey = key
+  heatmap.artReady = true
+  return true
+end
+
 --[[--------------------------------------------------------------------------------
   Panel construction
 ------------------------------------------------------------------------------------]]
@@ -146,9 +292,7 @@ function XPTooltip:CreateHeatmapPanel(frame)
   grid.xpTooltipKind = "elevated"
   frame.panels[#frame.panels + 1] = grid
 
-  local art = grid:CreateTexture(nil, "BACKGROUND", nil, 1)
-  art:SetAllPoints()
-  art:Hide()
+  local artTiles = {}
 
   local cells = {}
   for index = 1, GRID_CELLS do
@@ -191,7 +335,7 @@ function XPTooltip:CreateHeatmapPanel(frame)
     zoneLabel = zoneLabel,
     currentButton = currentButton,
     grid = grid,
-    art = art,
+    artTiles = artTiles,
     artCaption = artCaption,
     cells = cells,
     noData = noData,
@@ -232,9 +376,7 @@ function XPTooltip:RefreshHeatmap()
     heatmap.selector:Hide()
     heatmap.grid:Hide()
     heatmap.legend:Hide()
-    if heatmap.art then
-      heatmap.art:Hide()
-    end
+    HideHeatmapArt(heatmap)
     if heatmap.artCaption then
       heatmap.artCaption:Hide()
     end
@@ -328,7 +470,6 @@ function XPTooltip:RefreshHeatmap()
   local offsetY = max(0, floor((availableHeight - extent) / 2))
 
   local accent = theme.accent
-  local empty = theme.elevated or theme.panel or theme.border
   for index = 1, GRID_CELLS do
     local cell = heatmap.cells[index]
     if cell then
@@ -339,12 +480,13 @@ function XPTooltip:RefreshHeatmap()
         offsetX + col * stride, -(offsetY + row * stride))
       cell:SetSize(cellSize, cellSize)
       if counts[index] > 0 then
-        local alpha = 0.10 + 0.70 * (counts[index] / maximum)
+        local alpha = 0.30 + 0.70 * (counts[index] / maximum)
         Color(cell, accent, alpha)
+        cell:Show()
       else
-        Color(cell, empty, 0.35)
+        -- Empty cells must stay hidden so the zone map art remains visible.
+        cell:Hide()
       end
-      cell:Show()
     end
   end
 
@@ -352,23 +494,12 @@ function XPTooltip:RefreshHeatmap()
     "Max cell: " .. FormatNumber(maximum) .. "   Zone total: " .. FormatNumber(total)
   )
 
-  local texture
-  if type(self.GetHeatmapMapTexture) == "function" then
-    local ok, value = pcall(self.GetHeatmapMapTexture, self, selected.mapID)
-    if ok then
-      texture = value
-    end
-  end
-
   local applied = false
-  if texture and heatmap.art then
-    applied = pcall(heatmap.art.SetTexture, heatmap.art, texture)
-    if applied and heatmap.art.SetAlpha then
-      pcall(heatmap.art.SetAlpha, heatmap.art, 0.55)
-    end
-  end
-  if heatmap.art then
-    heatmap.art:SetShown(applied)
+  local ok, result = pcall(BuildHeatmapArt, heatmap, selected.mapID, extent, offsetX, offsetY)
+  if ok then
+    applied = result == true
+  else
+    HideHeatmapArt(heatmap)
   end
   if heatmap.artCaption then
     if applied then
@@ -411,65 +542,31 @@ end
   Map art
 ------------------------------------------------------------------------------------]]
 
-function XPTooltip:GetHeatmapMapTexture(mapID)
-  local id = tonumber(mapID)
-  if not id then
+local function TextureValue(value)
+  if type(value) == "number" then
+    return value
+  end
+  if type(value) == "string" and value ~= "" then
+    return value
+  end
+  return nil
+end
+
+local function LayerTexture(layer)
+  if type(layer) ~= "table" then
     return nil
   end
-
-  -- The whole probe runs inside pcall: some clients expose lazy/secret map-art
-  -- structures whose field access can throw even when the API itself exists.
-  local ok, texture = pcall(function()
-    if C_Map and type(C_Map.GetMapArtLayers) == "function" then
-      local layersOK, layers = pcall(C_Map.GetMapArtLayers, id)
-      if layersOK and type(layers) == "table" then
-        local firstOK, first = pcall(function()
-          return layers[1]
-        end)
-        if firstOK and type(first) == "table" then
-          local valueOK, fileDataID = pcall(function()
-            return first.fileDataID
-          end)
-          if valueOK and type(fileDataID) == "number" then
-            return fileDataID
-          end
-        end
+  local fields = { "fileDataID", "textureFileID", "texture", "fileID" }
+  for index = 1, #fields do
+    local ok, value = pcall(function()
+      return layer[fields[index]]
+    end)
+    if ok then
+      local texture = TextureValue(value)
+      if texture then
+        return texture
       end
     end
-
-    if C_Map and type(C_Map.GetMapArtLayerTextures) == "function" then
-      local texturesOK, textures = pcall(C_Map.GetMapArtLayerTextures, id, 1)
-      if texturesOK and type(textures) == "table" then
-        local countOK, count = pcall(function()
-          return #textures
-        end)
-        if countOK and type(count) == "number" then
-          for index = 1, count do
-            local valueOK, value = pcall(function()
-              return textures[index]
-            end)
-            if valueOK and type(value) == "number" then
-              return value
-            end
-          end
-        end
-      end
-    end
-
-    if type(GetMapInfo) == "function" then
-      local infoOK, legacy = pcall(GetMapInfo, id)
-      if infoOK and (type(legacy) == "string" or type(legacy) == "number") then
-        if legacy ~= "" then
-          return legacy
-        end
-      end
-    end
-
-    return nil
-  end)
-
-  if ok then
-    return texture
   end
   return nil
 end

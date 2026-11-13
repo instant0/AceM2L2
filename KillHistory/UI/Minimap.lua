@@ -44,9 +44,9 @@ function XPTooltip:InitializeMinimap()
   if not self.minimapObject then
     self.minimapObject = ldb:NewDataObject("AceM2L2", {
       type = "launcher",
-      icon = "Interface\\Icons\\INV_Misc_Map_01",
-      iconR = 0.55,
-      iconG = 0.84,
+      icon = "Interface\\AddOns\\AceM2L2\\Textures\\AceM2L2-icon.tga",
+      iconR = 1.00,
+      iconG = 1.00,
       iconB = 1.00,
       OnClick = function(_, button)
         self:OnMinimapClick(button)

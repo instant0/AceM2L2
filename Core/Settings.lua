@@ -117,8 +117,8 @@ function AceM2L2:SanitizeXPTooltipSettings()
   end
   ui.x = SanitizeInteger(ui.x, 0, -5000, 5000)
   ui.y = SanitizeInteger(ui.y, 0, -5000, 5000)
-  ui.width = SanitizeInteger(ui.width, 1000, 780, 1200)
-  ui.height = SanitizeInteger(ui.height, 680, 520, 900)
+  ui.width = SanitizeInteger(ui.width, 1150, 900, 1400)
+  ui.height = SanitizeInteger(ui.height, 780, 600, 1050)
   ui.sort = SafeString(ui.sort) or "kills"
   if ui.sort ~= "kills" and ui.sort ~= "name" and ui.sort ~= "lastSeen" then
     ui.sort = "kills"

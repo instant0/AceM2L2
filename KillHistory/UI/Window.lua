@@ -33,6 +33,15 @@ function XPTooltip:CreateUI()
     uiSettings.point or "CENTER", UIParent, uiSettings.relativePoint or "CENTER",
     uiSettings.x or 0, uiSettings.y or 0
   )
+  if frame.SetResizable then
+    frame:SetResizable(true)
+  end
+  if frame.SetResizeBounds then
+    pcall(frame.SetResizeBounds, frame, 900, 600, 1400, 1050)
+  else
+    if frame.SetMinResize then pcall(frame.SetMinResize, frame, 900, 600) end
+    if frame.SetMaxResize then pcall(frame.SetMaxResize, frame, 1400, 1050) end
+  end
   self:StylePanel(frame, "canvas")
   frame.panels[#frame.panels + 1] = frame
   frame.xpTooltipKind = "canvas"
@@ -55,11 +64,34 @@ function XPTooltip:CreateUI()
   frame:SetScript("OnShow", function()
     self:SafeRefreshUI()
   end)
+  frame:SetScript("OnSizeChanged", function()
+    if self.resizeRefreshPending then
+      return
+    end
+    self.resizeRefreshPending = true
+    local function refresh()
+      self.resizeRefreshPending = false
+      if self.ui and self.ui:IsShown() then
+        self:SafeRefreshUI()
+      end
+    end
+    if C_Timer and C_Timer.After then
+      pcall(C_Timer.After, 0.05, refresh)
+    else
+      refresh()
+    end
+  end)
 
   self:CreateAmbient(frame)
 
+  local logo = frame:CreateTexture(nil, "ARTWORK")
+  logo:SetSize(42, 42)
+  logo:SetPoint("TOPLEFT", 16, -10)
+  logo:SetTexture("Interface\\AddOns\\AceM2L2\\Textures\\AceM2L2-logo.tga")
+  frame.logo = logo
+
   local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  title:SetPoint("TOPLEFT", 16, -12)
+  title:SetPoint("TOPLEFT", 68, -10)
   title:SetText("ACE MOBS 2 LEVEL 2")
   frame.title = title
 
@@ -87,6 +119,22 @@ function XPTooltip:CreateUI()
     frame:Hide()
   end)
   frame.closeButton = closeButton
+
+  local resizeGrip = CreateFrame("Button", nil, frame)
+  resizeGrip:SetSize(18, 18)
+  resizeGrip:SetPoint("BOTTOMRIGHT", -4, 4)
+  local gripTexture = resizeGrip:CreateTexture(nil, "ARTWORK")
+  gripTexture:SetAllPoints()
+  local gripColor = self:GetTheme().border
+  gripTexture:SetColorTexture(gripColor[1], gripColor[2], gripColor[3], 0.75)
+  resizeGrip:SetScript("OnMouseDown", function()
+    pcall(frame.StartSizing, frame, "BOTTOMRIGHT")
+  end)
+  resizeGrip:SetScript("OnMouseUp", function()
+    pcall(frame.StopMovingOrSizing, frame)
+    self:SaveUIPosition()
+  end)
+  frame.resizeGrip = resizeGrip
 
   if type(UISpecialFrames) == "table" and frame:GetName() then
     local found = false
@@ -438,6 +486,12 @@ function XPTooltip:SaveUIPosition()
   settings.ui.relativePoint = relativePoint or "CENTER"
   settings.ui.x = floor((x or 0) + 0.5)
   settings.ui.y = floor((y or 0) + 0.5)
+  if self.ui.GetWidth then
+    settings.ui.width = floor((self.ui:GetWidth() or settings.ui.width or 1150) + 0.5)
+  end
+  if self.ui.GetHeight then
+    settings.ui.height = floor((self.ui:GetHeight() or settings.ui.height or 780) + 0.5)
+  end
 end
 
 function XPTooltip:SetTab(tab)

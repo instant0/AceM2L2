@@ -19,8 +19,9 @@ local FormatNumber = Util.FormatNumber
 local FormatPercent = Util.FormatPercent
 local FormatAgo = Util.FormatAgo
 
-local HEATMAP_GRID_SIZE = 16
+local HEATMAP_GRID_SIZE = 32
 local HEATMAP_CELLS = HEATMAP_GRID_SIZE * HEATMAP_GRID_SIZE
+local LEGACY_GRID_SIZE = 16
 local MAX_HEATMAP_MAPS = 40
 local MAX_HEATMAP_COUNT = 1000000
 
@@ -95,6 +96,21 @@ local function NormalizeCellCount(value)
   return min(MAX_HEATMAP_COUNT, count)
 end
 
+local function IsZoneMap(mapID)
+  if not C_Map or type(C_Map.GetMapInfo) ~= "function" then
+    return true
+  end
+  local ok, info = pcall(C_Map.GetMapInfo, mapID)
+  if not ok or type(info) ~= "table" then
+    return true
+  end
+  local mapType = tonumber(info.mapType)
+  if not mapType then
+    return true
+  end
+  return mapType ~= 0 and mapType ~= 1 and mapType ~= 2
+end
+
 local function SortZones(list)
   table.sort(list, function(a, b)
     if a.lastSeen ~= b.lastSeen then
@@ -124,6 +140,79 @@ end
   Normalization
 ------------------------------------------------------------------------------------]]
 
+local function AddCell(target, cell, count)
+  if cell < 1 or cell > HEATMAP_CELLS then
+    return
+  end
+  local merged = (target.cells[cell] or 0) + count
+  target.cells[cell] = min(MAX_HEATMAP_COUNT, merged)
+end
+
+local function MergeCells(source, target)
+  local cells = type(source.cells) == "table" and source.cells or nil
+  if not cells then
+    return
+  end
+
+  local sourceGrid = floor(tonumber(source.gridSize) or 0)
+  if sourceGrid ~= LEGACY_GRID_SIZE and sourceGrid ~= HEATMAP_GRID_SIZE then
+    sourceGrid = LEGACY_GRID_SIZE
+    for cellKey in pairs(cells) do
+      local cell = tonumber(cellKey)
+      if cell and cell > LEGACY_GRID_SIZE * LEGACY_GRID_SIZE then
+        sourceGrid = HEATMAP_GRID_SIZE
+        break
+      end
+    end
+  end
+
+  if sourceGrid == HEATMAP_GRID_SIZE then
+    for cellKey, cellValue in pairs(cells) do
+      if not IsSecret(cellKey) and not IsSecret(cellValue) then
+        local cell = tonumber(cellKey)
+        if cell and cell == floor(cell) then
+          local count = NormalizeCellCount(cellValue)
+          if count then
+            AddCell(target, cell, count)
+          end
+        end
+      end
+    end
+    return
+  end
+
+  -- Upgrade legacy 16x16 cells to four 32x32 cells while preserving totals.
+  for cellKey, cellValue in pairs(cells) do
+    if not IsSecret(cellKey) and not IsSecret(cellValue) then
+      local cell = tonumber(cellKey)
+      if cell and cell == floor(cell) and cell >= 1
+        and cell <= LEGACY_GRID_SIZE * LEGACY_GRID_SIZE then
+        local count = NormalizeCellCount(cellValue)
+        if count then
+          local oldRow = floor((cell - 1) / LEGACY_GRID_SIZE)
+          local oldCol = (cell - 1) % LEGACY_GRID_SIZE
+          local baseRow = oldRow * 2
+          local baseCol = oldCol * 2
+          local targetCells = {
+            baseRow * HEATMAP_GRID_SIZE + baseCol + 1,
+            baseRow * HEATMAP_GRID_SIZE + baseCol + 2,
+            (baseRow + 1) * HEATMAP_GRID_SIZE + baseCol + 1,
+            (baseRow + 1) * HEATMAP_GRID_SIZE + baseCol + 2,
+          }
+          local share = floor(count / 4)
+          local remainder = count % 4
+          for index = 1, 4 do
+            local add = share + (index <= remainder and 1 or 0)
+            if add > 0 then
+              AddCell(target, targetCells[index], add)
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
 -- Merge one stored map entry into an accumulator. Cells are the source of truth;
 -- duplicate numeric/string map keys therefore simply add their cell counts.
 local function MergeMapEntry(source, target)
@@ -131,21 +220,8 @@ local function MergeMapEntry(source, target)
     return
   end
 
-  local cells = type(source.cells) == "table" and source.cells or nil
-  if cells then
-    for cellKey, cellValue in pairs(cells) do
-      if not IsSecret(cellKey) and not IsSecret(cellValue) then
-        local cell = tonumber(cellKey)
-        if cell and cell == floor(cell) and cell >= 1 and cell <= HEATMAP_CELLS then
-          local count = NormalizeCellCount(cellValue)
-          if count then
-            local merged = (target.cells[cell] or 0) + count
-            target.cells[cell] = min(MAX_HEATMAP_COUNT, merged)
-          end
-        end
-      end
-    end
-  end
+  target.gridSize = HEATMAP_GRID_SIZE
+  MergeCells(source, target)
 
   local lastSeen = FiniteNumber(source.lastSeen)
   if lastSeen and lastSeen > target.lastSeen then
@@ -199,6 +275,7 @@ function XPTooltip:NormalizeHeatmaps(target)
   for index = 1, min(#list, MAX_HEATMAP_MAPS) do
     local entry = list[index]
     heatmaps[entry.key] = {
+      gridSize = HEATMAP_GRID_SIZE,
       cells = entry.cells,
       total = entry.total,
       lastSeen = entry.lastSeen,
@@ -226,7 +303,7 @@ function XPTooltip:GetHeatmapZones()
   for key, entry in pairs(heatmaps) do
     if type(entry) == "table" then
       local mapID = NormalizeMapID(key)
-      if mapID then
+      if mapID and IsZoneMap(mapID) then
         zones[#zones + 1] = {
           mapID = mapID,
           key = key,
@@ -276,7 +353,7 @@ function XPTooltip:RecordHeatmapKill(mapID, x, y)
   local id = NormalizeMapID(mapID)
   local px = UnitCoordinate(x)
   local py = UnitCoordinate(y)
-  if not id or not px or not py then
+  if not id or not px or not py or not IsZoneMap(id) then
     return false
   end
 
@@ -292,9 +369,10 @@ function XPTooltip:RecordHeatmapKill(mapID, x, y)
   local key = tostring(id)
   local entry = heatmaps[key]
   if type(entry) ~= "table" then
-    entry = { cells = {}, total = 0, lastSeen = 0 }
+    entry = { gridSize = HEATMAP_GRID_SIZE, cells = {}, total = 0, lastSeen = 0 }
     heatmaps[key] = entry
   end
+  entry.gridSize = HEATMAP_GRID_SIZE
   if type(entry.cells) ~= "table" then
     entry.cells = {}
   end
