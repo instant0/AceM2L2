@@ -14,7 +14,12 @@ local VISIBLE_ROWS = Util.VISIBLE_ROWS
 local SafeNumber = Util.SafeNumber
 local Lower = Util.Lower
 local FormatNumber = Util.FormatNumber
-local EnsureNumberMap = Util.EnsureNumberMap
+
+function XPTooltip:ResetScroll()
+  if self.ui and self.ui.scrollFrame and self.ui.scrollFrame.SetVerticalScroll then
+    pcall(self.ui.scrollFrame.SetVerticalScroll, self.ui.scrollFrame, 0)
+  end
+end
 
 function XPTooltip:BuildList()
   local list = {}
@@ -91,9 +96,10 @@ function XPTooltip:BuildList()
         if include and (search == "" or name:find(search, 1, true)) then
           local value = tonumber(mob.kills) or 0
           local rowValue = FormatNumber(value) .. " kills"
-          if type(mob.xp) == "table" and (tonumber(mob.xp.samples) or 0) > 0 then
+          if self:Supports("hasPerMobXP")
+            and type(mob.xp) == "table" and (tonumber(mob.xp.samples) or 0) > 0 then
             local avg = FormatNumber((tonumber(mob.xp.sumBase) or 0) / mob.xp.samples)
-            rowValue = rowValue .. "  |  avg " .. avg .. " XP"
+            rowValue = rowValue .. " | avg " .. avg .. " XP"
           end
           list[#list + 1] = {
             kind = "mob",
@@ -234,6 +240,7 @@ function XPTooltip:SetFilter(filter)
   end
   self.filter = filter
   self.selectedIndex = 1
+  self:ResetScroll()
   self:UpdateFilterButtons()
   self:BuildList()
   self:UpdateRows()
@@ -268,6 +275,8 @@ function XPTooltip:CycleSort()
     end
   end
   settings.ui.sort = nextSort
+  self.selectedIndex = 1
+  self:ResetScroll()
   if self.ui and self.ui.sortButton then
     self.ui.sortButton:SetText("Sort: " .. (nextSort == "lastSeen" and "Recent" or (nextSort == "name" and "Name" or "Kills")))
   end

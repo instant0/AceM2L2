@@ -36,6 +36,11 @@ function AceM2L2:CreateOptionsPanel()
   local category = Settings.RegisterVerticalLayoutCategory("Ace Mobs 2 Level 2")
   self.optionSettings = {}
 
+  local module = self:GetXPTooltipModule()
+  local function supports(capability)
+    return module and module.Supports and module:Supports(capability)
+  end
+
   local function addSetting(name, variable, defaultValue, getter, setter)
     local setting = Settings.RegisterProxySetting(
       category,
@@ -200,32 +205,37 @@ function AceM2L2:CreateOptionsPanel()
     "Show the AceM2L2 launcher icon around the minimap."
   )
 
-  addCheckbox(
-    "Kill History: show XP",
-    "ACEM2L2_XPTOOLTIP_SHOW_XP",
-    true,
-    function() return self.db.xpTooltip.showXP end,
-    function(value) self.db.xpTooltip.showXP = SanitizeBoolean(value, true) end,
-    "Show the estimated XP value on the mob tooltip."
-  )
+  if supports("hasTooltipXP") then
+    addCheckbox(
+      "Kill History: show XP",
+      "ACEM2L2_XPTOOLTIP_SHOW_XP",
+      true,
+      function() return self.db.xpTooltip.showXP end,
+      function(value) self.db.xpTooltip.showXP = SanitizeBoolean(value, true) end,
+      "Show the estimated XP value on the mob tooltip."
+    )
 
-  addCheckbox(
-    "Kill History: show percent of level",
-    "ACEM2L2_XPTOOLTIP_SHOW_PERCENT",
-    true,
-    function() return self.db.xpTooltip.showPercent end,
-    function(value) self.db.xpTooltip.showPercent = SanitizeBoolean(value, true) end,
-    "Show how much of the current level one kill is worth."
-  )
+    addCheckbox(
+      "Kill History: show percent of level",
+      "ACEM2L2_XPTOOLTIP_SHOW_PERCENT",
+      true,
+      function() return self.db.xpTooltip.showPercent end,
+      function(value) self.db.xpTooltip.showPercent = SanitizeBoolean(value, true) end,
+      "Show how much of the current level one kill is worth."
+    )
 
-  addCheckbox(
-    "Kill History: show kills to level",
-    "ACEM2L2_XPTOOLTIP_SHOW_KILLS",
-    true,
-    function() return self.db.xpTooltip.showKillsToLevel end,
-    function(value) self.db.xpTooltip.showKillsToLevel = SanitizeBoolean(value, true) end,
-    "Show how many kills of this mob remain to level."
-  )
+  end
+
+  if supports("hasKillsToLevel") then
+    addCheckbox(
+      "Kill History: show kills to level",
+      "ACEM2L2_XPTOOLTIP_SHOW_KILLS",
+      true,
+      function() return self.db.xpTooltip.showKillsToLevel end,
+      function(value) self.db.xpTooltip.showKillsToLevel = SanitizeBoolean(value, true) end,
+      "Show how many kills of this mob remain to level."
+    )
+  end
 
   addCheckbox(
     "Kill History: show kill count",
@@ -236,44 +246,61 @@ function AceM2L2:CreateOptionsPanel()
     "Show how many of this mob you have already killed."
   )
 
-  addCheckbox(
-    "Kill History: show rested",
-    "ACEM2L2_XPTOOLTIP_SHOW_RESTED",
-    true,
-    function() return self.db.xpTooltip.showRested end,
-    function(value) self.db.xpTooltip.showRested = SanitizeBoolean(value, true) end,
-    "Show rested XP bonus and rested kill counts."
-  )
+  if supports("hasRestedPool") then
+    addCheckbox(
+      "Kill History: show rested",
+      "ACEM2L2_XPTOOLTIP_SHOW_RESTED",
+      true,
+      function() return self.db.xpTooltip.showRested end,
+      function(value) self.db.xpTooltip.showRested = SanitizeBoolean(value, true) end,
+      "Show rested XP bonus and rested kill counts."
+    )
+  end
+
+  if supports("hasTooltipXP") then
+    addCheckbox(
+      "Kill History: show unknown mobs",
+      "ACEM2L2_XPTOOLTIP_SHOW_UNKNOWN",
+      true,
+      function() return self.db.xpTooltip.showUnknown end,
+      function(value) self.db.xpTooltip.showUnknown = SanitizeBoolean(value, true) end,
+      "Show an estimate/unknown line for mobs that have not been observed yet."
+    )
+  end
+
+  if supports("hasPerMobXP") then
+    addCheckbox(
+      "Kill History: count zero-XP kills",
+      "ACEM2L2_XPTOOLTIP_COUNT_ZERO",
+      true,
+      function() return self.db.xpTooltip.countZeroXPMobs end,
+      function(value) self.db.xpTooltip.countZeroXPMobs = SanitizeBoolean(value, true) end,
+      "Count gray/trivial kills when a readable UNIT_DIED event is available."
+    )
+  end
 
   addCheckbox(
-    "Kill History: show unknown mobs",
-    "ACEM2L2_XPTOOLTIP_SHOW_UNKNOWN",
-    true,
-    function() return self.db.xpTooltip.showUnknown end,
-    function(value) self.db.xpTooltip.showUnknown = SanitizeBoolean(value, true) end,
-    "Show an estimate/unknown line for mobs that have not been observed yet."
+    "Kill History: debug output",
+    "ACEM2L2_XPTOOLTIP_DEBUG",
+    false,
+    function() return self.db.xpTooltip.debug end,
+    function(value) self.db.xpTooltip.debug = SanitizeBoolean(value, false) end,
+    "Print Kill History XP and kill-identification diagnostics to chat."
   )
 
-  addCheckbox(
-    "Kill History: count zero-XP kills",
-    "ACEM2L2_XPTOOLTIP_COUNT_ZERO",
-    true,
-    function() return self.db.xpTooltip.countZeroXPMobs end,
-    function(value) self.db.xpTooltip.countZeroXPMobs = SanitizeBoolean(value, true) end,
-    "Count gray/trivial kills when a readable UNIT_DIED event is available."
-  )
-
-  addSlider(
-    "Kill History: manual XP bonus (%)",
-    "ACEM2L2_XPTOOLTIP_MANUAL_BONUS",
-    0,
-    0,
-    100,
-    1,
-    function() return self.db.xpTooltip.manualXPBonus or 0 end,
-    function(value) self.db.xpTooltip.manualXPBonus = SanitizeInteger(value, 0, 0, 100) end,
-    "Extra XP bonus for buffs the addon does not recognize."
-  )
+  if supports("hasXPFormula") then
+    addSlider(
+      "Kill History: manual XP bonus (%)",
+      "ACEM2L2_XPTOOLTIP_MANUAL_BONUS",
+      0,
+      0,
+      100,
+      1,
+      function() return self.db.xpTooltip.manualXPBonus or 0 end,
+      function(value) self.db.xpTooltip.manualXPBonus = SanitizeInteger(value, 0, 0, 100) end,
+      "Extra XP bonus for buffs the addon does not recognize."
+    )
+  end
 
   Settings.RegisterAddOnCategory(category)
   self.optionsCategory = category

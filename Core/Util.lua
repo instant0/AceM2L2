@@ -224,25 +224,33 @@ local function FormatToPattern(fmt)
     addLiteral(fmt:sub(i, percent - 1))
 
     local after = fmt:sub(percent + 1)
-    local position, conversion = after:match("^(%d+)%$([sdf])")
-    local consumed = nil
-
-    if conversion then
-      consumed = #position + 3
-    else
-      conversion = after:match("^([sdf])")
-      if conversion then
-        consumed = 2
-      elseif after:sub(1, 1) == "%" then
-        parts[#parts + 1] = "%%"
-        i = percent + 2
-      else
-        addLiteral("%")
-        i = percent + 1
-      end
+    local consumed = 0
+    local position
+    local rest = after
+    local positional, remainder = after:match("^(%d+)%$(.*)$")
+    if positional then
+      position = positional
+      consumed = #positional + 1
+      rest = remainder
     end
 
-    if conversion then
+    local flags = rest:match("^([%-%+0 #]*)") or ""
+    consumed = consumed + #flags
+    rest = rest:sub(#flags + 1)
+
+    local width = rest:match("^(%d*)") or ""
+    consumed = consumed + #width
+    rest = rest:sub(#width + 1)
+
+    local precision = rest:match("^(%.%d*)") or ""
+    consumed = consumed + #precision
+    rest = rest:sub(#precision + 1)
+
+    local conversion = rest:sub(1, 1)
+    if conversion == "%" then
+      parts[#parts + 1] = "%%"
+      i = percent + 2
+    elseif conversion == "s" or conversion == "d" or conversion == "f" then
       local slot = tonumber(position)
       if slot then
         if slot >= nextSlot then
@@ -262,7 +270,10 @@ local function FormatToPattern(fmt)
         slot = slot,
         kind = conversion,
       }
-      i = percent + consumed
+      i = percent + 1 + consumed + 1
+    else
+      addLiteral("%")
+      i = percent + 1
     end
   end
 
@@ -272,7 +283,6 @@ local function FormatToPattern(fmt)
 
   return "^" .. table.concat(parts) .. "$", tokens
 end
-
 local function SafeMatchN(message, pattern)
   if type(message) ~= "string" or IsSecretValue(message) then
     return nil

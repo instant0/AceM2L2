@@ -28,9 +28,18 @@ function XPTooltip:InitializeMinimap()
   if type(settings.minimap) ~= "table" then
     settings.minimap = CopyTable(DEFAULT_MINIMAP)
   end
-  if self.minimapSettingsTable ~= settings.minimap then
+  if self.minimapObject and self.minimapIcon and self.minimapRegistered then
+    if self.minimapSettingsTable ~= settings.minimap then
+      self.minimapSettingsTable = settings.minimap
+      if type(self.minimapIcon.Refresh) == "function" then
+        pcall(self.minimapIcon.Refresh, self.minimapIcon, "AceM2L2", settings.minimap)
+      end
+    end
+    self:UpdateMinimapVisibility()
+    return
+  end
+  if not self.minimapSettingsTable then
     self.minimapSettingsTable = settings.minimap
-    self.minimapRegistered = false
   end
   if not self.minimapObject then
     self.minimapObject = ldb:NewDataObject("AceM2L2", {

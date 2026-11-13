@@ -13,11 +13,27 @@ local CALIBRATION_VERSION = Util.CALIBRATION_VERSION
 local Clamp = Util.Clamp
 local Epoch = Util.Epoch
 local EnsureNumberMap = Util.EnsureNumberMap
-local FormulaXP = Formula.FormulaXP
-local RoundForever = Formula.RoundForever
 local ContextKey = Formula.ContextKey
-local CLASSIC_GROUP_PRIOR = Formula.CLASSIC_GROUP_PRIOR
-local GROUP_CALIBRATION_ENABLED = Formula.GROUP_CALIBRATION_ENABLED
+
+local function GetProfile(self)
+  return self.clientProfile or self:GetClientProfile()
+end
+
+local function ProfileFormula(self, playerLevel, mobLevel, classification)
+  local profile = GetProfile(self)
+  if not profile or not profile:Supports("hasXPFormula") then
+    return nil
+  end
+  return profile:GetFormula(playerLevel, mobLevel, classification)
+end
+
+local function ProfileRound(self, value)
+  local profile = GetProfile(self)
+  if profile and profile.Round then
+    return profile:Round(value)
+  end
+  return Formula.Round(value)
+end
 
 function XPTooltip:UpdateRatio(store, key, ratio)
   if not store or not key then
@@ -52,26 +68,30 @@ function XPTooltip:HasRatioSamples(entry, minimum)
 end
 
 function XPTooltip:GetEstimate(playerLevel, mobLevel, classification, mapID, groupSize, mobKey, buffSignature)
-  local base = FormulaXP(playerLevel, mobLevel, classification)
-  if base <= 0 then
+  local profile = GetProfile(self)
+  if not profile or not profile:Supports("hasXPFormula") then
+    return 0
+  end
+  local base = ProfileFormula(self, playerLevel, mobLevel, classification)
+  if not base or base <= 0 then
     return 0
   end
 
-  local wellFed, wellRested = self:GetBuffInfo()
-  local buffed = RoundForever(base * self:GetBuffMultiplier(wellFed, wellRested))
+  local wellFed, wellRested, _, restedStacks = self:GetBuffInfo()
+  local buffed = ProfileRound(self, base * self:GetBuffMultiplier(wellFed, wellRested, restedStacks))
 
   local calibration = self.char and self.char.calibration
   local groupRatio
   if groupSize and groupSize > 1 then
-    if GROUP_CALIBRATION_ENABLED then
+    if profile:UsesGroupLearning() then
       local groupEntry = calibration and calibration.groups[tostring(groupSize)]
       if self:HasRatioSamples(groupEntry, 5) then
         groupRatio = self:EffectiveRatio(groupEntry)
       else
-        groupRatio = CLASSIC_GROUP_PRIOR[min(groupSize, 5)] or 1
+        groupRatio = profile:GetGroupPrior(groupSize)
       end
     else
-      groupRatio = CLASSIC_GROUP_PRIOR[min(groupSize, 5)] or 1
+      groupRatio = profile:GetGroupPrior(groupSize)
     end
   else
     groupRatio = 1
@@ -103,7 +123,7 @@ function XPTooltip:GetEstimate(playerLevel, mobLevel, classification, mapID, gro
     end
   end
 
-  return RoundForever(buffed * groupRatio * correction)
+  return ProfileRound(self, buffed * groupRatio * correction)
 end
 
 function XPTooltip:KillsToLevel(remaining, killXP, pool)
@@ -128,6 +148,11 @@ function XPTooltip:RecordObservation(mob, info, rawBase, buffedXP, totalXP)
   if not mob or not info or not rawBase or rawBase <= 0 then
     return
   end
+  local profile = GetProfile(self)
+  if not profile or not profile:Supports("hasXPFormula")
+    or not profile:Supports("hasPerMobXP") or not profile:Supports("hasObservedXP") then
+    return
+  end
   local playerLevel = info.playerLevel or self:GetPlayerLevel()
   local mobLevel = info.level
   if not playerLevel or not mobLevel then
@@ -135,8 +160,8 @@ function XPTooltip:RecordObservation(mob, info, rawBase, buffedXP, totalXP)
   end
 
   local classification = info.classification or mob.classification or "normal"
-  local formula = FormulaXP(playerLevel, mobLevel, classification)
-  if formula <= 0 then
+  local formula = ProfileFormula(self, playerLevel, mobLevel, classification)
+  if not formula or formula <= 0 then
     return
   end
 
@@ -243,8 +268,10 @@ function XPTooltip:ResetCalibration()
   self.pendingDeaths = {}
   self.recentChatKills = {}
   self.pendingChatXP = {}
+  -- Aggregate calibration only; exact per-mob observations are cleared by
+  -- ResetObservations, not by recalibrate.
   db.calibration = { zones = {}, levels = {}, groups = {}, classes = {}, mobs = {} }
   db.calibrationVersion = CALIBRATION_VERSION
-  AceM2L2:SafePrint("Kill History calibration reset.")
+  AceM2L2:SafePrint("Kill History calibration reset (observations kept).")
   self:RefreshUI()
 end

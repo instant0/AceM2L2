@@ -9,56 +9,30 @@ local Util = XPTooltip.Util
 local Formula = XPTooltip.Formula
 
 local floor, min, max = math.floor, math.min, math.max
-local MAX_MOBS = Util.MAX_MOBS
 local MAX_PENDING_DEATHS = Util.MAX_PENDING_DEATHS
-local MAX_CONTEXTS_PER_MOB = Util.MAX_CONTEXTS_PER_MOB
-local CONTEXT_MAX_AGE = Util.CONTEXT_MAX_AGE
 local IsSecret = Util.IsSecret
 local SafeCall = Util.SafeCall
-local SafeNumber = Util.SafeNumber
 local SafeString = Util.SafeString
 local SafeBool = Util.SafeBool
-local Trim = Util.Trim
 local Lower = Util.Lower
-local CopyTable = Util.CopyTable
 local CopyInfo = Util.CopyInfo
 local Now = Util.Now
 local Epoch = Util.Epoch
-local EnsureNumberMap = Util.EnsureNumberMap
 local ContextKey = Formula.ContextKey
+local DEATH_COMMIT_DELAY = 2.5
+local CHAT_MATCH_WINDOW = 3.0
+local PENDING_CHAT_WINDOW = 4.5
+local PENDING_CHAT_COMMIT_DELAY = 5.0
 
 --[[--------------------------------------------------------------------------------
   Buffs and rest
 ------------------------------------------------------------------------------------]]
 
-local function HasAura(name)
-  if type(AuraUtil) == "table" and type(AuraUtil.FindAuraByName) == "function" then
-    local ok, aura = pcall(AuraUtil.FindAuraByName, name, "player", "HELPFUL")
-    if ok and aura and not IsSecret(aura) then
-      return true
-    end
-  end
-  if C_UnitAuras and type(C_UnitAuras.GetAuraDataByIndex) == "function" then
-    for index = 1, 40 do
-      local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", index, "HELPFUL")
-      if not ok or not aura then
-        break
-      end
-      if not IsSecret(aura) then
-        local auraName = aura.name
-        if not IsSecret(auraName) and auraName == name then
-          return true
-        end
-      end
-    end
-  end
-  return false
-end
-
 function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObservation)
   if not info then
     return
   end
+  local supportsPerMobXP = self:Supports("hasPerMobXP")
   local db = self.char
   local playerLevel = info.playerLevel or self:GetPlayerLevel() or 0
   local mapID = info.mapID or self:GetMapID() or 0
@@ -107,17 +81,25 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
       end
       local levelKey = tostring(playerLevel)
       areaLevels[levelKey] = (tonumber(areaLevels[levelKey]) or 0) + 1
+      local byArea = mob.killsByAreaLevel[mapKey]
+      if type(byArea) ~= "table" then
+        byArea = {}
+        mob.killsByAreaLevel[mapKey] = byArea
+      end
+      byArea[levelKey] = (tonumber(byArea[levelKey]) or 0) + 1
     end
   end
 
   db.totals.kills = (tonumber(db.totals.kills) or 0) + 1
   db.session.kills = (tonumber(db.session.kills) or 0) + 1
-  if totalXP then
+  if totalXP and supportsPerMobXP then
+    mob.totalXP = (tonumber(mob.totalXP) or 0) + totalXP
+    mob.sessionXP = (tonumber(mob.sessionXP) or 0) + totalXP
     db.totals.xp = (tonumber(db.totals.xp) or 0) + totalXP
     db.session.xp = (tonumber(db.session.xp) or 0) + totalXP
   end
 
-  if rawBase and rawBase > 0 and not skipObservation then
+  if rawBase and rawBase > 0 and not skipObservation and supportsPerMobXP then
     self:RecordObservation(mob, info, rawBase, buffedXP, totalXP)
   end
 
@@ -161,8 +143,11 @@ function XPTooltip:QueueUnidentifiedKill(info, totalXP, rawBase, buffedXP, skipO
     ))
   end
   if C_Timer and C_Timer.After then
-    pcall(C_Timer.After, 3.0, function()
-      self:CommitUnidentifiedKill(entry)
+    pcall(C_Timer.After, PENDING_CHAT_COMMIT_DELAY, function()
+      local ok, err = pcall(self.CommitUnidentifiedKill, self, entry)
+      if not ok then
+        self:ReportError("CommitUnidentifiedKill", err)
+      end
     end)
   else
     self:CommitUnidentifiedKill(entry)
@@ -189,7 +174,7 @@ function XPTooltip:TakePendingChatKill(now)
     local entry = self.pendingChatXP[index]
     if entry and not entry.consumed and not entry.canceled
       and entry.generation == self.dataGeneration
-      and (now - (entry.at or 0)) <= 4 then
+      and (now - (entry.at or 0)) <= PENDING_CHAT_WINDOW then
       entry.consumed = true
       table.remove(self.pendingChatXP, index)
       return entry
@@ -234,18 +219,32 @@ end
 function XPTooltip:FindKillInfo(name, now)
   for index = #self.pendingDeaths, 1, -1 do
     local pending = self.pendingDeaths[index]
-    if pending and not pending.counted then
+    if pending and not pending.counted and not pending.committed then
       local pendingName = pending.info and pending.info.name
-      if (now - pending.at) <= 3 and (not name or not pendingName or Lower(name) == Lower(pendingName)) then
+      if (now - pending.at) <= CHAT_MATCH_WINDOW
+        and (not name or not pendingName or Lower(name) == Lower(pendingName)) then
         pending.counted = true
         return pending.info
       end
     end
   end
 
+  -- A death may already have been committed as a zero-XP kill. If a late chat
+  -- arrives for the same recent unit, suppress it instead of counting twice.
+  for index = #self.pendingDeaths, 1, -1 do
+    local pending = self.pendingDeaths[index]
+    if pending and pending.committed then
+      local pendingName = pending.info and pending.info.name
+      if (now - pending.at) <= CHAT_MATCH_WINDOW
+        and (not name or not pendingName or Lower(name) == Lower(pendingName)) then
+        return nil, true
+      end
+    end
+  end
+
   local function matches(candidate)
     return candidate
-      and (now - candidate.at) <= 3
+      and (now - candidate.at) <= CHAT_MATCH_WINDOW
       and (not name or not candidate.name or Lower(name) == Lower(candidate.name))
   end
 
@@ -259,6 +258,9 @@ function XPTooltip:FindKillInfo(name, now)
 end
 
 function XPTooltip:HandleXPChat(message)
+  if not self:Supports("hasPerMobXP") then
+    return
+  end
   if IsSecret(message) then
     return
   end
@@ -276,8 +278,8 @@ function XPTooltip:HandleXPChat(message)
   local poolAfter = self:GetRestedPool()
   local poolBefore = self.poolBeforeKill or self.lastPool or poolAfter
   self.poolBeforeKill = nil
-  local wellFed, wellRested, buffDetection = self:GetBuffInfo()
-  local buffMultiplier = self:GetBuffMultiplier(wellFed, wellRested)
+  local wellFed, wellRested, buffDetection, restedStacks = self:GetBuffInfo()
+  local buffMultiplier = self:GetBuffMultiplier(wellFed, wellRested, restedStacks)
   local buffedXP = total
   local rawBase = buffedXP / buffMultiplier
   -- Do not use rested kills for calibration unless the chat text is known to
@@ -285,7 +287,11 @@ function XPTooltip:HandleXPChat(message)
   -- non-rested observations are clean.
   local skipObservation = (poolAfter > 0) or (poolBefore > poolAfter) or (not buffDetection)
 
-  local source = self:FindKillInfo(name, now)
+  local source, alreadyCounted = self:FindKillInfo(name, now)
+  if alreadyCounted then
+    self.lastPool = poolAfter
+    return
+  end
   local info = CopyInfo(source) or {
     name = name or "Unknown",
     mobKey = self:GetMobKey(name),
@@ -362,20 +368,25 @@ function XPTooltip:FindDeathCandidate(guid)
   -- Exact GUID matches are safe even if the target was acquired long ago.
   -- Target units are often cleared as soon as a mob dies, so keep the last
   -- valid hostile target briefly instead of dropping its identity.
-  if guid and self.lastTarget and self.lastTarget.guid == guid
-    and (now - (self.lastTarget.at or 0)) <= 60 then
+  if guid and self.lastTarget and self.lastTarget.guid == guid then
     return self.lastTarget
   end
-  if guid and self.lastMouseover and self.lastMouseover.guid == guid
-    and (now - (self.lastMouseover.at or 0)) <= 60 then
+  if guid and self.lastMouseover and self.lastMouseover.guid == guid then
     return self.lastMouseover
   end
 
+  -- Forever can fall back to the last target when the client clears its GUID on
+  -- death. Counts-only clients cannot be corrected by XP chat, so only exact
+  -- GUID matches are safe there.
+  if not self:Supports("hasPerMobXP") then
+    return nil
+  end
+
   local targetDead = SafeBool(SafeCall(UnitIsDead, "target"))
+  local mouseoverDead = SafeBool(SafeCall(UnitIsDead, "mouseover"))
   if targetDead and self.lastTarget and (now - self.lastTarget.at) <= 10 then
     return self.lastTarget
   end
-  local mouseoverDead = SafeBool(SafeCall(UnitIsDead, "mouseover"))
   if mouseoverDead and self.lastMouseover and (now - self.lastMouseover.at) <= 10 then
     return self.lastMouseover
   end
@@ -395,7 +406,7 @@ function XPTooltip:HandleUnitDied(guid)
   local now = Now()
   for index = #self.recentChatKills, 1, -1 do
     local recent = self.recentChatKills[index]
-    if recent and (now - (recent.at or 0)) <= 3 then
+    if recent and (now - (recent.at or 0)) <= CHAT_MATCH_WINDOW then
       local sameKey = recent.mobKey and candidate.mobKey and recent.mobKey == candidate.mobKey
       local bothKeysKnown = recent.mobKey and candidate.mobKey
       local sameName = recent.name and candidate.name and Lower(recent.name) == Lower(candidate.name)
@@ -440,13 +451,20 @@ function XPTooltip:HandleUnitDied(guid)
 
   self.poolBeforeKill = self:GetRestedPool()
 
+  local countZero = self.settings and self.settings.countZeroXPMobs
+  if not self:Supports("hasPerMobXP") then
+    -- UNIT_DIED is the only kill source on counts-only clients, so the setting
+    -- that filters gray/zero-XP kills from the XP path must not suppress them.
+    countZero = true
+  end
+
   local entry = {
     info = candidate,
     at = Now(),
     counted = false,
     committed = false,
     generation = self.dataGeneration,
-    countZero = self.settings and self.settings.countZeroXPMobs,
+    countZero = countZero,
   }
   self.pendingDeaths[#self.pendingDeaths + 1] = entry
   while #self.pendingDeaths > MAX_PENDING_DEATHS do
@@ -454,8 +472,11 @@ function XPTooltip:HandleUnitDied(guid)
   end
 
   if C_Timer and C_Timer.After then
-    pcall(C_Timer.After, 2.5, function()
-      self:CommitPendingDeath(entry)
+    pcall(C_Timer.After, DEATH_COMMIT_DELAY, function()
+      local ok, err = pcall(self.CommitPendingDeath, self, entry)
+      if not ok then
+        self:ReportError("CommitPendingDeath", err)
+      end
     end)
   else
     self:CommitPendingDeath(entry)
@@ -470,10 +491,11 @@ function XPTooltip:CommitPendingDeath(entry)
     return
   end
   entry.committed = true
+  entry.counted = true
   if not self:IsActive() then
     return
   end
-  if entry.countZero then
+  if entry.countZero or not self:Supports("hasPerMobXP") then
     local info = CopyInfo(entry.info) or { name = "Unknown", at = Now() }
     info.playerLevel = self:GetPlayerLevel() or 1
     info.level = info.level or info.playerLevel

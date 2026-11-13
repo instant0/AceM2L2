@@ -249,31 +249,33 @@ Util.EnsureNumberMap = EnsureNumberMap
 
 -- Client API wrappers, map/group helpers, and buff detection.
 
-local function HasAuraSpellID(spellID)
-  if not C_UnitAuras or type(C_UnitAuras.GetAuraDataByIndex) ~= "function" then
+local WELL_FED_SPELL_IDS = {}
+for spellID = 19705, 19740 do
+  WELL_FED_SPELL_IDS[spellID] = true
+end
+local WELL_RESTED_SPELL_IDS = { [429959] = true }
+
+local function MatchesAura(aura, name, spellIDs)
+  if type(aura) ~= "table" or IsSecret(aura) then
     return false
   end
-  for index = 1, 40 do
-    local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", index, "HELPFUL")
-    if not ok or not aura then
-      break
-    end
-    if not IsSecret(aura) then
-      local spellId = aura.spellId
-      if not IsSecret(spellId) and tonumber(spellId) == spellID then
-        return true
-      end
-    end
+  local auraName = aura.name
+  if name and not IsSecret(auraName) and auraName == name then
+    return true
   end
-  return false
+  local rawSpellID = aura.spellId
+  if IsSecret(rawSpellID) then
+    return false
+  end
+  local spellID = tonumber(rawSpellID)
+  return spellID ~= nil and spellIDs ~= nil and spellIDs[spellID] == true
 end
 
-
-local function HasAura(name)
+local function FindAura(name, spellIDs)
   if type(AuraUtil) == "table" and type(AuraUtil.FindAuraByName) == "function" then
-    local ok, aura = pcall(AuraUtil.FindAuraByName, name, "player", "HELPFUL")
-    if ok and aura and not IsSecret(aura) then
-      return true
+    local ok, aura = pcall(AuraUtil.FindAuraByName, name or "", "player", "HELPFUL")
+    if ok and MatchesAura(aura, name, spellIDs) then
+      return aura
     end
   end
   if C_UnitAuras and type(C_UnitAuras.GetAuraDataByIndex) == "function" then
@@ -282,15 +284,30 @@ local function HasAura(name)
       if not ok or not aura then
         break
       end
-      if not IsSecret(aura) then
-        local auraName = aura.name
-        if not IsSecret(auraName) and auraName == name then
-          return true
-        end
+      if MatchesAura(aura, name, spellIDs) then
+        return aura
       end
     end
   end
-  return false
+  return nil
+end
+
+local function AuraStacks(aura)
+  if type(aura) ~= "table" then
+    return 1
+  end
+  local raw = aura.applications
+  if IsSecret(raw) then
+    raw = nil
+  end
+  if raw == nil then
+    raw = aura.charges
+    if IsSecret(raw) then
+      raw = nil
+    end
+  end
+  local stacks = tonumber(raw) or 1
+  return math.max(1, math.min(3, stacks))
 end
 
 function XPTooltip:GetPlayerLevel()
@@ -298,14 +315,27 @@ function XPTooltip:GetPlayerLevel()
 end
 
 function XPTooltip:GetXP()
+  if not self:Supports("hasPlayerXPState") then
+    return nil
+  end
   return SafeNumber(SafeCall(UnitXP, "player"))
 end
 
 function XPTooltip:GetXPMax()
+  if not self:Supports("hasPlayerXPState") then
+    return nil
+  end
   return SafeNumber(SafeCall(UnitXPMax, "player"))
 end
 
 function XPTooltip:GetMaxLevel()
+  local profile = self.clientProfile or self:GetClientProfile()
+  if profile and profile.GetMaxLevel then
+    local value = profile:GetMaxLevel()
+    if value then
+      return value
+    end
+  end
   local maxLevel = SafeNumber(SafeCall(GetMaxPlayerLevel))
   if not maxLevel then
     maxLevel = SafeNumber(SafeCall(GetMaxLevelForPlayer))
@@ -325,10 +355,16 @@ function XPTooltip:IsXPDisabled()
 end
 
 function XPTooltip:GetRestedPool()
+  if not self:Supports("hasRestedPool") then
+    return 0
+  end
   return SafeNumber(SafeCall(GetXPExhaustion)) or 0
 end
 
 function XPTooltip:CanReadRested()
+  if not self:Supports("hasRestedPool") then
+    return false
+  end
   if type(GetXPExhaustion) ~= "function" then
     return false
   end
@@ -383,38 +419,96 @@ function XPTooltip:ParseNPCID(guid)
   return tonumber(parts[6])
 end
 
-function XPTooltip:CaptureUnit(unit)
+function XPTooltip:IsCritter(unit)
+  if type(UnitIsCritter) == "function" then
+    local value = SafeBool(SafeCall(UnitIsCritter, unit))
+    if value ~= nil then
+      return value
+    end
+  end
+  return SafeString(SafeCall(UnitCreatureType, unit)) == "Critter"
+end
+
+function XPTooltip:IsTapDenied(unit)
+  return SafeBool(SafeCall(UnitIsTapDenied, unit)) == true
+end
+
+function XPTooltip:IsUnitEligible(unit)
+  if not unit or type(unit) ~= "string" or IsSecret(unit) then
+    return false
+  end
   local exists = SafeBool(SafeCall(UnitExists, unit))
-  if not exists then
-    return nil
+  if exists ~= true then
+    return false
   end
+
+  local strict = self:Supports("hasReadableBooleans")
   local isPlayer = SafeBool(SafeCall(UnitIsPlayer, unit))
-  if isPlayer == nil or isPlayer then
-    return nil
+  if strict then
+    if isPlayer == nil or isPlayer then
+      return false
+    end
+  elseif isPlayer == true then
+    return false
   end
+
   local isDead = SafeBool(SafeCall(UnitIsDead, unit))
-  if isDead == nil or isDead then
-    return nil
+  if strict then
+    if isDead == nil or isDead then
+      return false
+    end
+  elseif isDead == true then
+    return false
   end
+
   local controlled = SafeBool(SafeCall(UnitPlayerControlled, unit))
-  if controlled == nil or controlled then
-    return nil
+  if strict then
+    if controlled == nil or controlled then
+      return false
+    end
+  elseif controlled == true then
+    return false
   end
-  local creatureType = SafeCall(UnitCreatureType, unit)
-  if creatureType == "Critter" then
-    return nil
+
+  if self:IsCritter(unit) or self:IsTapDenied(unit) then
+    return false
   end
+
   local canAttack = SafeBool(SafeCall(UnitCanAttack, "player", unit))
-  if canAttack ~= true then
+  if strict then
+    if canAttack ~= true then
+      return false
+    end
+  elseif canAttack == false then
+    return false
+  end
+
+  -- Counts need some readable identity; never manufacture an Unknown entry.
+  local name = Trim(SafeCall(UnitName, unit))
+  if not name or name == "" then
+    name = nil
+  end
+  local guid = SafeString(SafeCall(UnitGUID, unit))
+  local npcID = guid and self:ParseNPCID(guid) or nil
+  return name ~= nil or npcID ~= nil
+end
+
+function XPTooltip:CaptureUnit(unit)
+  if not self:IsUnitEligible(unit) then
     return nil
   end
   local name = Trim(SafeCall(UnitName, unit))
+  if not name or name == "" then
+    name = nil
+  end
   local guid = SafeString(SafeCall(UnitGUID, unit))
   local level = SafeNumber(SafeCall(UnitLevel, unit))
   local classification = SafeString(SafeCall(UnitClassification, unit)) or "normal"
   local npcID = guid and self:ParseNPCID(guid) or nil
-  if not name and not npcID then
-    return nil
+  if not name and npcID then
+    -- The NPC ID is attributable even when the name is secret. Use a stable
+    -- label so DeleteUnknownEntries does not treat a real NPC as Unknown.
+    name = "NPC " .. tostring(npcID)
   end
   return {
     name = name,
@@ -429,6 +523,9 @@ function XPTooltip:CaptureUnit(unit)
 end
 
 function XPTooltip:CanDetectBuffs()
+  if not self:Supports("hasAuraAPI") then
+    return false
+  end
   local byName = type(AuraUtil) == "table" and type(AuraUtil.FindAuraByName) == "function"
   local byID = C_UnitAuras and type(C_UnitAuras.GetAuraDataByIndex) == "function"
   return (byName or byID) and true or false
@@ -437,29 +534,42 @@ end
 function XPTooltip:GetBuffInfo()
   local now = Now()
   local canDetect = self:CanDetectBuffs()
+    and (self:Supports("hasWellFed") or self:Supports("hasWellRestedAura"))
   if self.buffCacheTime and (now - self.buffCacheTime) < 1 then
-    return self.buffCacheWellFed, self.buffCacheWellRested, self.buffCacheCanDetect
+    return self.buffCacheWellFed, self.buffCacheWellRested,
+      self.buffCacheCanDetect, self.buffCacheWellRestedStacks
   end
-  local wellFed = canDetect and HasAura("Well Fed") or false
-  local wellRested = canDetect and (HasAura("Well-Rested") or HasAuraSpellID(429959)) or false
+  local wellFedAura = canDetect and self:Supports("hasWellFed")
+    and FindAura("Well Fed", WELL_FED_SPELL_IDS) or nil
+  local restedAura = canDetect and self:Supports("hasWellRestedAura")
+    and FindAura("Well-Rested", WELL_RESTED_SPELL_IDS) or nil
+  local wellFed = wellFedAura ~= nil
+  local wellRested = restedAura ~= nil
+  local stacks = wellRested and AuraStacks(restedAura) or 0
   self.buffCacheTime = now
   self.buffCacheWellFed = wellFed
   self.buffCacheWellRested = wellRested
   self.buffCacheCanDetect = canDetect
-  return wellFed, wellRested, canDetect
+  self.buffCacheWellRestedStacks = stacks
+  return wellFed, wellRested, canDetect, stacks
 end
 
 function XPTooltip:GetBuffSignature()
   local settings = self.settings or self:GetSettings()
-  local wellFed, wellRested = self:GetBuffInfo()
+  local wellFed, wellRested, _, stacks = self:GetBuffInfo()
+  wellFed = wellFed and self:Supports("hasWellFed") or false
+  wellRested = wellRested and self:Supports("hasWellRestedAura") or false
   local parts = {}
   if wellFed then
     parts[#parts + 1] = "wf"
   end
   if wellRested then
-    parts[#parts + 1] = "wr"
+    parts[#parts + 1] = "wr" .. tostring(stacks or 1)
   end
-  local manual = settings and tonumber(settings.manualXPBonus) or 0
+  local manual = 0
+  if self:Supports("hasXPFormula") then
+    manual = settings and tonumber(settings.manualXPBonus) or 0
+  end
   if manual > 0 then
     parts[#parts + 1] = "m" .. tostring(manual)
   end
@@ -469,14 +579,19 @@ function XPTooltip:GetBuffSignature()
   return table.concat(parts, "+"), wellFed, wellRested
 end
 
-function XPTooltip:GetBuffMultiplier(wellFed, wellRested)
+function XPTooltip:GetBuffMultiplier(wellFed, wellRested, wellRestedStacks)
+  if not self:Supports("hasXPFormula") then
+    return 1
+  end
   local settings = self.settings or self:GetSettings()
   local multiplier = 1
-  if wellFed then
+  if wellFed and self:Supports("hasWellFed") then
     multiplier = multiplier * 1.05
   end
-  if wellRested then
-    multiplier = multiplier * 1.03
+  if wellRested and self:Supports("hasWellRestedAura") then
+    local stacks = tonumber(wellRestedStacks) or 3
+    stacks = math.max(1, math.min(3, stacks))
+    multiplier = multiplier * (1 + 0.01 * stacks)
   end
   local manual = settings and tonumber(settings.manualXPBonus) or 0
   if manual > 0 then

@@ -10,11 +10,13 @@ local UI = XPTooltip.UI
 
 local floor, min, max = math.floor, math.min, math.max
 local THEMES = UI.THEMES
-local CAMELOT_PROJECT_ID = WOW_PROJECT_CAMELOT or 18
 local CALIBRATION_VERSION = Util.CALIBRATION_VERSION
 local DEFAULT_MINIMAP = Util.DEFAULT_MINIMAP
 local Trim = Util.Trim
 local Lower = Util.Lower
+local IsSecret = Util.IsSecret
+local SafeCall = Util.SafeCall
+local SafeBool = Util.SafeBool
 local FormatNumber = Util.FormatNumber
 local FormatAgo = Util.FormatAgo
 local FormatDate = Util.FormatDate
@@ -23,12 +25,19 @@ local Epoch = Util.Epoch
 
 function XPTooltip:PrintStatus()
   local compatible, reason, hasProcessor, hasHook = self:CheckCompatibility()
+  local profile = self:GetClientProfile()
   AceM2L2:SafePrint("Kill History: " .. self:GetStatusText())
-  AceM2L2:SafePrint("  Project=" .. tostring(WOW_PROJECT_ID) .. ", Forever=" .. tostring(WOW_PROJECT_ID == CAMELOT_PROJECT_ID))
+  AceM2L2:SafePrint("  Client=" .. (profile and profile.id or "unknown")
+    .. ", Project=" .. tostring(self:GetProjectID())
+    .. ", Mode=" .. (profile and profile:GetStatusLabel() or "unavailable"))
   AceM2L2:SafePrint("  Interface=" .. tostring(AceM2L2:GetInterfaceVersion())
-    .. ", compatible=" .. tostring(compatible)
+    .. ", supported=" .. tostring(compatible)
     .. ", processor=" .. tostring(hasProcessor)
     .. ", fallback=" .. tostring(hasHook))
+  AceM2L2:SafePrint("  Kill tracking=" .. tostring(self:Supports("hasKillTracking"))
+    .. ", formula=" .. tostring(self:Supports("hasXPFormula"))
+    .. ", perMobXP=" .. tostring(self:Supports("hasPerMobXP"))
+    .. ", tooltipXP=" .. tostring(self:Supports("hasTooltipXP")))
   AceM2L2:SafePrint("  Buff detection=" .. tostring(self:CanDetectBuffs()))
   local settings = self:GetSettings()
   local minimap = settings and settings.minimap or {}
@@ -42,6 +51,72 @@ function XPTooltip:PrintStatus()
   if self.lastError then
     AceM2L2:SafePrint("  LastError: " .. tostring(self.lastError))
   end
+end
+
+local function ProbeValue(label, value)
+  local text
+  if value == nil then
+    text = "<nil>"
+  elseif IsSecret(value) then
+    text = "<secret>"
+  else
+    text = tostring(value)
+  end
+  AceM2L2:SafePrint("  " .. label .. "=" .. text)
+end
+
+function XPTooltip:PrintProbe()
+  local profile = self:GetClientProfile()
+  AceM2L2:SafePrint("Kill History probe:")
+  ProbeValue("projectID", self:GetProjectID())
+  ProbeValue("interface", AceM2L2:GetInterfaceVersion())
+  ProbeValue("profile", profile and profile.id or "unknown")
+  ProbeValue("mode", profile and profile:GetStatusLabel() or "unavailable")
+  ProbeValue("active", self:IsActive())
+  ProbeValue("autoDisabled", self.autoDisabled)
+  ProbeValue("tooltipHook", self.tooltipHookInstalled)
+
+  AceM2L2:SafePrint("  Capabilities (" .. self:GetCapabilitySummary() .. ")")
+
+  local apis = {
+    "UnitExists", "UnitName", "UnitGUID", "UnitLevel", "UnitClassification",
+    "UnitIsPlayer", "UnitIsDead", "UnitCanAttack", "UnitXP", "UnitXPMax",
+    "GetXPExhaustion", "GetMaxPlayerLevel",
+  }
+  local parts = {}
+  for _, name in ipairs(apis) do
+    parts[#parts + 1] = name .. "=" .. (type(_G[name]) == "function" and "yes" or "no")
+  end
+  AceM2L2:SafePrint("  APIs: " .. table.concat(parts, " "))
+
+  local unit
+  if SafeBool(SafeCall(UnitExists, "target")) then
+    unit = "target"
+  elseif SafeBool(SafeCall(UnitExists, "mouseover")) then
+    unit = "mouseover"
+  end
+  if unit then
+    ProbeValue("unit", unit)
+    ProbeValue("name", SafeCall(UnitName, unit))
+    ProbeValue("guid", SafeCall(UnitGUID, unit))
+    ProbeValue("level", SafeCall(UnitLevel, unit))
+    ProbeValue("classification", SafeCall(UnitClassification, unit))
+    ProbeValue("isPlayer", SafeCall(UnitIsPlayer, unit))
+    ProbeValue("isDead", SafeCall(UnitIsDead, unit))
+    ProbeValue("canAttack", SafeCall(UnitCanAttack, "player", unit))
+    ProbeValue("eligible", self:IsUnitEligible(unit))
+  else
+    AceM2L2:SafePrint("  unit=<none>")
+  end
+  ProbeValue("mapID", self:GetMapID())
+  ProbeValue("mapName", self:GetMapName(self:GetMapID()))
+  ProbeValue("groupSize", self:GetGroupSize())
+  ProbeValue("maxLevel", self:GetMaxLevel())
+  ProbeValue("xp", self:GetXP())
+  ProbeValue("xpMax", self:GetXPMax())
+  ProbeValue("xpRaw", SafeCall(UnitXP, "player"))
+  ProbeValue("xpMaxRaw", SafeCall(UnitXPMax, "player"))
+  ProbeValue("restedPool", self:GetRestedPool())
 end
 
 function XPTooltip:PrintKills(filter)
@@ -73,7 +148,8 @@ function XPTooltip:PrintKills(filter)
     AceM2L2:SafePrint(string.format("%s (%s)", tostring(mob.name or entry.key), tostring(entry.key)))
     AceM2L2:SafePrint("  Total kills: " .. FormatNumber(mob.kills))
     AceM2L2:SafePrint("  This session: " .. FormatNumber(mob.sessionKills or 0))
-    if type(mob.xp) == "table" and (tonumber(mob.xp.samples) or 0) > 0 then
+    if self:Supports("hasPerMobXP")
+      and type(mob.xp) == "table" and (tonumber(mob.xp.samples) or 0) > 0 then
       AceM2L2:SafePrint("  Avg base XP: " .. FormatNumber((mob.xp.sumBase or 0) / mob.xp.samples))
       AceM2L2:SafePrint("  Avg total XP: " .. FormatNumber((mob.xp.sumTotal or 0) / mob.xp.samples))
     end
@@ -86,7 +162,8 @@ function XPTooltip:PrintKills(filter)
   for index = 1, min(#list, 15) do
     local mob = list[index].mob
     local avg = ""
-    if type(mob.xp) == "table" and (tonumber(mob.xp.samples) or 0) > 0 then
+    if self:Supports("hasPerMobXP")
+      and type(mob.xp) == "table" and (tonumber(mob.xp.samples) or 0) > 0 then
       avg = "  avg " .. FormatNumber((mob.xp.sumBase or 0) / mob.xp.samples) .. " XP"
     end
     AceM2L2:SafePrint(string.format(
@@ -153,7 +230,9 @@ function XPTooltip:PrintSession()
   end
   AceM2L2:SafePrint("Kill History session:")
   AceM2L2:SafePrint("  Kills: " .. FormatNumber(db.session.kills or 0))
-  AceM2L2:SafePrint("  XP: " .. FormatNumber(db.session.xp or 0))
+  if self:Supports("hasPerMobXP") then
+    AceM2L2:SafePrint("  XP: " .. FormatNumber(db.session.xp or 0))
+  end
   AceM2L2:SafePrint("  Started: " .. FormatAgo(db.session.startedAt or 0))
 end
 
@@ -185,9 +264,14 @@ function XPTooltip:PrintStats()
     end
   end
 
-  AceM2L2:SafePrint("  Totals: kills=" .. FormatNumber(db.totals.kills or 0)
-    .. ", xp=" .. FormatNumber(db.totals.xp or 0)
-    .. ", uniqueMobs=" .. FormatNumber(db.totals.uniqueMobs or 0))
+  if self:Supports("hasPerMobXP") then
+    AceM2L2:SafePrint("  Totals: kills=" .. FormatNumber(db.totals.kills or 0)
+      .. ", xp=" .. FormatNumber(db.totals.xp or 0)
+      .. ", uniqueMobs=" .. FormatNumber(db.totals.uniqueMobs or 0))
+  else
+    AceM2L2:SafePrint("  Totals: kills=" .. FormatNumber(db.totals.kills or 0)
+      .. ", uniqueMobs=" .. FormatNumber(db.totals.uniqueMobs or 0))
+  end
   AceM2L2:SafePrint("  DB: mobs=" .. FormatNumber(mobCount)
     .. ", areas=" .. FormatNumber(areaCount)
     .. ", levels=" .. FormatNumber(levelCount)
@@ -242,6 +326,10 @@ function XPTooltip:PrintDump()
 end
 
 function XPTooltip:PrintTable()
+  if not self:Supports("hasXPFormula") then
+    AceM2L2:SafePrint("Kill History: XP table is unavailable on this client.")
+    return
+  end
   local playerLevel = self:GetPlayerLevel()
   local xpMax = self:GetXPMax()
   local xpCurrent = self:GetXP()
@@ -295,6 +383,7 @@ function XPTooltip:ResetKills()
 end
 
 function XPTooltip:DeleteMobEntry(mobKey)
+  self.dataGeneration = (self.dataGeneration or 0) + 1
   local name, kills = self:RemoveMobEntry(mobKey)
   if not name then
     AceM2L2:SafePrint("Kill History: that entry no longer exists.")
@@ -350,6 +439,7 @@ function XPTooltip:DeleteMobByName(name, confirm)
   end
 
   local removed, kills = 0, 0
+  self.dataGeneration = (self.dataGeneration or 0) + 1
   for _, match in ipairs(matches) do
     local removedName, removedKills = self:RemoveMobEntry(match.key, true)
     if removedName then
@@ -386,6 +476,7 @@ function XPTooltip:DeleteUnknownEntries()
   end
 
   local removed, kills = 0, 0
+  self.dataGeneration = (self.dataGeneration or 0) + 1
   for _, mobKey in ipairs(keys) do
     local removedName, removedKills = self:RemoveMobEntry(mobKey, true)
     if removedName then
@@ -425,6 +516,7 @@ function XPTooltip:PrintHelp()
   AceM2L2:SafePrint("Kill History commands:")
   AceM2L2:SafePrint("/acem2l2 xpt on|off")
   AceM2L2:SafePrint("/acem2l2 xpt status")
+  AceM2L2:SafePrint("/acem2l2 xpt probe")
   AceM2L2:SafePrint("/acem2l2 xpt ui")
   AceM2L2:SafePrint("/acem2l2 xpt kills [name]")
   AceM2L2:SafePrint("/acem2l2 xpt areas")
@@ -437,6 +529,7 @@ function XPTooltip:PrintHelp()
   AceM2L2:SafePrint("/acem2l2 xpt scale 80-120")
   AceM2L2:SafePrint("/acem2l2 xpt starttab overview|mobs|areas|levels")
   AceM2L2:SafePrint("/acem2l2 xpt minimap on|off|reset|status")
+  AceM2L2:SafePrint("/acem2l2 xpt debug on|off")
   AceM2L2:SafePrint("/acem2l2 xpt recalibrate confirm")
   AceM2L2:SafePrint("/acem2l2 xpt delete <mob name>")
   AceM2L2:SafePrint("/acem2l2 xpt delete confirm <mob name>")
@@ -461,6 +554,8 @@ function XPTooltip:HandleCommand(input)
     AceM2L2:SafePrint("Kill History disabled.")
   elseif command == "status" then
     self:PrintStatus()
+  elseif command == "probe" then
+    self:PrintProbe()
   elseif command == "ui" then
     self:OpenUI()
   elseif command == "kills" then
@@ -543,6 +638,18 @@ function XPTooltip:HandleCommand(input)
       self:PrintMinimapStatus()
     else
       AceM2L2:SafePrint("Usage: /acem2l2 xpt minimap on|off|reset|status")
+    end
+  elseif command == "debug" then
+    local action = Lower(rest) or ""
+    local settings = self:GetSettings()
+    if action == "on" then
+      settings.debug = true
+      AceM2L2:SafePrint("Kill History debug enabled.")
+    elseif action == "off" then
+      settings.debug = false
+      AceM2L2:SafePrint("Kill History debug disabled.")
+    else
+      AceM2L2:SafePrint("Usage: /acem2l2 xpt debug on|off")
     end
   elseif command == "config" then
     AceM2L2:HandleSlashCommand("config")

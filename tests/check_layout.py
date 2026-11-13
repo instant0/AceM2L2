@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate AceM2L2 TOC/XML references and exact filename case.
+"""Validate AceM2L2 TOC/XML references, metadata, and exact filename case.
 
 This catches the class of bugs that only appear on case-sensitive filesystems:
 a file exists as `Readme.txt` while a reference says `README.txt`, or a TOC
@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -31,6 +32,14 @@ XML_REF_RE = re.compile(
     (["'])(?P<path>[^"']+)\1
     """
 )
+TOC_META_RE = re.compile(r"^##\s*([^:]+):\s*(.*)$")
+REQUIRED_META = {
+    "Version": None,
+    "Interface": ("120105", "16001"),
+    "SavedVariables": ("AceM2L2DB",),
+    "SavedVariablesPerCharacter": ("AceM2L2CharDB",),
+    "AddonCompartmentFunc": ("AceM2L2_OnCompartmentClick",),
+}
 
 
 def exact_exists(root: Path, reference: str) -> tuple[bool, str]:
@@ -60,21 +69,49 @@ def exact_exists(root: Path, reference: str) -> tuple[bool, str]:
     return True, ""
 
 
-def read_toc(root: Path, errors: list[str]) -> list[tuple[str, int]]:
+def read_toc(root: Path, errors: list[str]) -> tuple[list[tuple[str, int]], dict[str, str]]:
     toc = root / TOC_NAME
     if not toc.is_file():
         errors.append(f"missing TOC: {TOC_NAME}")
-        return []
+        return [], {}
 
     references: list[tuple[str, int]] = []
+    metadata: dict[str, str] = {}
+    seen: set[str] = set()
     for line_number, raw_line in enumerate(
         toc.read_text(encoding="utf-8").splitlines(), start=1
     ):
         line = raw_line.strip()
-        if not line or line.startswith("#"):
+        if not line:
             continue
+        if line.startswith("##"):
+            match = TOC_META_RE.match(line)
+            if match:
+                metadata[match.group(1).strip()] = match.group(2).strip()
+            continue
+        if line.startswith("#"):
+            continue
+        if line in seen:
+            errors.append(f"{TOC_NAME}:{line_number}: duplicate TOC entry: {line}")
+            continue
+        seen.add(line)
         references.append((line, line_number))
-    return references
+    return references, metadata
+
+
+def validate_metadata(metadata: dict[str, str], errors: list[str]) -> None:
+    for key, expected in REQUIRED_META.items():
+        value = metadata.get(key, "")
+        if not value:
+            errors.append(f"{TOC_NAME}: missing metadata {key}")
+            continue
+        if expected:
+            parts = [part.strip() for part in value.split(",")]
+            for required in expected:
+                if required not in parts:
+                    errors.append(
+                        f"{TOC_NAME}: {key} must contain {required!r}, got {value!r}"
+                    )
 
 
 def validate_references(
@@ -108,6 +145,11 @@ def validate_references(
             errors.append(f"cannot read {xml_path}: {error}")
             continue
 
+        try:
+            ET.fromstring(text)
+        except ET.ParseError as error:
+            errors.append(f"{xml_path.name}: malformed XML: {error}")
+
         for match in XML_REF_RE.finditer(text):
             reference = match.group("path")
             ok, reason = exact_exists(xml_path.parent, reference)
@@ -122,17 +164,38 @@ def validate_references(
     return resolved
 
 
-def validate_root_lua_files(
+def validate_lua_files(
     root: Path,
     resolved: set[Path],
     errors: list[str],
 ) -> None:
-    """Every shipped root Lua file must be loaded by the TOC."""
-    for lua_file in sorted(root.glob("*.lua")):
+    """Every shipped Lua file must be loaded by the TOC."""
+    for lua_file in sorted(root.rglob("*.lua")):
+        parts = set(lua_file.relative_to(root).parts)
+        if parts & {"Libs", "dev", "tests"}:
+            continue
         if lua_file.resolve() not in resolved:
             errors.append(
-                f"root Lua file is not referenced by {TOC_NAME}: {lua_file.name}"
+                f"Lua file is not referenced by {TOC_NAME}: "
+                f"{lua_file.relative_to(root)}"
             )
+
+
+def validate_bindings(root: Path, resolved: set[Path], errors: list[str]) -> None:
+    bindings_xml = root / "Bindings.xml"
+    bindings_lua = root / "Bindings.lua"
+    if bindings_xml.is_file() and bindings_xml.resolve() not in resolved:
+        errors.append("Bindings.xml exists but is not loaded by the TOC")
+    if bindings_xml.is_file():
+        text = bindings_xml.read_text(encoding="utf-8", errors="replace")
+        for required in ("ACEM2L2_XPTOOLTIP", "AceM2L2_ToggleXPTooltip"):
+            if required not in text:
+                errors.append(f"Bindings.xml missing {required}")
+    if bindings_lua.is_file():
+        text = bindings_lua.read_text(encoding="utf-8", errors="replace")
+        for required in ("AceM2L2_ToggleXPTooltip", "AceM2L2_OnCompartmentClick"):
+            if f"function {required}" not in text:
+                errors.append(f"Bindings.lua missing function {required}")
 
 
 def main() -> int:
@@ -166,13 +229,14 @@ def main() -> int:
         else:
             warnings.append(message)
 
-    references = read_toc(root, errors)
+    references, metadata = read_toc(root, errors)
+    validate_metadata(metadata, errors)
     resolved = validate_references(root, references, errors)
-    validate_root_lua_files(root, resolved, errors)
+    validate_lua_files(root, resolved, errors)
+    validate_bindings(root, resolved, errors)
 
-    bindings_xml = root / "Bindings.xml"
-    if bindings_xml.is_file() and bindings_xml.resolve() not in resolved:
-        errors.append("Bindings.xml exists but is not loaded by the TOC")
+    if "embeds.xml" not in {reference for reference, _ in references}:
+        errors.append(f"{TOC_NAME} must load embeds.xml")
 
     print(f"Addon root: {root}")
     print(f"TOC: {TOC_NAME}")

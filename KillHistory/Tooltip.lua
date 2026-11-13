@@ -16,12 +16,15 @@ local SafeString = Util.SafeString
 local SafeBool = Util.SafeBool
 local Trim = Util.Trim
 local ContextKey = Formula.ContextKey
-local RoundForever = Formula.RoundForever
 local FormatNumber = Util.FormatNumber
 local FormatPercent = Util.FormatPercent
 
 function XPTooltip:InstallTooltipHook()
   if self.tooltipHookInstalled then
+    return
+  end
+  if not self:Supports("hasTooltipHook") then
+    self.tooltipHookInstalled = false
     return
   end
   self.tooltipHookInstalled = true
@@ -46,7 +49,8 @@ function XPTooltip:InstallTooltipHook()
 
   if not installed then
     self.tooltipHookInstalled = false
-    self:ReportError("tooltip hook", "no usable tooltip hook")
+    self.hasProcessor = false
+    self:ReportError("tooltip hook", "no usable tooltip hook", false)
   end
 
   if GameTooltip and GameTooltip.HookScript then
@@ -71,34 +75,33 @@ function XPTooltip:OnTooltip(tooltip, data)
 end
 
 function XPTooltip:IsTooltipCandidate(unit)
-  if not unit or type(unit) ~= "string" or IsSecret(unit) then
+  return self:IsUnitEligible(unit)
+end
+
+function XPTooltip:AddTooltipKillCount(tooltip, mob, playerLevel, settings)
+  if not settings or not settings.showKillCount then
     return false
   end
-  if not UnitExists(unit) then
-    return false
+  local killsTotal = tonumber(mob and mob.kills) or 0
+  local killsAtLevel = 0
+  if mob and playerLevel and type(mob.killsAtLevel) == "table" then
+    killsAtLevel = tonumber(mob.killsAtLevel[tostring(playerLevel)]) or 0
   end
-  local isPlayer = SafeBool(SafeCall(UnitIsPlayer, unit))
-  if isPlayer == nil or isPlayer then
-    return false
-  end
-  local isDead = SafeBool(SafeCall(UnitIsDead, unit))
-  if isDead == nil or isDead then
-    return false
-  end
-  local controlled = SafeBool(SafeCall(UnitPlayerControlled, unit))
-  if controlled == nil or controlled then
-    return false
-  end
-  local creatureType = SafeCall(UnitCreatureType, unit)
-  if creatureType == "Critter" then
-    return false
-  end
-  local canAttack = SafeBool(SafeCall(UnitCanAttack, "player", unit))
-  return canAttack == true
+  tooltip:AddDoubleLine(
+    "|cffaaaaaaKilled:|r",
+    "|cffffffff" .. FormatNumber(killsTotal) .. "|r |cffaaaaaa(this level: " .. FormatNumber(killsAtLevel) .. ")|r"
+  )
+  return true
 end
 
 function XPTooltip.AddTooltipLines(self, tooltip, data)
-  local unit = select(2, tooltip:GetUnit())
+  local unit
+  if tooltip and type(tooltip.GetUnit) == "function" then
+    local ok, _, token = pcall(tooltip.GetUnit, tooltip)
+    if ok then
+      unit = token
+    end
+  end
   if not unit and data then
     local guid = SafeString(data.guid)
     if guid and self.lastTarget and self.lastTarget.guid == guid then
@@ -107,28 +110,53 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
       unit = "mouseover"
     end
   end
-  if not unit and UnitExists("mouseover") then
+  if not unit and SafeBool(SafeCall(UnitExists, "mouseover")) then
     unit = "mouseover"
   end
   if not self:IsTooltipCandidate(unit) then
     return
   end
 
-  local playerLevel = self:GetPlayerLevel()
-  local xpMax = self:GetXPMax()
-  local xpCurrent = self:GetXP()
-  if not playerLevel or not xpMax or not xpCurrent or xpMax <= 0 then
-    return
-  end
-  local maxLevel = self:GetMaxLevel()
-  if playerLevel >= maxLevel or self:IsXPDisabled() then
+  local settings = self.settings or self:GetSettings()
+  if not settings then
     return
   end
 
   local name = Trim(SafeCall(UnitName, unit))
-  name = Trim(name)
   local guid = SafeString(SafeCall(UnitGUID, unit))
   local npcID = guid and self:ParseNPCID(guid) or nil
+  local mobKey = self:GetMobKey(name, npcID)
+  local mob = self.char and self.char.mobs and self.char.mobs[mobKey] or nil
+  local playerLevel = self:GetPlayerLevel()
+
+  local killsTotal = tonumber(mob and mob.kills) or 0
+  local killsAtLevel = 0
+  if mob and playerLevel and type(mob.killsAtLevel) == "table" then
+    killsAtLevel = tonumber(mob.killsAtLevel[tostring(playerLevel)]) or 0
+  end
+
+  local supportsXP = self:Supports("hasTooltipXP")
+  local xpMax = supportsXP and self:GetXPMax() or nil
+  local xpCurrent = supportsXP and self:GetXP() or nil
+  local maxLevel = supportsXP and self:GetMaxLevel() or nil
+  local xpDisabled = supportsXP and self:IsXPDisabled() or false
+  local xpAvailable = supportsXP and playerLevel and xpMax and xpCurrent
+    and xpMax > 0 and maxLevel and playerLevel < maxLevel and not xpDisabled
+
+  -- Counts-only clients and missing XP state still get the kill-count line.
+  if not xpAvailable then
+    local signature = table.concat({
+      tostring(unit), tostring(guid or ""), tostring(playerLevel),
+      "counts", tostring(killsTotal), tostring(killsAtLevel),
+    }, ":")
+    if tooltip.xpTooltipSignature == signature then
+      return
+    end
+    tooltip.xpTooltipSignature = signature
+    self:AddTooltipKillCount(tooltip, mob, playerLevel, settings)
+    return
+  end
+
   local rawMobLevel = SafeNumber(SafeCall(UnitLevel, unit))
   local mobLevel
   if rawMobLevel == nil or rawMobLevel == 0 then
@@ -137,19 +165,25 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
     mobLevel = rawMobLevel
   end
   local classification = SafeString(SafeCall(UnitClassification, unit)) or "normal"
-  local mobKey = self:GetMobKey(name, npcID)
   local mapID = self:GetMapID()
   local groupSize = self:GetGroupSize()
   local buffSignature = self:GetBuffSignature()
   local contextKey = ContextKey(playerLevel, mobLevel, groupSize, mapID, classification, buffSignature)
 
-  local mob = self.char and self.char.mobs[mobKey] or nil
+  local profile = self.clientProfile or self:GetClientProfile()
+  local function round(value)
+    if profile and profile.Round then
+      return profile:Round(value)
+    end
+    return Formula.Round(value)
+  end
+
   local exact = false
   local estimate
   if (not groupSize or groupSize <= 1) and type(mob) == "table" and type(mob.contexts) == "table" then
     local context = mob.contexts[contextKey]
     if type(context) == "table" and (tonumber(context.samples) or 0) >= 1 then
-      estimate = RoundForever((tonumber(context.sumBuffed) or 0) / context.samples)
+      estimate = round((tonumber(context.sumBuffed) or 0) / context.samples)
       exact = true
     end
   end
@@ -160,20 +194,23 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
   if groupSize and groupSize > 1 then
     soloEstimate = self:GetEstimate(playerLevel, mobLevel, classification, mapID, 1, mobKey, buffSignature)
   end
-  if not estimate or estimate <= 0 then
-    if self.settings.showUnknown then
-      tooltip:AddLine("|cffaaaaaaXP: no XP from this mob|r")
-    end
-    return
-  end
 
   local signature = tostring(unit) .. ":" .. tostring(guid or "") .. ":" .. tostring(playerLevel)
     .. ":" .. tostring(mobLevel) .. ":" .. tostring(estimate) .. ":" .. tostring(soloEstimate)
     .. ":" .. tostring(groupSize) .. ":" .. tostring(buffSignature)
+    .. ":" .. tostring(killsTotal) .. ":" .. tostring(killsAtLevel)
   if tooltip.xpTooltipSignature == signature then
     return
   end
   tooltip.xpTooltipSignature = signature
+
+  if not estimate or estimate <= 0 then
+    if settings.showUnknown then
+      tooltip:AddLine("|cffaaaaaaXP: no XP from this mob|r")
+    end
+    self:AddTooltipKillCount(tooltip, mob, playerLevel, settings)
+    return
+  end
 
   local pool = self:GetRestedPool()
   local restedBonus = min(estimate, floor(pool / 2))
@@ -182,7 +219,6 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
   local remaining = xpMax - xpCurrent
   local kills = self:KillsToLevel(remaining, estimate, pool)
   local prefix = exact and "" or "~"
-  local settings = self.settings
 
   if settings.showXP then
     local value = prefix .. FormatNumber(totalXP)
@@ -202,7 +238,7 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
     )
   end
 
-  if settings.showKillsToLevel and kills and kills > 0 then
+  if settings.showKillsToLevel and self:Supports("hasKillsToLevel") and kills and kills > 0 then
     local suffix = ""
     if pool > 0 and settings.showRested then
       suffix = " |cffaaaaaa(while rested)|r"
@@ -210,17 +246,7 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
     tooltip:AddDoubleLine("|cffaaaaaaKills to level:|r", "|cffffffff" .. prefix .. FormatNumber(kills) .. suffix)
   end
 
-  if settings.showKillCount then
-    local killsTotal = tonumber(mob and mob.kills) or 0
-    local killsAtLevel = 0
-    if mob and type(mob.killsAtLevel) == "table" then
-      killsAtLevel = tonumber(mob.killsAtLevel[tostring(playerLevel)]) or 0
-    end
-    tooltip:AddDoubleLine(
-      "|cffaaaaaaKilled:|r",
-      "|cffffffff" .. FormatNumber(killsTotal) .. "|r |cffaaaaaa(this level: " .. FormatNumber(killsAtLevel) .. ")|r"
-    )
-  end
+  self:AddTooltipKillCount(tooltip, mob, playerLevel, settings)
 
   if groupSize and groupSize > 1 and settings.showXP then
     tooltip:AddLine("|cffaaaaaaGroup kills split XP; the XP line is your share.|r")

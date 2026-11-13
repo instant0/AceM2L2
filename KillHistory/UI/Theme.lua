@@ -83,11 +83,19 @@ UI.THEMES = THEMES
 function XPTooltip:GetTheme()
   local settings = self.settings or self:GetSettings()
   local key = settings and settings.theme or "dark"
+  local classFile
+  if key == "class" then
+    local _, class = SafeCall(UnitClass, "player")
+    classFile = class
+  end
+  local cacheKey = key .. ":" .. tostring(classFile or "")
+  if self.themeCacheKey == cacheKey and self.themeCache then
+    return self.themeCache
+  end
+
   local base = THEMES[key] or THEMES.aether
   local theme = CopyTable(base)
-
   if key == "class" then
-    local _, classFile = SafeCall(UnitClass, "player")
     local color = classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile]
     if not color and classFile and C_ClassColor and C_ClassColor.GetClassColor then
       color = SafeCall(C_ClassColor.GetClassColor, classFile)
@@ -98,6 +106,8 @@ function XPTooltip:GetTheme()
       theme.bar = { color.r, color.g, color.b, 0.45 }
     end
   end
+  self.themeCacheKey = cacheKey
+  self.themeCache = theme
   return theme
 end
 

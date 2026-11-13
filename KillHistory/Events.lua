@@ -120,6 +120,7 @@ function XPTooltip:StartSession()
   for _, mob in pairs(db.mobs) do
     if type(mob) == "table" then
       mob.sessionKills = 0
+      mob.sessionXP = 0
     end
   end
 end
@@ -164,7 +165,10 @@ function XPTooltip:Prune()
       end
       mob.killsAtLevel = EnsureNumberMap(mob.killsAtLevel)
       mob.killsByMap = EnsureNumberMap(mob.killsByMap)
+      mob.killsByAreaLevel = EnsureNumberMap(mob.killsByAreaLevel)
       mob.contexts = EnsureNumberMap(mob.contexts)
+      mob.totalXP = tonumber(mob.totalXP) or 0
+      mob.sessionXP = tonumber(mob.sessionXP) or 0
 
       local contextCount = 0
       local oldestKey, oldestSeen
@@ -237,5 +241,16 @@ function XPTooltip:Prune()
       end
       mobCount = mobCount - 1
     end
+  end
+
+  local actual = 0
+  for _, mob in pairs(db.mobs) do
+    if type(mob) == "table" then
+      actual = actual + 1
+    end
+  end
+  db.totals.uniqueMobs = actual
+  if self.ui and self.ui:IsShown() then
+    self:RequestUIUpdate()
   end
 end

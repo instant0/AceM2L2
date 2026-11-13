@@ -6,3 +6,6 @@ ACCEM2L2.lua
 Thumbs.db
 *.bak
 *.swp
+luac.out
+__pycache__/
+*.pyc

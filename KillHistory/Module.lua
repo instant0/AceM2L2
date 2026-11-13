@@ -13,7 +13,6 @@ XPTooltip.Formula = XPTooltip.Formula or {}
 XPTooltip.UI = XPTooltip.UI or {}
 
 local Util = XPTooltip.Util
-local CAMELOT_PROJECT_ID = WOW_PROJECT_CAMELOT or 18
 
 function XPTooltip:GetSettings()
   if type(AceM2L2DB) ~= "table" then
@@ -25,42 +24,50 @@ function XPTooltip:GetSettings()
   local profile = AceM2L2DB.profile
   local settings = profile.xpTooltip
   if type(settings) ~= "table" then
-    settings = Util.CopyTable(Util.DEFAULT_SETTINGS)
-    settings.ui = Util.CopyTable(Util.DEFAULT_UI)
+    settings = {}
     profile.xpTooltip = settings
   end
+
+  local function fillDefaults(target, defaults)
+    for key, value in pairs(defaults) do
+      if type(value) == "table" then
+        if type(target[key]) ~= "table" then
+          target[key] = Util.CopyTable(value)
+        else
+          fillDefaults(target[key], value)
+        end
+      elseif target[key] == nil then
+        target[key] = value
+      end
+    end
+  end
+
+  fillDefaults(settings, Util.DEFAULT_SETTINGS)
   if type(settings.ui) ~= "table" then
-    settings.ui = Util.CopyTable(Util.DEFAULT_UI)
+    settings.ui = {}
   end
+  fillDefaults(settings.ui, Util.DEFAULT_UI)
   if type(settings.minimap) ~= "table" then
-    settings.minimap = Util.CopyTable(Util.DEFAULT_MINIMAP)
+    settings.minimap = {}
   end
-  if settings.theme == nil then
-    settings.theme = "aether"
-  end
-  if settings.scale == nil then
-    settings.scale = 1.0
-  end
-  if settings.startTab == nil then
-    settings.startTab = "overview"
-  end
-  if settings.sound == nil then
-    settings.sound = true
-  end
+  fillDefaults(settings.minimap, Util.DEFAULT_MINIMAP)
   return settings
 end
 
 function XPTooltip:CheckCompatibility()
   local reasons = {}
-  local isForever = WOW_PROJECT_ID == CAMELOT_PROJECT_ID
-  if not isForever then
-    reasons[#reasons + 1] = "not Forever"
+  local profile = self.clientProfile or self:GetClientProfile()
+  if not profile then
+    reasons[#reasons + 1] = "unsupported client"
+  elseif not profile:Supports("hasKillTracking") then
+    reasons[#reasons + 1] = "kill tracking disabled for this client"
   end
-  for _, globalName in ipairs({
-    "UnitXP", "UnitXPMax", "UnitLevel", "UnitName", "UnitGUID",
-    "UnitExists", "UnitIsPlayer", "UnitIsDead", "UnitPlayerControlled",
-    "UnitCreatureType", "UnitCanAttack",
-  }) do
+
+  local required = {}
+  if profile and profile.GetRequiredGlobals then
+    required = profile:GetRequiredGlobals() or {}
+  end
+  for _, globalName in ipairs(required) do
     if type(_G[globalName]) ~= "function" then
       reasons[#reasons + 1] = "missing " .. globalName
     end
@@ -72,14 +79,13 @@ function XPTooltip:CheckCompatibility()
     and Enum.TooltipDataType
     and Enum.TooltipDataType.Unit ~= nil
   local hasHook = GameTooltip and type(GameTooltip.HookScript) == "function"
-  if not hasProcessor and not hasHook then
-    reasons[#reasons + 1] = "no tooltip hook"
-  end
 
+  -- A missing tooltip hook disables tooltip lines only, not kill tracking.
   return #reasons == 0, table.concat(reasons, ", "), hasProcessor, hasHook
 end
 
 function XPTooltip:OnInitialize()
+  self:RefreshClient()
   self:EnsureDB()
   self.settings = self:GetSettings()
   self.pendingDeaths = {}
@@ -129,6 +135,8 @@ function XPTooltip:OnDisable()
 end
 
 function XPTooltip:Refresh()
+  self:RefreshClient()
+  self:EnsureDB()
   self.settings = self:GetSettings()
   if not self.settings then
     self.active = false
@@ -169,9 +177,6 @@ function XPTooltip:Refresh()
   end
 
   self:Install()
-  if self.autoDisabled or not self.tooltipHookInstalled then
-    return
-  end
   self.active = true
   self:InitializeMinimap()
   self:RefreshUI()
@@ -200,7 +205,7 @@ function XPTooltip:Install()
   for _, entry in ipairs(events) do
     local ok, err = pcall(self.RegisterEvent, self, entry[1], entry[2])
     if not ok then
-      self:ReportError("RegisterEvent " .. tostring(entry[1]), err)
+      self:ReportError("RegisterEvent " .. tostring(entry[1]), err, false)
     end
   end
 
@@ -208,14 +213,6 @@ function XPTooltip:Install()
   self.lastXP = self:GetXP()
   self.lastPool = self:GetRestedPool()
   self.lastTarget = self:CaptureUnit("target")
-
-  if not self.tooltipHookInstalled then
-    self.active = false
-    self.autoDisabled = true
-    self.autoDisableReason = "tooltip hook failed"
-    pcall(self.UnregisterAllEvents, self)
-    self.installed = false
-  end
 end
 
 function XPTooltip:SetUserEnabled(value)
@@ -242,13 +239,20 @@ function XPTooltip:IsActive()
     and not self.autoDisabled
 end
 
-function XPTooltip:ReportError(context, err)
+function XPTooltip:ReportError(context, err, countTowardCircuit)
   local message = tostring(context or "error") .. ": " .. tostring(err)
   if #message > 400 then
     message = message:sub(1, 400)
   end
   self.lastError = message
-  self.circuitErrors = (self.circuitErrors or 0) + 1
+  local now = Util.Now()
+  if self.lastErrorTime and (now - self.lastErrorTime) > 60 then
+    self.circuitErrors = 0
+  end
+  self.lastErrorTime = now
+  if countTowardCircuit ~= false then
+    self.circuitErrors = (self.circuitErrors or 0) + 1
+  end
   if self.circuitErrors >= 5 then
     self.active = false
     self.autoDisabled = true
@@ -256,6 +260,7 @@ function XPTooltip:ReportError(context, err)
     pcall(self.UnregisterAllEvents, self)
     self.installed = false
     self:CloseUI()
+    self:HideMinimapIcon()
   end
   if self.settings and self.settings.debug then
     AceM2L2:SafePrint("|cffff5555Kill History " .. message .. "|r")
@@ -274,7 +279,13 @@ function XPTooltip:GetStatusText()
     return "auto-disabled (" .. tostring(self.autoDisableReason or "incompatible") .. ")"
   end
   if self.active then
-    return "active (" .. (self.hasProcessor and "TooltipDataProcessor" or "OnTooltipSetUnit") .. ")"
+    local profile = self.clientProfile or self:GetClientProfile()
+    local mode = profile and profile:GetStatusLabel() or "unknown client"
+    local hook = "no tooltip hook"
+    if self.tooltipHookInstalled then
+      hook = self.hasProcessor and "TooltipDataProcessor" or "OnTooltipSetUnit"
+    end
+    return "active (" .. mode .. ", " .. hook .. ")"
   end
   return "inactive"
 end

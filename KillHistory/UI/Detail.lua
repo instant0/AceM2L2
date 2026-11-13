@@ -18,12 +18,22 @@ function XPTooltip:ShowModel(npcID)
   if not self.ui or not self.ui.model or not self.ui.modelFallback then
     return
   end
-  if not self.ui.model.SetCreature then
-    self:HideModel("No model support")
+  if not self:Supports("hasModel") then
+    self:HideModel("")
     return
   end
   if not npcID then
     self:HideModel("No model data")
+    return
+  end
+  if self.modelNPCID == npcID and self.ui.model then
+    self.ui.model:Show()
+    self.ui.modelFallback:Hide()
+    self.ui.modelFallbackIcon:Hide()
+    return
+  end
+  if not self.ui.model.SetCreature then
+    self:HideModel("No model support")
     return
   end
   local ok = pcall(self.ui.model.SetCreature, self.ui.model, npcID)
@@ -34,6 +44,7 @@ function XPTooltip:ShowModel(npcID)
   self.ui.model:Show()
   self.ui.modelFallback:Hide()
   self.ui.modelFallbackIcon:Hide()
+  self.modelNPCID = npcID
   pcall(self.ui.model.SetRotation, self.ui.model, self.modelYaw or 0)
   if self.ui.model.SetCamDistanceScale then
     pcall(self.ui.model.SetCamDistanceScale, self.ui.model, 1.15)
@@ -47,6 +58,7 @@ function XPTooltip:HideModel(text)
   if not self.ui or not self.ui.model or not self.ui.modelFallback then
     return
   end
+  self.modelNPCID = nil
   self.ui.model:Hide()
   self.ui.modelFallback:SetText(text or "")
   if text and text ~= "" then
@@ -71,7 +83,8 @@ function XPTooltip:UpdateDetail()
       self.ui.heroName:SetText("No kill data")
     end
     if self.ui.heroSub then
-      self.ui.heroSub:SetText("Kill a mob on Forever to start the history.")
+      local profile = self:GetClientProfile()
+      self.ui.heroSub:SetText(profile and profile:GetEmptyStateText() or "Kill a mob to start the history.")
     end
     self.ui.details:SetText("")
     return
@@ -138,7 +151,8 @@ function XPTooltip:UpdateMobDetail(mobKey)
     lines[#lines + 1] = "This level: " .. FormatNumber(atLevel)
   end
 
-  if type(mob.xp) == "table" and (tonumber(mob.xp.samples) or 0) > 0 then
+  if self:Supports("hasPerMobXP")
+    and type(mob.xp) == "table" and (tonumber(mob.xp.samples) or 0) > 0 then
     lines[#lines + 1] = "Avg base XP: " .. FormatNumber((tonumber(mob.xp.sumBase) or 0) / mob.xp.samples)
     lines[#lines + 1] = "Avg total XP: " .. FormatNumber((tonumber(mob.xp.sumTotal) or 0) / mob.xp.samples)
   end

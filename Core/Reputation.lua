@@ -9,8 +9,6 @@ local Util = AceM2L2.Util
 local IsSecretValue = Util.IsSecretValue
 local SafeBoolean = Util.SafeBoolean
 local SafeNumber = Util.SafeNumber
-local SafeString = Util.SafeString
-local SafeCall = Util.SafeCall
 local SafeLower = Util.SafeLower
 local Trim = Util.Trim
 local StripColorCodes = Util.StripColorCodes
@@ -18,7 +16,6 @@ local NormalizeNumber = Util.NormalizeNumber
 local NormalizeFaction = Util.NormalizeFaction
 local ParseFormatted = Util.ParseFormatted
 local GetSafeTime = Util.GetSafeTime
-local GetUnitLevel = Util.GetUnitLevel
 local GetPlayerGuildName = Util.GetPlayerGuildName
 local AddChatMessage = Util.AddChatMessage
 local SanitizeLabel = Util.SanitizeLabel
@@ -71,22 +68,22 @@ function AceM2L2:ParseRepMessage(message)
     local _, ordered = ParseFormatted(text, info.fmt)
     if ordered then
       local factionName = nil
-      local gain = 0
-      local foundNumber = false
+      local gain = nil
 
       for _, item in ipairs(ordered) do
         if item.kind == "s" and not factionName then
           factionName = Trim(item.value)
         elseif item.kind == "d" or item.kind == "f" then
           local number = NormalizeNumber(item.value, item.kind)
-          if number then
-            gain = gain + number
-            foundNumber = true
+          if number and not gain then
+            -- Reputation chat formats normally contain one amount. If a
+            -- localized format includes extra numbers, the first is the gain.
+            gain = number
           end
         end
       end
 
-      if factionName and foundNumber and gain > 0 then
+      if factionName and gain and gain > 0 then
         return factionName, gain, info.key
       end
     end

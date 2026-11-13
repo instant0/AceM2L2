@@ -10,13 +10,11 @@ local Util = XPTooltip.Util
 
 local floor, min, max = math.floor, math.min, math.max
 local DEFAULT_UI = Util.DEFAULT_UI
-local DEFAULT_MINIMAP = Util.DEFAULT_MINIMAP
 local ROW_HEIGHT = Util.ROW_HEIGHT
 local VISIBLE_ROWS = Util.VISIBLE_ROWS
 local FormatNumber = Util.FormatNumber
 local CreateBackdropFrame = UI.CreateBackdropFrame
 local CreateTextButton = UI.CreateTextButton
-local SetGradientTexture = UI.SetGradientTexture
 
 function XPTooltip:CreateUI()
   if self.ui then
@@ -168,6 +166,8 @@ function XPTooltip:CreateUI()
 
   searchBox:SetScript("OnTextChanged", function(box)
     self.searchText = box:GetText() or ""
+    self.selectedIndex = 1
+    self:ResetScroll()
     if self.ui and self.ui.searchPlaceholder then
       if self.searchText == "" then
         self.ui.searchPlaceholder:Show()
@@ -245,6 +245,9 @@ function XPTooltip:CreateUI()
   scrollFrame:SetScrollChild(scrollChild)
   scrollFrame:SetScript("OnVerticalScroll", function()
     self:UpdateRows()
+    if scrollFrame.UpdateScrollChildRect then
+      pcall(scrollFrame.UpdateScrollChildRect, scrollFrame)
+    end
   end)
   frame.scrollFrame = scrollFrame
   frame.scrollChild = scrollChild
@@ -637,7 +640,11 @@ function XPTooltip:OpenUI()
   if type(UIFrameFadeIn) == "function" then
     pcall(UIFrameFadeIn, frame, 0.15, 0, 1)
   end
-  self:SafeRefreshUI()
+  if settings and settings.startTab then
+    self:SetTab(settings.startTab)
+  else
+    self:SafeRefreshUI()
+  end
 end
 
 function XPTooltip:CloseUI()

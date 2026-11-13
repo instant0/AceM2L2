@@ -12,7 +12,6 @@ local floor, min, max = math.floor, math.min, math.max
 local CreateBackdropFrame = UI.CreateBackdropFrame
 local FormatNumber = Util.FormatNumber
 local FormatAgo = Util.FormatAgo
-local EnsureNumberMap = Util.EnsureNumberMap
 
 function XPTooltip:CreateOverviewPanel(frame)
   local panel = CreateBackdropFrame(frame)
@@ -164,7 +163,9 @@ function XPTooltip:RefreshOverview()
     )
   end
   if #lines == 0 then
-    lines[1] = "No kills recorded yet.\nKill a mob on Forever to start the history."
+    local profile = self:GetClientProfile()
+    lines[1] = "No kills recorded yet.\n"
+      .. (profile and profile:GetEmptyStateText() or "Kill a mob to start the history.")
   end
   overview.topMobsText:SetText(table.concat(lines, "\n"))
 

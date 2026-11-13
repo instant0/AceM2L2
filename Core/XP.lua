@@ -7,8 +7,6 @@ local AceM2L2 = AceM2L2
 local Util = AceM2L2.Util
 
 local SafeNumber = Util.SafeNumber
-local SafeString = Util.SafeString
-local SafeCall = Util.SafeCall
 local IsSecretValue = Util.IsSecretValue
 local Trim = Util.Trim
 local StripColorCodes = Util.StripColorCodes
@@ -73,6 +71,24 @@ function AceM2L2:ShouldPrintXPMsg(estimatedKills)
   return estimatedKills >= minRemaining
 end
 
+local KILL_XP_KEYS = {
+  COMBATLOG_XPGAIN_FIRSTPERSON = true,
+  COMBATLOG_XPGAIN_FIRSTPERSON_GROUP = true,
+  COMBATLOG_XPGAIN_FIRSTPERSON_RAID = true,
+  COMBATLOG_XPGAIN_FIRSTPERSON_UNNAMED = true,
+  COMBATLOG_XPGAIN_FIRSTPERSON_UNNAMED_GROUP = true,
+  COMBATLOG_XPGAIN_FIRSTPERSON_UNNAMED_RAID = true,
+}
+
+local function IsSupportedXPSource(key)
+  if key == "COMBATLOG_XPGAIN_QUEST" or KILL_XP_KEYS[key] then
+    return true
+  end
+  return key:match("^COMBATLOG_XPGAIN_EXHAUSTION%d+$") ~= nil
+    or key:match("^COMBATLOG_XPGAIN_EXHAUSTION%d+_GROUP$") ~= nil
+    or key:match("^COMBATLOG_XPGAIN_EXHAUSTION%d+_RAID$") ~= nil
+end
+
 function AceM2L2:GetXPFmts()
   if self.xpFmts then
     return self.xpFmts
@@ -80,7 +96,7 @@ function AceM2L2:GetXPFmts()
 
   local formats = {}
   for key, value in pairs(_G) do
-    if type(key) == "string" and type(value) == "string" and key:match("^COMBATLOG_XPGAIN_") then
+    if type(key) == "string" and type(value) == "string" and IsSupportedXPSource(key) then
       local hasName = true
       if key:find("_UNNAMED", 1, true) or key:find("_QUEST", 1, true) then
         hasName = false
@@ -101,6 +117,29 @@ function AceM2L2:GetXPFmts()
   return formats
 end
 
+local function SelectXPAmount(numbers, key)
+  if #numbers == 0 then
+    return nil
+  end
+  if #numbers == 1 then
+    return numbers[1]
+  end
+  -- Group/raid text can contain a personal share plus a party bonus. Use the
+  -- first captured amount rather than inflating it by summing every number.
+  if key:find("_GROUP", 1, true) or key:find("_RAID", 1, true) then
+    return numbers[1]
+  end
+  -- Rested/exhaustion text may expose base and rested amounts separately.
+  if key:find("_EXHAUSTION", 1, true) then
+    local total = 0
+    for _, value in ipairs(numbers) do
+      total = total + value
+    end
+    return total
+  end
+  return numbers[1]
+end
+
 function AceM2L2:ParseXPMessage(message)
   if not message or IsSecretValue(message) then
     return nil
@@ -111,8 +150,7 @@ function AceM2L2:ParseXPMessage(message)
     local _, ordered = ParseFormatted(text, info.fmt)
     if ordered then
       local name = nil
-      local total = 0
-      local foundNumber = false
+      local numbers = {}
 
       for _, item in ipairs(ordered) do
         if item.kind == "s" and info.hasName and not name then
@@ -120,13 +158,13 @@ function AceM2L2:ParseXPMessage(message)
         elseif item.kind == "d" or item.kind == "f" then
           local number = NormalizeNumber(item.value, item.kind)
           if number then
-            total = total + number
-            foundNumber = true
+            numbers[#numbers + 1] = number
           end
         end
       end
 
-      if foundNumber and total > 0 then
+      local total = SelectXPAmount(numbers, info.key)
+      if total and total > 0 then
         return name, total, info.key
       end
     end
@@ -259,12 +297,19 @@ function AceM2L2:HandlePlayerXPUpdate()
   end
 
   local now = GetSafeTime()
-  local isQuest = false
-  local name = nil
-  if self.lastXPInfoTime and self.lastXPInfoTime > 0 and (now - self.lastXPInfoTime) < 2 then
-    isQuest = self.lastXPSource == "quest"
-    name = self.lastCreatureName
+  local hasInfo = self.lastXPInfoTime and self.lastXPInfoTime > 0
+    and (now - self.lastXPInfoTime) < 2
+  if not hasInfo or not self.lastXPSource then
+    -- An XP delta without a recognized kill/quest chat source (for example
+    -- exploration or bonus XP) must not enter the rolling kill average.
+    self.lastCreatureName = nil
+    self.lastXPSource = nil
+    self.lastXPInfoTime = 0
+    return
   end
+
+  local isQuest = self.lastXPSource == "quest"
+  local name = self.lastCreatureName
 
   self.lastCreatureName = nil
   self.lastXPSource = nil
