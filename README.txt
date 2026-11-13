@@ -178,7 +178,7 @@ Diagnostics and upgrades:
   Tent is a rested-pool top-up, not a separate XP multiplier.
 
 Window controls:
-- Overview, Mobs, Areas, and Levels tabs.
+- Overview, Mobs, Areas, Levels, and Heatmap tabs.
 - Search and filter on the Mobs tab; Sort cycles Kills, Name, and Recent.
 - Select a mob and choose Remove in the detail panel. Choose Confirm within five
   seconds to delete that one entry.

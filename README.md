@@ -311,9 +311,9 @@ bug reports.
 AceM2L2.toc          Addon metadata and load order
 ACEM2L2.lua          AceAddon bootstrap and binding metadata
 Core/                Defaults, utilities, settings, XP, reputation, options, commands, events
-KillHistory/         Module, client profiles, data, formula, calibration, tracking, tooltip, commands, events
+KillHistory/         Module, client profiles, data, formula, calibration, tracking, world data, heatmaps, tooltip, commands, events
 KillHistory/Clients/ Forever and Midnight profile policy
-KillHistory/UI/      Theme, widgets, list, detail, overview, window, minimap
+KillHistory/UI/      Theme, widgets, list, detail, overview, heatmap, nameplates, window, minimap
 Bindings.lua         Keybind and addon-compartment entry points
 Bindings.xml         Ctrl+Shift+X binding definition
 embeds.xml           Embedded library load order
@@ -321,13 +321,9 @@ Libs/                LibStub, CallbackHandler, Ace3, LibDataBroker, LibDBIcon
 tests/               Offline smoke tests, layout checker, release validator, and build script
 README.txt           Player-facing readme
 README.md            Project/developer readme (this file)
-dev/TASKS.md         Current task tracker (ignored by Git)
-dev/PLAN.md          Refactor, test, release, and maintenance plan
 ```
 
-Development-only documents under `dev/` are ignored by Git (see `.gitignore`).
-They are local working documents and may not exist in a fresh clone. Keep the
-developer docs to these two files plus the two READMEs.
+`README.txt` is the in-game/player guide; this file is the developer reference.
 
 ## Development
 
@@ -395,8 +391,7 @@ archive must contain `AceM2L2/`. Use `--strict-root` in release/CI checks.
 
 ### Live checks
 
-Use the release gate in [`dev/TASKS.md`](dev/TASKS.md) or
-[`dev/PLAN.md`](dev/PLAN.md). The main outstanding areas are:
+The main outstanding areas are:
 
 - tooltip hook availability and `GameTooltip:GetUnit`,
 - exact XP chat semantics for groups and dungeons,
@@ -423,8 +418,8 @@ The release zip has a single top-level `AceM2L2/` directory containing:
 - `LICENSE`
 - the required folders under `Libs/`
 
-`Libs/LibStub/tests/` is excluded from release archives. Developer docs, the
-offline tests, `dev/`, `dist/`, and the exact-case checker are not packaged.
+`Libs/LibStub/tests/` is excluded from release archives. The project README,
+offline tests, `dist/`, and the exact-case checker are not packaged.
 
 Build the release zip directly from the workspace with the checked-in script:
 
@@ -442,7 +437,7 @@ Current release artifacts:
 ```text
 dist/AceM2L2-2.0.0.zip
 /mnt/r/AceM2L2-2.0.0.zip
-SHA-256: 6058ef4816e23bb8dfda061169317a05ef95e6f090bd97adc3a4f08b23f5ce9e
+SHA-256: d29c3d607b186a2ea2f7ce53a36af1458ad01408dea76fbca8f0257db67d0c82
 ```
 
 Both copies are validated when present. Copy the `dist/` zip to `/mnt/r/` when
@@ -453,7 +448,7 @@ Older zips may remain in `dist/` as local archives; do not ship them. An
 unzipped `/mnt/r/` test folder may exist locally for testing, but it is not a
 release artifact.
 
-Documentation-only changes to `README.md` or `dev/` do not require rebuilding the
+Documentation-only changes to `README.md` do not require rebuilding the
 release zip. Rebuild only when a packaged file changes (Lua, TOC, embeds,
 Bindings, Libs, `README.txt`, or `LICENSE`).
 
@@ -481,8 +476,6 @@ Bindings, Libs, `README.txt`, or `LICENSE`).
 - Midnight observed XP, calibrated estimates, kills-to-level, rested/buffs, and
   group learning are **not available in 2.0.0**. No setting or command enables
   them; they stay behind the live probe gates.
-- Current open work is tracked in `dev/TASKS.md`; the maintenance plan is
-  `dev/PLAN.md`.
 
 ## License
 
