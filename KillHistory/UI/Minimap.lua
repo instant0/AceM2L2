@@ -89,6 +89,8 @@ end
 function XPTooltip:OnMinimapClick(button)
   if button == "RightButton" then
     AceM2L2:HandleSlashCommand("config")
+  elseif button == "MiddleButton" and type(self.ToggleDiagnosticsUI) == "function" then
+    self:ToggleDiagnosticsUI()
   else
     self:ToggleUI()
   end
@@ -122,7 +124,7 @@ function XPTooltip:OnMinimapTooltip(tooltip)
       )
     end
   end
-  tooltip:AddLine("Left-click: open   Right-click: settings", theme.muted[1], theme.muted[2], theme.muted[3])
+  tooltip:AddLine("Left-click: open   Right-click: settings   Middle-click: data", theme.muted[1], theme.muted[2], theme.muted[3])
 end
 
 function XPTooltip:PrintMinimapStatus()

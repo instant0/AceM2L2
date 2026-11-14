@@ -423,36 +423,9 @@ function AceM2L2:CreateOptionsPanel()
     end
 
     local hasWorldGrinding = supports("hasPerMobXP")
-    local hasWorldHeatmap = supports("hasMapPosition")
     local hasWorldNameplates = supports("hasNamePlateAPI")
-    if hasWorldGrinding or hasWorldHeatmap or hasWorldNameplates then
+    if hasWorldGrinding or hasWorldNameplates then
       addHeader("World")
-
-      if hasWorldHeatmap then
-        addCheckbox(
-          "Show heatmap tab",
-          "ACEM2L2_XPTOOLTIP_SHOW_HEATMAP",
-          true,
-          function() return self.db.xpTooltip.showHeatmap end,
-          function(value)
-            local showHeatmap = SanitizeBoolean(value, true)
-            self.db.xpTooltip.showHeatmap = showHeatmap
-            if not module then
-              return
-            end
-            if not showHeatmap and module.tab == "heatmap" and type(module.SetTab) == "function" then
-              pcall(module.SetTab, module, "overview")
-            end
-            if type(module.RefreshUI) == "function" then
-              pcall(module.RefreshUI, module)
-            end
-            if type(module.UpdateTabs) == "function" then
-              pcall(module.UpdateTabs, module)
-            end
-          end,
-          "Show the Heatmap tab in the Kill Story window. Heatmap data is always recorded."
-        )
-      end
 
       if hasWorldGrinding then
         addCheckbox(
@@ -604,11 +577,97 @@ function AceM2L2:CreateOptionsPanel()
     end
   end
 
+  local function addHeatmapOptions()
+    if not supports("hasMapPosition") then
+      return
+    end
+
+    addHeader("Display")
+
+    addCheckbox(
+      "Show heatmap tab",
+      "ACEM2L2_XPTOOLTIP_SHOW_HEATMAP",
+      true,
+      function() return self.db.xpTooltip.showHeatmap end,
+      function(value)
+        local showHeatmap = SanitizeBoolean(value, true)
+        self.db.xpTooltip.showHeatmap = showHeatmap
+        if not module then
+          return
+        end
+        if not showHeatmap and module.tab == "heatmap" and type(module.SetTab) == "function" then
+          pcall(module.SetTab, module, "overview")
+        end
+        if type(module.RefreshUI) == "function" then
+          pcall(module.RefreshUI, module)
+        end
+        if type(module.UpdateTabs) == "function" then
+          pcall(module.UpdateTabs, module)
+        end
+      end,
+      "Show the Heatmap tab in the Kill Story window. Heatmap data is always recorded."
+    )
+
+    addCheckbox(
+      "Reveal unexplored areas",
+      "ACEM2L2_XPTOOLTIP_REVEAL_UNEXPLORED",
+      true,
+      function() return self.db.xpTooltip.revealUnexplored ~= false end,
+      function(value)
+        self.db.xpTooltip.revealUnexplored = SanitizeBoolean(value, true)
+        if module and type(module.RefreshHeatmap) == "function" then
+          pcall(module.RefreshHeatmap, module)
+        end
+      end,
+      "Show the full zone map in the heatmap background, including areas this character has not explored."
+    )
+
+    addSlider(
+      "Heatmap intensity",
+      "ACEM2L2_XPTOOLTIP_HEATMAP_INTENSITY",
+      100,
+      50,
+      200,
+      5,
+      function() return self.db.xpTooltip.heatmapIntensity or 100 end,
+      function(value)
+        self.db.xpTooltip.heatmapIntensity = SanitizeInteger(value, 100, 50, 200)
+        if module and type(module.RefreshHeatmap) == "function" then
+          pcall(module.RefreshHeatmap, module)
+        end
+      end,
+      "Adjusts heat contrast. 100 is the default; higher values make hot cells stand out more."
+    )
+
+    addCheckbox(
+      "Warm heat colors",
+      "ACEM2L2_XPTOOLTIP_HEATMAP_WARM",
+      false,
+      function() return self.db.xpTooltip.heatmapWarmColors == true end,
+      function(value)
+        self.db.xpTooltip.heatmapWarmColors = SanitizeBoolean(value, false)
+        if module and type(module.RefreshHeatmap) == "function" then
+          pcall(module.RefreshHeatmap, module)
+        end
+      end,
+      "Use a fire palette (amber to red) instead of the theme-accent heat gradient."
+    )
+  end
+
   if useSubcategory("Tooltip") then
     addTooltipOptions()
   else
     addHeader("Tooltip")
     addTooltipOptions()
+  end
+
+  if supports("hasMapPosition") then
+    if useSubcategory("Heatmap") then
+      addHeatmapOptions()
+    else
+      addHeader("Heatmap")
+      addHeatmapOptions()
+    end
   end
 
   self.optionsCategory = category

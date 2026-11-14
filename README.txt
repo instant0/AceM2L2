@@ -4,7 +4,7 @@ Ace Mobs 2 Level 2 (AceM2L2)
 XP, reputation, and Kill Story
 
 Author:     faslkjd56
-Version:    2.1.6
+Version:    2.4.4
 GameVer.:   Midnight 12.1.5 (Retail) / Forever 1.60.1 (Classic+)
 _____________________________________________________________________________________
 
@@ -24,21 +24,33 @@ Progress at a glance
 - Kills-to-level and reputation-repeat estimates in chat.
 - XP remaining, kills remaining, and time-to-level.
 - XP/hour and XP/minute from measured gains.
-- Works with normal kills, unnamed kills, groups, raids, quests, and rested XP.
+- Forever: normal kills, unnamed kills, groups, raids, quests, and rested XP.
 
 Kill Story window
 - Overview, Mobs, Areas, Heatmap, and Levels tabs.
 - Kill history by mob, player level, area, and session.
-- Quest XP ledger and per-level leveling history.
-- Dungeon XP, leveling goals, and speedrun splits.
-- Loot value, gold/hour, and clear gear-upgrade notifications.
-- Death locations, respawn intervals, and grinding-spot suggestions.
-- Per-zone kill heatmap with a 32x32 density grid and static zone-map art
-  underneath it.
+- Quest XP ledger (Forever) and per-level leveling history.
+- Dungeon XP (Forever), leveling goals, and level-time splits.
+- Loot value, gold/hour, and gear-upgrade notifications.
+- Death locations, respawn intervals, and grinding-spot suggestions (Forever).
+- Resizable window, search, filters, sort modes, multiple themes, and a 3D mob
+  model.
 
-- Resizable window with a larger default size.
-- 3D mob model, search, filters, sort modes, and multiple themes.
-- Minimap icon, addon-compartment entry, and Ctrl+Shift+X keybind.
+Heatmap
+- Per-zone 64x64 kill-density grid with static zone-map art underneath.
+- Full zone art, including a "Reveal unexplored areas" option that is on by
+  default.
+- A multi-stop heat gradient (theme accent to gold to red) so the busiest
+  cells are the hottest, with adjustable contrast and an optional fire palette
+  in Settings > Heatmap.
+- Zone paging, map-art fallback, and a Low-to-High gradient legend with the
+  zone total.
+
+Data insights
+- Kill counts by mob, area, level, and session.
+- Data diagnostics: middle-click the minimap icon or use
+  `/acem2l2 xpt data` to see tracked counts, limits, heatmap cells, and an
+  estimated store size.
 
 Tooltips
 - Forever: XP estimates, percent of level, XP remaining, mob level,
@@ -48,8 +60,9 @@ Tooltips
 
 Quality of life
 - Per-character history is stored separately for Forever and Midnight.
-- Settings use native section headers and a Tooltip subpage.
+- Native Settings sections with dedicated Tooltip and Heatmap subpages.
 - Reads safely around restricted or secret game data.
+- Minimap icon, addon-compartment entry, and Ctrl+Shift+X keybind.
 - No external Ace3 install required; libraries are embedded.
 
 _____________________________________________________________________________________
@@ -65,10 +78,10 @@ Forever 1.60.1 — full mode
 
 Midnight 12.1.5 — counts-focused mode
 - Kill, area, level, and session tracking with the full Kill Story window.
-- Heatmaps, death locations, respawns, dungeon activity, goals, splits,
-  loot, gold, and gear upgrades without XP claims.
+- Heatmaps, death locations, respawns, dungeon activity, goals, splits, loot,
+  gold, and gear upgrades without XP claims.
 - Optional nameplate levels.
-- No XP rate, grinding-spot, calibration, rested, or buff claims until the
+- XP rate, grinding spots, calibration, rested, and buff claims stay off until
   Midnight data is live-verified.
 
 _____________________________________________________________________________________
@@ -103,67 +116,31 @@ Window tabs:
   economy, world data, and recent level history.
 - Mobs — search, filter, sort, remove one mob, or clean Unknown rows.
 - Areas — where you have been killing.
-- Heatmap — switch zones, inspect a 32x32 kill-density grid, and see the zone
+- Heatmap — switch zones, inspect a 64x64 kill-density grid, and see the zone
   total. Map art is optional; the grid works without it.
 - Levels — kill and XP performance by player level.
 
 Tips:
 - Drag the window to move it; drag the 3D model to rotate it.
 - Press Escape or the X button to close the window.
+- Middle-click the minimap icon (or run `/acem2l2 xpt data`) to inspect tracked
+  counts and the approximate store size.
 - Use `/acem2l2 xpt debug on` only when reporting a problem.
-- Back up `WTF/Account/<account>/SavedVariables/AceM2L2*.lua` before major
-  upgrades.
 
 _____________________________________________________________________________________
 
-	KNOWN LIMITATIONS
+	GOOD TO KNOW
 _____________________________________________________________________________________
 
-- Heatmaps keep up to 40 zones; each zone is a 32x32 grid.
-- Death history keeps 100 deaths; respawn tracking keeps 300 NPCs with up to
-  20 samples each.
-- Quest history keeps 200 quests; level history keeps 200 records; rate history
-  keeps 240 samples; mob history keeps 2000 mobs per client.
-- Heatmaps, death locations, respawns, and nameplate levels need the client's
-  map-position and nameplate APIs. Missing or secret values limit those features
-  without stopping normal kill tracking.
-- Heatmaps use stored kill data and static zone art, not a live map or minimap.
-- Grinding spots need at least 5 kill-XP samples over 120 seconds, so short
-  sessions may not produce a recommendation.
-- Midnight XP estimates, calibration, kills-to-level, rested, and buffs stay
-  off until its data is live-verified.
-- Live verification of quest XP labels, group/dungeon XP, and Midnight behavior
-  is still pending.
-
-_____________________________________________________________________________________
-
-	CHANGELOG
-_____________________________________________________________________________________
-
-2.1.6 — Lifted the zone-map art above the grid backdrop so it no longer looks
-        faded or blue-tinted; map tiles render at full opacity.
-2.1.5 — Increased the heatmap to a 32x32 grid, migrated legacy 16x16 cells,
-        and strengthened heat-cell colors for better contrast.
-2.1.4 — Hardened the tiled zone-map renderer with cached art and conservative
-        tile/layer limits, keeping the detailed zone map visible during refresh
-        and resize.
-2.1.3 — Fixed the heatmap to use the correct tiled zone map, resolved zone map
-        IDs instead of continent/world maps, and hid empty cells so the zone art
-        stays visible.
-2.1.2 — Improved the heatmap with static zone-map art beneath the kill grid,
-        hid empty cells so the map remains visible, enlarged the default window
-        by about 15%, and added safe window resizing.
-2.1.1 — Added the Kill Story logo to the addon/minimap icon, window header,
-        and Settings branding; rebuilt the user guide.
-2.1.0 — User-facing documentation refresh, Kill Story naming throughout, and
-        reliability fixes for settings ranges, world/economy normalization,
-        tooltip hooks, debug output, migration, and restricted API data.
-2.0.0 — Major feature release: XP rate and time-to-level, dungeon XP, leveling
-        goals, speedrun splits, loot value, gold/hour, gear upgrades, death
-        locations, respawn tracking, grinding spots, optional nameplate levels,
-        and per-zone kill heatmaps.
-1.14.x — Tooltip, quest XP, leveling history, buff, and settings improvements.
-1.13.0 — Internal refactor, normalization, and focused test suite.
-1.12.0 — Midnight counts-focused support and per-client data.
-1.11.x — Kill Story window, Aether theme, search, and tracking improvements.
-Older   — Compatibility updates for Midnight, Dragonflight, BfA, and Legion.
+- Forever gets the full XP and tooltip experience. Midnight runs in
+  counts-focused mode for XP-related features.
+- Heatmaps use stored kill records and static zone art, not a live map or
+  minimap. The "Reveal unexplored areas" option uses generated official client
+  map-overlay data.
+- Heatmaps, death locations, and respawns need the client's map-position APIs.
+  Nameplate levels need the client's nameplate API.
+- History is stored per character and per client. Safety caps keep the window
+  responsive; the Data diagnostics panel shows current usage and estimated size.
+- Keeping a modest history is intentional: it keeps login, save, and the
+  window responsive. Use the diagnostics panel if you want to see how much is
+  currently tracked.

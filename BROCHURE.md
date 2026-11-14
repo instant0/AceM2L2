@@ -18,15 +18,18 @@ experience on Midnight.
   to level.
 - **Know what you killed.** Kill Story tracks mobs, levels, areas, sessions, and
   most-killed creatures.
-- **Know where to grind.** Death locations, respawn intervals, and zone heatmaps
-  show where your kills cluster. The heatmap uses static zone-map art beneath a
-  kill-density grid, not a live map.
-- **Make it yours.** Resizable window, multiple themes, scale control, and a
-  minimap launcher.
-- **Know what it is worth.** Track session loot value, gold/hour, and clear gear
+- **Know where to grind.** Zone heatmaps show where your kills cluster; death
+  locations and respawn intervals add context. The heatmap uses static zone-map
+  art beneath a kill-density grid, with an optional full-terrain reveal for
+  unexplored areas. It is not a live map.
+- **Make it yours.** Resizable window, multiple themes, scale control, heatmap
+  intensity/color controls, and a minimap launcher.
+- **Inspect your data.** Middle-click the minimap icon to see tracked counts,
+  limits, heatmap cells, and estimated store size.
+- **Know what it is worth.** Track session loot value, gold/hour, and gear
   upgrades.
-- **Keep quests separate.** Quest XP has its own ledger and never pollutes kill
-  averages.
+- **Keep quests separate.** On Forever, quest XP has its own ledger and never
+  pollutes kill averages.
 
 ## Feature highlights
 
@@ -34,15 +37,19 @@ experience on Midnight.
 |---|---|---|---|
 | Kills-to-level | Kill Story window | Death locations | Loot value |
 | XP remaining | Mob/area/level history | Respawn intervals | Gold/hour |
-| XP/hour and XP/minute | Quest XP ledger | Grinding spots | Gear upgrades |
-| Time-to-level | Leveling history | Zone heatmaps | Session totals |
-| Reputation repeats | Dungeon XP, goals, splits | Optional nameplate levels | Clear-upgrade alerts |
+| XP/hour and XP/minute (Forever) | Quest XP ledger (Forever) | Grinding spots (Forever) | Gear upgrades |
+| Time-to-level (Forever) | Leveling history | Zone heatmaps | Session totals |
+| Reputation repeats | Dungeon XP, goals, splits | Optional nameplate levels (Midnight) | Gear-upgrade alerts |
 
+XP estimates, kills-to-level, XP rate, calibration, rested/buff models, quest
+XP, dungeon XP, and grinding spots are Forever-only. Midnight is counts-focused
+and keeps the non-XP history; nameplate levels are Midnight-only.
+ 
 ## Built for both clients
 
 **Forever 1.60.1 — full mode**
 
-- Full XP formula, tooltip estimates, calibration, and 3D mob browser.
+- Full XP formula, tooltip estimates, calibration, and 3D mob model card.
 - XP rate, time-to-level, and grinding-spot suggestions.
 - Well Fed XP Boost, Well-Rested, Camp Tent rested XP, and active XP bonuses.
 - Quest XP, leveling history, loot, gold, deaths, respawns, and heatmaps.
@@ -82,6 +89,56 @@ experience on Midnight.
   off until its data is live-verified.
 
 ## Changelog
+
+### 2.4.4
+
+- Heatmaps now use a multi-stop gradient (theme accent to gold to red) instead
+  of a single accent colour, with a Low-to-High legend bar.
+- Intensity now adjusts contrast so the weakest and hottest cells stay distinct
+  at every setting, including 200%.
+
+### 2.4.3
+
+- Heatmap refreshes recolor active cells in place when a new cell maximum
+  appears, instead of rebuilding the whole cell pool.
+
+### 2.4.2
+
+- Moved heatmap controls to their own Settings > Heatmap subpage.
+
+### 2.4.1
+
+- Rewrote the player readme as a concise feature guide with a short
+  performance/data note.
+
+### 2.4.0
+
+- Added heatmap intensity and warm-color settings.
+- Added a data diagnostics frame, opened by middle-clicking the minimap icon or
+  `/acem2l2 xpt data`.
+- Clarified that mob/quest/death caps are per character and per client, not per
+  zone.
+
+### 2.3.1
+
+- Strengthened the heat-cell alpha ramp so low- and mid-density cells remain
+  visible over the full zone-map art.
+
+### 2.3.0
+
+- Added full zone-map overlays generated from the official client tables, so
+  unexplored areas can show their real map art immediately.
+- Added a "Reveal unexplored areas" setting, on by default.
+
+### 2.2.1
+
+- Discovered areas now use Blizzard's explored-map overlays; undiscovered areas
+  keep the base parchment-style art.
+
+### 2.2.0
+
+- Heatmap resolution increased to 64x64 with legacy 16x16/32x32 migration,
+  lazy cell creation, and incremental refreshes.
 
 ### 2.1.6
 
@@ -124,7 +181,7 @@ experience on Midnight.
 ### 2.0.0
 
 - Major feature release: XP rate and time-to-level, dungeon XP, leveling goals,
-  speedrun splits, loot value, gold/hour, gear upgrades, death locations,
+  level-time splits, loot value, gold/hour, gear upgrades, death locations,
   respawn tracking, grinding spots, optional nameplate levels, and per-zone
   kill heatmaps.
 

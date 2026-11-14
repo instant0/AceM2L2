@@ -302,6 +302,13 @@ function XPTooltip:Install()
     end
   end
 
+  -- Explored-map overlays change as the character discovers new areas. The
+  -- event is optional so a client without it can still use the heatmap.
+  local explorationOK = pcall(
+    self.RegisterEvent, self, "MAP_EXPLORATION_UPDATED", "OnMapExplorationUpdated"
+  )
+  self.explorationEventAvailable = explorationOK
+
   -- Nameplates also feed respawn sightings, so these events are registered even
   -- when the level display is off. Both registrations must succeed; a partial
   -- pair is rolled back to keep the availability flag truthful.

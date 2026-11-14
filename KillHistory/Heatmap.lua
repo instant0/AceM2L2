@@ -19,9 +19,10 @@ local FormatNumber = Util.FormatNumber
 local FormatPercent = Util.FormatPercent
 local FormatAgo = Util.FormatAgo
 
-local HEATMAP_GRID_SIZE = 32
+local HEATMAP_GRID_SIZE = 64
 local HEATMAP_CELLS = HEATMAP_GRID_SIZE * HEATMAP_GRID_SIZE
 local LEGACY_GRID_SIZE = 16
+local LEGACY_32_GRID_SIZE = 32
 local MAX_HEATMAP_MAPS = 40
 local MAX_HEATMAP_COUNT = 1000000
 
@@ -144,8 +145,81 @@ local function AddCell(target, cell, count)
   if cell < 1 or cell > HEATMAP_CELLS then
     return
   end
-  local merged = (target.cells[cell] or 0) + count
-  target.cells[cell] = min(MAX_HEATMAP_COUNT, merged)
+  local current = FiniteNumber(target.cells[cell]) or 0
+  target.cells[cell] = min(MAX_HEATMAP_COUNT, current + count)
+end
+
+local function MaxCellIndex(cells)
+  local maxCell = 0
+  for cellKey in pairs(cells) do
+    local cell = tonumber(cellKey)
+    if cell and cell == floor(cell) and cell > maxCell then
+      maxCell = cell
+    end
+  end
+  return maxCell
+end
+
+-- Prefer the stored grid size. Legacy saves have no gridSize field, so infer
+-- from the largest cell index: 16x16, 32x32, or the current 64x64 grid.
+local function DetectSourceGrid(source, cells)
+  local grid = floor(tonumber(source.gridSize) or 0)
+  if grid >= 1 and grid <= HEATMAP_GRID_SIZE
+    and HEATMAP_GRID_SIZE % grid == 0 then
+    return grid
+  end
+
+  local maxCell = MaxCellIndex(cells)
+  if maxCell <= 0 then
+    return HEATMAP_GRID_SIZE
+  elseif maxCell > LEGACY_32_GRID_SIZE * LEGACY_32_GRID_SIZE then
+    return HEATMAP_GRID_SIZE
+  elseif maxCell > LEGACY_GRID_SIZE * LEGACY_GRID_SIZE then
+    return LEGACY_32_GRID_SIZE
+  end
+  return LEGACY_GRID_SIZE
+end
+
+local function UpgradeCells(sourceCells, target, sourceGrid)
+  local ratio = floor(HEATMAP_GRID_SIZE / sourceGrid)
+  if ratio < 1 then
+    return
+  end
+  local targetCellsPerSource = ratio * ratio
+
+  for cellKey, cellValue in pairs(sourceCells) do
+    if not IsSecret(cellKey) and not IsSecret(cellValue) then
+      local cell = tonumber(cellKey)
+      if cell and cell == floor(cell) and cell >= 1
+        and cell <= sourceGrid * sourceGrid then
+        local count = NormalizeCellCount(cellValue)
+        if count then
+          if ratio == 1 then
+            AddCell(target, cell, count)
+          else
+            local oldRow = floor((cell - 1) / sourceGrid)
+            local oldCol = (cell - 1) % sourceGrid
+            local baseRow = oldRow * ratio
+            local baseCol = oldCol * ratio
+            local share = floor(count / targetCellsPerSource)
+            local remainder = count % targetCellsPerSource
+            local index = 0
+            for rowOffset = 0, ratio - 1 do
+              for colOffset = 0, ratio - 1 do
+                index = index + 1
+                local add = share + (index <= remainder and 1 or 0)
+                if add > 0 then
+                  local targetCell = (baseRow + rowOffset) * HEATMAP_GRID_SIZE
+                    + (baseCol + colOffset) + 1
+                  AddCell(target, targetCell, add)
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
 end
 
 local function MergeCells(source, target)
@@ -153,64 +227,11 @@ local function MergeCells(source, target)
   if not cells then
     return
   end
-
-  local sourceGrid = floor(tonumber(source.gridSize) or 0)
-  if sourceGrid ~= LEGACY_GRID_SIZE and sourceGrid ~= HEATMAP_GRID_SIZE then
-    sourceGrid = LEGACY_GRID_SIZE
-    for cellKey in pairs(cells) do
-      local cell = tonumber(cellKey)
-      if cell and cell > LEGACY_GRID_SIZE * LEGACY_GRID_SIZE then
-        sourceGrid = HEATMAP_GRID_SIZE
-        break
-      end
-    end
-  end
-
-  if sourceGrid == HEATMAP_GRID_SIZE then
-    for cellKey, cellValue in pairs(cells) do
-      if not IsSecret(cellKey) and not IsSecret(cellValue) then
-        local cell = tonumber(cellKey)
-        if cell and cell == floor(cell) then
-          local count = NormalizeCellCount(cellValue)
-          if count then
-            AddCell(target, cell, count)
-          end
-        end
-      end
-    end
+  local sourceGrid = DetectSourceGrid(source, cells)
+  if not sourceGrid then
     return
   end
-
-  -- Upgrade legacy 16x16 cells to four 32x32 cells while preserving totals.
-  for cellKey, cellValue in pairs(cells) do
-    if not IsSecret(cellKey) and not IsSecret(cellValue) then
-      local cell = tonumber(cellKey)
-      if cell and cell == floor(cell) and cell >= 1
-        and cell <= LEGACY_GRID_SIZE * LEGACY_GRID_SIZE then
-        local count = NormalizeCellCount(cellValue)
-        if count then
-          local oldRow = floor((cell - 1) / LEGACY_GRID_SIZE)
-          local oldCol = (cell - 1) % LEGACY_GRID_SIZE
-          local baseRow = oldRow * 2
-          local baseCol = oldCol * 2
-          local targetCells = {
-            baseRow * HEATMAP_GRID_SIZE + baseCol + 1,
-            baseRow * HEATMAP_GRID_SIZE + baseCol + 2,
-            (baseRow + 1) * HEATMAP_GRID_SIZE + baseCol + 1,
-            (baseRow + 1) * HEATMAP_GRID_SIZE + baseCol + 2,
-          }
-          local share = floor(count / 4)
-          local remainder = count % 4
-          for index = 1, 4 do
-            local add = share + (index <= remainder and 1 or 0)
-            if add > 0 then
-              AddCell(target, targetCells[index], add)
-            end
-          end
-        end
-      end
-    end
-  end
+  UpgradeCells(cells, target, sourceGrid)
 end
 
 -- Merge one stored map entry into an accumulator. Cells are the source of truth;
@@ -229,12 +250,24 @@ local function MergeMapEntry(source, target)
   end
 end
 
+function XPTooltip:InvalidateHeatmapCache()
+  self.heatmapGeneration = (self.heatmapGeneration or 0) + 1
+  self.heatmapNormalizeCache = nil
+end
+
 function XPTooltip:NormalizeHeatmaps(target)
   if target == nil then
     target = self.char
   end
   if type(target) ~= "table" then
     return {}
+  end
+
+  local generation = self.heatmapGeneration or 0
+  local cache = self.heatmapNormalizeCache
+  if cache and cache.target == target and cache.generation == generation
+    and cache.heatmaps == target.heatmaps then
+    return cache.heatmaps
   end
 
   local source = type(target.heatmaps) == "table" and target.heatmaps or {}
@@ -283,6 +316,11 @@ function XPTooltip:NormalizeHeatmaps(target)
   end
 
   target.heatmaps = heatmaps
+  self.heatmapNormalizeCache = {
+    target = target,
+    generation = generation,
+    heatmaps = heatmaps,
+  }
   return heatmaps
 end
 
@@ -290,8 +328,10 @@ function XPTooltip:ResetHeatmaps()
   local db = self.char
   if type(db) == "table" then
     db.heatmaps = {}
+    self:InvalidateHeatmapCache()
     return db.heatmaps
   end
+  self:InvalidateHeatmapCache()
   return {}
 end
 
@@ -307,6 +347,7 @@ function XPTooltip:GetHeatmapZones()
         zones[#zones + 1] = {
           mapID = mapID,
           key = key,
+          gridSize = entry.gridSize or HEATMAP_GRID_SIZE,
           total = entry.total,
           lastSeen = entry.lastSeen,
           cells = entry.cells,
@@ -388,6 +429,9 @@ function XPTooltip:RecordHeatmapKill(mapID, x, y)
   end
   entry.lastSeen = max(0, Epoch())
 
+  -- The entry lives in the cached normalized table, so the cache already sees
+  -- this in-place update. Invalidating here would force a full copy of every
+  -- zone on the next UI refresh, once per kill.
   local mapCount = 0
   for _ in pairs(heatmaps) do
     mapCount = mapCount + 1
@@ -449,6 +493,10 @@ function XPTooltip:PrintHeatmap(rest)
     end
 
     local cellCount = CountCells(zone.cells)
+    local gridSize = floor(tonumber(zone.gridSize) or HEATMAP_GRID_SIZE)
+    if gridSize < 1 or gridSize > HEATMAP_GRID_SIZE then
+      gridSize = HEATMAP_GRID_SIZE
+    end
     AceM2L2:SafePrint(string.format(
       "Kill Story heatmap: %s (%s kills, %s cells)",
       ZoneName(self, zone.mapID),
@@ -473,10 +521,10 @@ function XPTooltip:PrintHeatmap(rest)
 
     for index = 1, min(#cells, 10) do
       local item = cells[index]
-      local col = (item.cell - 1) % HEATMAP_GRID_SIZE + 1
-      local row = floor((item.cell - 1) / HEATMAP_GRID_SIZE) + 1
-      local xPercent = floor((col - 0.5) * 100 / HEATMAP_GRID_SIZE + 0.5)
-      local yPercent = floor((row - 0.5) * 100 / HEATMAP_GRID_SIZE + 0.5)
+      local col = (item.cell - 1) % gridSize + 1
+      local row = floor((item.cell - 1) / gridSize) + 1
+      local xPercent = floor((col - 0.5) * 100 / gridSize + 0.5)
+      local yPercent = floor((row - 0.5) * 100 / gridSize + 0.5)
       local share = zone.total > 0 and item.count / zone.total * 100 or 0
       AceM2L2:SafePrint(string.format(
         "  %d%%, %d%%: %s kills (%s of zone)",

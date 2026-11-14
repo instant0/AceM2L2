@@ -782,6 +782,15 @@ for _, category in ipairs(settingsMock.categories) do
 end
 assert(tooltipCategory and tooltipCategory.parent == mainCategory, "tooltip subcategory missing")
 assert(tooltipCategory.registered, "tooltip subcategory not registered")
+local heatmapCategory
+for _, category in ipairs(settingsMock.categories) do
+  if category.name == "Heatmap" then
+    heatmapCategory = category
+  end
+end
+assert(heatmapCategory and heatmapCategory.parent == mainCategory,
+  "heatmap subcategory missing")
+assert(heatmapCategory.registered, "heatmap subcategory not registered")
 
 local function HasHeader(category, text)
   for _, initializer in ipairs(category.layout.initializers) do
@@ -798,6 +807,25 @@ assert(HasHeader(tooltipCategory, "XP lines"), "missing XP lines header")
 assert(HasHeader(tooltipCategory, "Kill lines"), "missing Kill lines header")
 assert(HasHeader(tooltipCategory, "Rested and bonuses"), "missing Rested header")
 assert(HasHeader(tooltipCategory, "Edge cases"), "missing Edge cases header")
+assert(HasHeader(heatmapCategory, "Display"), "missing heatmap display header")
+local function FindSetting(name)
+  for _, setting in ipairs(settingsMock.settings) do
+    if setting.name == name then
+      return setting
+    end
+  end
+end
+for _, name in ipairs({ "Show heatmap tab", "Reveal unexplored areas",
+  "Heatmap intensity", "Warm heat colors" }) do
+  local setting = FindSetting(name)
+  assert(setting and setting.category == heatmapCategory,
+    name .. " is not on the Heatmap page")
+end
+if SCENARIO == "forever" then
+  local grindingSetting = FindSetting("Show grinding spot")
+  assert(grindingSetting and grindingSetting.category == tooltipCategory,
+    "grinding spot setting should remain on the Tooltip page")
+end
 
 local mobLevelSetting, mobLevelInitializer
 for _, setting in ipairs(settingsMock.settings) do
@@ -1102,11 +1130,459 @@ local averageRespawn, respawnSamples = module:GetRespawnStats(1234)
 assert(respawnSamples == 3 and averageRespawn == 300,
   "respawn interval not recorded")
 
+assert(module.HEATMAP_GRID_SIZE == 64 and module.HEATMAP_CELLS == 4096,
+  "heatmap grid is not 64x64")
 module:ResetHeatmaps()
 assert(module:RecordHeatmapKill(12, 0.25, 0.75), "heatmap kill not captured")
 local heatmapZones = module:GetHeatmapZones()
 assert(#heatmapZones == 1 and heatmapZones[1].mapID == 12
   and heatmapZones[1].total == 1, "heatmap zones mismatch")
+assert(heatmapZones[1].gridSize == 64, "heatmap gridSize not stored")
+local expectedHeatCell = math.floor(0.75 * 64) * 64 + math.floor(0.25 * 64) + 1
+assert(heatmapZones[1].cells[expectedHeatCell] == 1,
+  "heatmap cell was not captured at 64x64")
+local cachedHeatmaps = module:NormalizeHeatmaps()
+assert(module:NormalizeHeatmaps() == cachedHeatmaps,
+  "normalized heatmap view was not reused")
+
+-- 32x32 data must split into 2x2 blocks at 64x64.
+module:ResetHeatmaps()
+module.char.heatmaps["12"] = {
+  gridSize = 32,
+  cells = { [1] = 4 },
+  total = 4,
+  lastSeen = 1,
+}
+module:InvalidateHeatmapCache()
+heatmapZones = module:GetHeatmapZones()
+assert(heatmapZones[1].gridSize == 64 and heatmapZones[1].total == 4,
+  "32x32 heatmap migration metadata mismatch")
+for _, cell in ipairs({ 1, 2, 65, 66 }) do
+  assert(heatmapZones[1].cells[cell] == 1,
+    "32x32 heatmap migration lost cell " .. tostring(cell))
+end
+
+-- Legacy 16x16 data must split into 4x4 blocks at 64x64.
+module:ResetHeatmaps()
+module.char.heatmaps["12"] = {
+  cells = { [1] = 16 },
+  total = 16,
+  lastSeen = 1,
+}
+module:InvalidateHeatmapCache()
+heatmapZones = module:GetHeatmapZones()
+assert(heatmapZones[1].gridSize == 64 and heatmapZones[1].total == 16,
+  "legacy heatmap migration metadata mismatch")
+local legacyCells = 0
+for cell, count in pairs(heatmapZones[1].cells) do
+  local row = math.floor((cell - 1) / 64)
+  local col = (cell - 1) % 64
+  assert(row >= 0 and row < 4 and col >= 0 and col < 4,
+    "legacy heatmap migration placed a cell outside the 4x4 block")
+  assert(count == 1, "legacy heatmap migration split count incorrectly")
+  legacyCells = legacyCells + 1
+end
+assert(legacyCells == 16, "legacy heatmap migration cell count mismatch")
+
+-- A 64x64 entry must copy through unchanged.
+module:ResetHeatmaps()
+module.char.heatmaps["12"] = {
+  gridSize = 64,
+  cells = { [4096] = 3 },
+  total = 3,
+  lastSeen = 1,
+}
+module:InvalidateHeatmapCache()
+heatmapZones = module:GetHeatmapZones()
+assert(heatmapZones[1].cells[4096] == 3 and heatmapZones[1].total == 3,
+  "64x64 heatmap data was not preserved")
+
+-- Legacy remainder distribution: 17 kills in one 16x16 cell must split into
+-- sixteen 64x64 cells (one of them holding the extra kill), not lose a kill.
+module:ResetHeatmaps()
+module.char.heatmaps["12"] = {
+  gridSize = 16,
+  cells = { [1] = 17 },
+  lastSeen = 1,
+}
+module:InvalidateHeatmapCache()
+local splitZone = module:GetHeatmapZones()[1]
+local splitSum, splitCells, splitDoubled = 0, 0, 0
+for _, count in pairs(splitZone.cells) do
+  splitSum = splitSum + count
+  splitCells = splitCells + 1
+  if count == 2 then
+    splitDoubled = splitDoubled + 1
+  end
+end
+assert(splitZone.total == 17 and splitSum == 17 and splitCells == 16
+  and splitDoubled == 1, "legacy heatmap remainder distribution mismatch")
+
+-- Duplicate numeric/string map keys merge into one zone; lastSeen keeps the
+-- newest sighting and cells add together.
+module:ResetHeatmaps()
+module.char.heatmaps[12] = {
+  gridSize = 64,
+  cells = { [5] = 2 },
+  lastSeen = 10,
+}
+module.char.heatmaps["12"] = {
+  gridSize = 64,
+  cells = { [5] = 3, [6] = 1 },
+  lastSeen = 20,
+}
+module:InvalidateHeatmapCache()
+local mergedZones = module:GetHeatmapZones()
+assert(#mergedZones == 1 and mergedZones[1].total == 6,
+  "duplicate heatmap map keys did not merge")
+assert(mergedZones[1].cells[5] == 5 and mergedZones[1].cells[6] == 1,
+  "duplicate heatmap cells did not add")
+assert(mergedZones[1].lastSeen == 20,
+  "duplicate heatmap map keys did not keep the newest lastSeen")
+
+-- The normalized store keeps only the newest MAX_HEATMAP_MAPS zones.
+module:ResetHeatmaps()
+for mapID = 100, 140 do
+  module.char.heatmaps[tostring(mapID)] = {
+    gridSize = 64,
+    cells = { [1] = 1 },
+    total = 1,
+    lastSeen = mapID,
+  }
+end
+module:InvalidateHeatmapCache()
+local capped = module:NormalizeHeatmaps()
+local cappedCount = 0
+for _ in pairs(capped) do
+  cappedCount = cappedCount + 1
+end
+assert(cappedCount == module.MAX_HEATMAP_MAPS,
+  "heatmap map cap not enforced")
+assert(capped["100"] == nil and capped["140"] ~= nil,
+  "heatmap map cap kept the wrong zones")
+
+-- Resetting the store must invalidate the normalized cache so a later kill
+-- does not resurrect the previous zones.
+module:ResetHeatmaps()
+assert(module:RecordHeatmapKill(17, 0.5, 0.5), "post-reset heatmap kill failed")
+assert(#module:GetHeatmapZones() == 1, "post-reset heatmap zone missing")
+module:ResetHeatmaps()
+local afterReset = 0
+for _ in pairs(module:NormalizeHeatmaps()) do
+  afterReset = afterReset + 1
+end
+assert(afterReset == 0, "heatmap cache survived reset")
+assert(module:RecordHeatmapKill(18, 0.5, 0.5), "second post-reset kill failed")
+local refreshedZones = module:GetHeatmapZones()
+assert(#refreshedZones == 1 and refreshedZones[1].mapID == 18,
+  "heatmap cache did not refresh after reset")
+
+-- The UI creates heat cells lazily and reuses them incrementally. Map 13 is
+-- used so the refresh is a full zone change after the migration fixtures.
+module:ResetHeatmaps()
+assert(module:RecordHeatmapKill(13, 0.25, 0.75), "UI heatmap seed kill failed")
+module:OpenUI()
+module:SetTab("heatmap")
+module:RefreshHeatmap()
+local heatmapUI = module.ui and module.ui.heatmap
+assert(heatmapUI and heatmapUI.cellCount < module.HEATMAP_CELLS,
+  "heatmap UI preallocated the full 64x64 cell grid")
+local initialCellCount = heatmapUI.cellCount
+local renderedCount = 0
+for _ in pairs(heatmapUI.renderedCounts) do
+  renderedCount = renderedCount + 1
+end
+assert(renderedCount == 1 and heatmapUI.renderedCounts[expectedHeatCell] == 1,
+  "heatmap UI did not render only the active cell")
+assert(module:RecordHeatmapKill(13, 0.25, 0.75), "UI heatmap repeat kill failed")
+module:RefreshHeatmap()
+assert(heatmapUI.cellCount == initialCellCount
+  and heatmapUI.renderedCounts[expectedHeatCell] == 2,
+  "heatmap UI did not update the existing cell incrementally")
+assert(module:RecordHeatmapKill(13, 0.75, 0.25), "UI heatmap second-cell kill failed")
+module:RefreshHeatmap()
+assert(heatmapUI.cellCount == initialCellCount + 1,
+  "heatmap UI did not create the second active cell lazily")
+
+-- A cell removed from the store is hidden by the incremental path without a
+-- full rebuild, so stale heat cannot linger on the map.
+module:ResetHeatmaps()
+module.char.heatmaps["13"] = {
+  gridSize = 64,
+  cells = { [1] = 3, [2] = 3, [3] = 1 },
+  total = 7,
+  lastSeen = 1,
+}
+module:InvalidateHeatmapCache()
+module.heatmapZoneKey = "13"
+module:RefreshHeatmap()
+local staleCell = heatmapUI.cells[3]
+assert(heatmapUI.renderedCounts[3] == 1 and staleCell and staleCell:IsShown(),
+  "stale-cell fixture did not render")
+module.char.heatmaps["13"].cells[3] = nil
+module.char.heatmaps["13"].total = 6
+module:InvalidateHeatmapCache()
+module:RefreshHeatmap()
+assert(heatmapUI.renderedCounts[3] == nil and not staleCell:IsShown(),
+  "incremental refresh did not hide a removed cell")
+
+-- Explored-map overlays must be drawn above the base zone art; mouseover-only
+-- highlight overlays must not be baked into the static heatmap background.
+local savedMapArtLayers = C_Map.GetMapArtLayers
+local savedMapArtLayerTextures = C_Map.GetMapArtLayerTextures
+local savedExplorationInfo = C_MapExplorationInfo
+local savedGetMapArtID = C_Map.GetMapArtID
+local savedMapOverlayData = module.MapOverlayData
+assert(type(savedMapOverlayData) == "table", "generated map overlay data missing")
+C_Map.GetMapArtLayers = function()
+  return {
+    { layerWidth = 256, layerHeight = 256, tileWidth = 128, tileHeight = 128 },
+  }
+end
+C_Map.GetMapArtLayerTextures = function()
+  return { 1001, 1002, 1003, 1004 }
+end
+C_MapExplorationInfo = {
+  GetExploredMapTextures = function()
+    return {
+      {
+        textureWidth = 128,
+        textureHeight = 128,
+        offsetX = 64,
+        offsetY = 64,
+        fileDataIDs = { 2001 },
+        isShownByMouseOver = false,
+      },
+      {
+        textureWidth = 128,
+        textureHeight = 128,
+        offsetX = 0,
+        offsetY = 0,
+        fileDataIDs = { 2002 },
+        isShownByMouseOver = true,
+      },
+    }
+  end,
+}
+module:ResetHeatmaps()
+assert(module:RecordHeatmapKill(14, 0.5, 0.5), "explored-art heatmap seed failed")
+module:SetTab("heatmap")
+module:RefreshHeatmap()
+heatmapUI = module.ui and module.ui.heatmap
+local shownArt, foundExplored, foundMouseover = 0, false, false
+for _, tile in ipairs(heatmapUI.artTiles or {}) do
+  if tile and tile.shown then
+    shownArt = shownArt + 1
+    if tile.texture == 2001 then
+      foundExplored = true
+    elseif tile.texture == 2002 then
+      foundMouseover = true
+    end
+  end
+end
+assert(shownArt == 5 and foundExplored and not foundMouseover,
+  "explored map overlays were not composited correctly")
+C_MapExplorationInfo.GetExploredMapTextures = function()
+  return {
+    {
+      textureWidth = 128,
+      textureHeight = 128,
+      offsetX = 64,
+      offsetY = 64,
+      fileDataIDs = { 2001 },
+      isShownByMouseOver = false,
+    },
+    {
+      textureWidth = 128,
+      textureHeight = 128,
+      offsetX = 0,
+      offsetY = 64,
+      fileDataIDs = { 2003 },
+      isShownByMouseOver = false,
+    },
+  }
+end
+module:RefreshHeatmap()
+local updatedArt, foundNewExplored = 0, false
+for _, tile in ipairs(heatmapUI.artTiles or {}) do
+  if tile and tile.shown then
+    updatedArt = updatedArt + 1
+    if tile.texture == 2003 then
+      foundNewExplored = true
+    end
+  end
+end
+assert(updatedArt == 6 and foundNewExplored,
+  "newly explored overlay did not rebuild the map art")
+
+-- Generated full-overlay data must reveal undiscovered areas and must not
+-- duplicate overlays that the official explored API already returned.
+local projectID = module.projectID or 18
+C_Map.GetMapArtID = function()
+  return 9999
+end
+module.MapOverlayData = {
+  [projectID] = {
+    [9999] = {
+      { 128, 128, 0, 0, "3001" },
+      { 128, 128, 128, 0, "3002" },
+    },
+  },
+}
+module.mapOverlayCache = nil
+C_MapExplorationInfo.GetExploredMapTextures = function()
+  return nil
+end
+module:ResetHeatmaps()
+assert(module:RecordHeatmapKill(15, 0.5, 0.5), "full-overlay heatmap seed failed")
+module:SetTab("heatmap")
+module:RefreshHeatmap()
+heatmapUI = module.ui and module.ui.heatmap
+local staticArt, foundStatic1, foundStatic2 = 0, false, false
+for _, tile in ipairs(heatmapUI.artTiles or {}) do
+  if tile and tile.shown then
+    staticArt = staticArt + 1
+    if tile.texture == 3001 then
+      foundStatic1 = true
+    elseif tile.texture == 3002 then
+      foundStatic2 = true
+    end
+  end
+end
+assert(staticArt == 6 and foundStatic1 and foundStatic2,
+  "full-overlay data did not reveal missing map art")
+C_MapExplorationInfo.GetExploredMapTextures = function()
+  return {
+    {
+      textureWidth = 128,
+      textureHeight = 128,
+      offsetX = 0,
+      offsetY = 0,
+      fileDataIDs = { 4001 },
+      isShownByMouseOver = false,
+    },
+  }
+end
+module:RefreshHeatmap()
+local overlapArt, foundExplored4001, foundStatic3001 = 0, false, false
+for _, tile in ipairs(heatmapUI.artTiles or {}) do
+  if tile and tile.shown then
+    overlapArt = overlapArt + 1
+    if tile.texture == 4001 then
+      foundExplored4001 = true
+    elseif tile.texture == 3001 then
+      foundStatic3001 = true
+    end
+  end
+end
+assert(overlapArt == 6 and foundExplored4001 and not foundStatic3001,
+  "explored overlay was duplicated by the full-overlay data")
+local savedRevealUnexplored = module:GetSettings().revealUnexplored
+module:GetSettings().revealUnexplored = false
+module:RefreshHeatmap()
+local revealOffArt, foundRevealOffStatic = 0, false
+for _, tile in ipairs(heatmapUI.artTiles or {}) do
+  if tile and tile.shown then
+    revealOffArt = revealOffArt + 1
+    if tile.texture == 3002 then
+      foundRevealOffStatic = true
+    end
+  end
+end
+assert(revealOffArt == 5 and not foundRevealOffStatic,
+  "reveal-unexplored setting did not disable generated overlay data")
+module:GetSettings().revealUnexplored = savedRevealUnexplored
+module.MapOverlayData = savedMapOverlayData
+module.mapOverlayCache = nil
+C_Map.GetMapArtID = savedGetMapArtID
+C_Map.GetMapArtLayers = savedMapArtLayers
+C_Map.GetMapArtLayerTextures = savedMapArtLayerTextures
+C_MapExplorationInfo = savedExplorationInfo
+
+local heatSettings = module:GetSettings()
+assert(heatSettings.heatmapIntensity == 100 and heatSettings.heatmapWarmColors == false,
+  "heatmap appearance defaults mismatch")
+assert(type(module.GetHeatColor) == "function", "heat colour ramp is not exposed")
+
+-- The ramp must change hue as well as alpha, keep the weakest cell clearly
+-- weaker than the hottest, and not flatten when intensity is raised.
+local themeAccent = { 0.25, 0.55, 0.95 }
+local lowHeat = module.GetHeatColor(1, 13, 1.0, false, themeAccent)
+local midHeat = module.GetHeatColor(4, 13, 1.0, false, themeAccent)
+local highHeat = module.GetHeatColor(13, 13, 1.0, false, themeAccent)
+assert(lowHeat[4] < midHeat[4] and midHeat[4] < highHeat[4],
+  "heat alpha is not monotonic")
+assert(lowHeat[4] < 0.6 and highHeat[4] == 1,
+  "weakest heat cell is not clearly weaker than the hottest")
+assert(lowHeat[1] ~= highHeat[1] or lowHeat[2] ~= highHeat[2]
+  or lowHeat[3] ~= highHeat[3], "heat ramp still uses a single colour")
+local lowHeat200 = module.GetHeatColor(1, 13, 2.0, false, themeAccent)
+local highHeat200 = module.GetHeatColor(13, 13, 2.0, false, themeAccent)
+assert(lowHeat200[4] < 0.5 and highHeat200[4] == 1,
+  "200% intensity collapsed the heat ramp")
+local warmLow = module.GetHeatColor(1, 13, 1.0, true, themeAccent)
+local warmHigh = module.GetHeatColor(13, 13, 1.0, true, themeAccent)
+assert(warmLow[1] > 0.5 and warmHigh[1] < warmLow[1]
+  and warmHigh[3] < warmLow[3], "warm heat gradient mismatch")
+
+-- Render a known 1..13 spread and verify the UI and legend use the ramp.
+module:ResetHeatmaps()
+module.char.heatmaps["21"] = {
+  gridSize = 64,
+  cells = { [1] = 1, [2] = 4, [3] = 8, [4] = 13 },
+  total = 26,
+  lastSeen = 1,
+}
+module:InvalidateHeatmapCache()
+module.heatmapZoneKey = "21"
+module:SetTab("heatmap")
+module:RefreshHeatmap()
+local gradientUI = module.ui and module.ui.heatmap
+local lowCell = gradientUI and gradientUI.cells[1]
+local midCell = gradientUI and gradientUI.cells[2]
+local highCell = gradientUI and gradientUI.cells[4]
+assert(lowCell and midCell and highCell and lowCell:IsShown()
+  and midCell:IsShown() and highCell:IsShown(), "gradient heat cells missing")
+assert(lowCell.color[4] < midCell.color[4] and midCell.color[4] < highCell.color[4],
+  "UI heat cells do not use the alpha ramp")
+assert(lowCell.color[1] ~= highCell.color[1]
+  or lowCell.color[2] ~= highCell.color[2]
+  or lowCell.color[3] ~= highCell.color[3],
+  "UI heat cells do not use the colour ramp")
+local swatches = gradientUI.gradientSwatches
+assert(type(swatches) == "table" and #swatches > 1,
+  "heat gradient legend swatches missing")
+local firstSwatch, lastSwatch = swatches[1], swatches[#swatches]
+assert(firstSwatch.color and lastSwatch.color
+  and (firstSwatch.color[1] ~= lastSwatch.color[1]
+    or firstSwatch.color[2] ~= lastSwatch.color[2]
+    or firstSwatch.color[3] ~= lastSwatch.color[3]),
+  "heat gradient legend is not a gradient")
+
+heatSettings.heatmapWarmColors = true
+module:RefreshHeatmap()
+assert(highCell.color[1] > 0.5 and highCell.color[2] < 0.1,
+  "warm heat palette not applied to the top cell")
+heatSettings.heatmapWarmColors = false
+heatSettings.heatmapIntensity = 200
+module:RefreshHeatmap()
+assert(lowCell.color[4] < 0.5,
+  "200% intensity flattened the weakest UI heat cell")
+heatSettings.heatmapIntensity = 100
+module:RefreshHeatmap()
+
+local dataStats = module:GetDataStats()
+assert(type(dataStats) == "table" and dataStats.maxMobs == 2000
+  and dataStats.maxHeatmapZones == 40 and dataStats.estimatedBytes > 0,
+  "data diagnostics stats mismatch")
+assert(dataStats.heatmapZones >= 1 and type(dataStats.heatmapCells) == "number",
+  "data diagnostics did not count heatmap storage")
+module:ToggleDiagnosticsUI()
+assert(module.diagnosticsUI,
+  "diagnostics UI was not created")
+assert(pcall(module.RefreshDiagnosticsUI, module),
+  "diagnostics UI refresh failed")
+module:ToggleDiagnosticsUI()
 
 local savedNamePlate = C_NamePlate
 local savedNamePlateAvailable = module.namePlateEventAvailable

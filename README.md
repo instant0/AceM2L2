@@ -5,7 +5,7 @@ and provides a **Kill Story** browser for Forever 1.60.1 and Midnight 12.1.5.
 Forever gets the full XP/tooltip experience; Midnight gets counts-focused
 history plus the non-XP features until its XP data is live-verified.
 
-- **Version:** 2.1.6
+- **Version:** 2.4.4
 - **Author:** faslkjd56
 - **Interfaces:** Midnight `120105`, Forever `16001`
 - **Clients:** Midnight 12.1.5 and Forever 1.60.1
@@ -112,13 +112,16 @@ model. Client-specific policy lives only in `KillHistory/Client.lua` and
 - Leveling history with per-level duration, XP, and kills, shown in the Overview
   and with `/xpt history [level]`.
 - XP/hour, XP/minute, and time-to-level from measured gains.
-- Dungeon XP, leveling goals, and speedrun splits.
-- Session loot value, gold/hour, and clear gear-upgrade notifications.
+- Dungeon XP, leveling goals, and level-time splits.
+- Session loot value, gold/hour, and gear-upgrade notifications.
 - Death locations, respawn intervals, and grinding-spot recommendations.
 - Overview, Mobs, Areas, Heatmap, and Levels tabs. The Heatmap tab can be
   hidden while heatmap data keeps recording.
-- Per-zone 32x32 kill heatmap with tiled zone-map art beneath the grid; empty
-  cells stay hidden so the map remains visible.
+- Per-zone 64x64 kill heatmap with tiled zone-map art and full generated map
+  overlays beneath the grid; empty cells stay hidden so the map remains visible.
+  Cells use a multi-stop gradient (theme accent -> gold -> red) so the busiest
+  cell is visibly hottest, with a matching legend bar. Heat intensity and the
+  optional fire palette are configurable in Settings > Heatmap.
 - Resizable window with a larger default size.
 
 - Search, filters, sort modes, relative bars, and a 3D model hero card.
@@ -166,9 +169,11 @@ The Tooltip sections are client-gated:
 - **Kill lines** — kill count and the mob level line.
 - **XP rate** — XP rate, time-to-level, and the rate window (Forever only).
 - **Dungeon** — dungeon activity.
-- **World** — Heatmap tab (shown by default; hiding it does not stop
-  recording), grinding spot (Forever only), and nameplate levels (Midnight
-  only, off by default).
+- **World** — grinding spot (Forever only) and nameplate levels (Midnight only,
+  off by default).
+- **Heatmap** subpage — Show heatmap tab (shown by default; hiding it does not
+  stop recording), Reveal unexplored areas (on by default), Heatmap intensity
+  (50-200%, adjusts gradient contrast), and Warm heat colors (fire palette).
 - **Leveling goal** — goal progress in the Overview.
 - **Level splits** — latest split in the Overview.
 - **Economy** — session loot, gold/hour, and gear upgrades where supported.
@@ -215,8 +220,8 @@ Each client namespace stores:
 - `deaths` — time-ordered `{ at, mapID, x, y }`, oldest first.
 - `respawns` — `[npcID] = { name, intervals = { seconds, ... }, lastSeen,
   lastDeath }`.
-- `heatmaps` — `[tostring(mapID)] = { cells = { [1..1024] = count }, total,
-  lastSeen }` for the 32x32 grid.
+- `heatmaps` — `[tostring(mapID)] = { gridSize = 64, cells = { [1..4096] = count },
+  total, lastSeen }` for the 64x64 grid.
 - `areas` — `[mapID] = kills`; `levels` — `[playerLevel] = kills`;
   `areaLevels` — `[mapID] = { [playerLevel] = kills }`.
 - `calibration` — `zones`, `levels`, `groups`, `classes`, and `mobs` ratio
@@ -320,6 +325,28 @@ Storage schema: `2`
 Per-client data schema: `1`  
 Calibration schema: `2`
 
+## Generated Map Overlays
+
+`KillHistory/MapOverlayData.lua` is generated from the official client
+`WorldMapOverlay` and `WorldMapOverlayTile` DB2 tables. It contains the complete
+overlay set keyed by `uiMapArtID`, including texture fileDataIDs, dimensions,
+and offsets. This is the data the runtime exploration API does not expose for
+unexplored areas.
+
+- Generated for Midnight **12.1.5.69848** and Forever **1.60.1.69913**.
+- Regenerate after a client patch with:
+
+  ```bash
+  python3 tests/generate_map_overlays.py
+  ```
+
+- The script downloads the tables from wago.tools. Use `--source-dir` to point at
+  local CSV exports.
+- No Mapster or Leatrix overlay data is copied.
+- The generated file is about 280 KB.
+- If the overlay data is missing or stale, the heatmap falls back to the
+  character's explored overlays and the base zone art.
+
 ## Commands
 
 Use `/acem2l2` or `/am2`. `/acem2l2 xptooltip` is an alias for
@@ -357,6 +384,7 @@ Use `/acem2l2 xpt help` for the Kill Story command list:
 ```text
 /acem2l2 xpt on|off
 /acem2l2 xpt ui
+/acem2l2 xpt data
 /acem2l2 xpt status
 /acem2l2 xpt probe
 /acem2l2 xpt kills [name]
@@ -416,6 +444,22 @@ target/mouseover identity, map/group/XP/rested values, and marks secret values
 as `<secret>`. Include `/acem2l2 xpt status` and `/acem2l2 xpt probe` output in
 bug reports.
 
+## Data Diagnostics
+
+Middle-click the minimap icon or run `/acem2l2 xpt data` to open a diagnostics
+frame. It shows:
+
+- mobs, quests, deaths, respawn NPCs/samples, heatmap zones/cells, level
+  records, rate samples, contexts, and calibration entries;
+- each count against its current safety cap;
+- an approximate store size from a bounded recursive estimate, not a
+  SavedVariables file-size API.
+
+The 2000-mob cap is per character and per project/client, across all zones. A
+zone with 500 tracked mobs uses 25% of that character's mob budget. Quests and
+deaths are separate stores; heatmaps are also separate and capped by zone count,
+not by the mob cap.
+
 ## Project Layout
 
 ```text
@@ -427,7 +471,8 @@ KillHistory/Client.lua     Client profile registry and capability queries
 KillHistory/Clients/       Forever and Midnight profile policy
 KillHistory/Data.lua       Character store, mob identity, merge, and accounting
 KillHistory/World.lua      Map position, deaths, respawns, and grinding spots
-KillHistory/Heatmap.lua    Per-zone 32x32 kill grid data and capture
+KillHistory/Heatmap.lua    Per-zone 64x64 kill grid data and capture
+KillHistory/MapOverlayData.lua  Generated full map-overlay data (official client tables)
 KillHistory/Calibration.lua  XP correction stores and observations
 KillHistory/Tracking.lua     Kill recording, chat/death matching, and pruning
 KillHistory/Tooltip.lua      Tooltip hook and line rendering
@@ -435,6 +480,7 @@ KillHistory/Commands.lua     Kill Story slash commands and chat output
 KillHistory/Events.lua       Event entry points and session lifecycle
 KillHistory/UI/Nameplates.lua  Optional Midnight nameplate levels
 KillHistory/UI/Heatmap.lua     Heatmap panel, zone pager, and map art
+KillHistory/UI/Diagnostics.lua Data counts, limits, and approximate size panel
 KillHistory/UI/            Theme, widgets, list, detail, overview, window, minimap
 Bindings.lua               Keybind and addon-compartment entry points
 Bindings.xml               Ctrl+Shift+X binding definition
@@ -444,6 +490,7 @@ tests/snapshot.lua         Deterministic behavior snapshot
 tests/smoke.lua            Client-scenario smoke suite
 tests/fixtures.lua         Shared fixtures for the smoke suite
 tests/libs_smoke.lua       Embedded-library load test
+tests/generate_map_overlays.py  Regenerates MapOverlayData.lua from client DB2 exports
 tests/test_stats.py        Focused-suite size statistics
 tests/check_layout.py      Shipping-layout validator
 tests/check_release.py     Release-zip validator
@@ -528,7 +575,7 @@ The main outstanding areas are:
 - tooltip hook availability and `GameTooltip:GetUnit`,
 - exact XP chat semantics for groups and dungeons,
 - rested pool behavior,
-- heatmap recording, the 32x32 grid, and map-art fallback,
+- heatmap recording, the 64x64 grid, and map-art availability,
 - death locations and respawn intervals against live map-position and nameplate
   visibility,
 - grinding-spot recommendations reaching the 5-sample/120-second threshold,
@@ -574,9 +621,9 @@ checks skip release validation unless `CHECK_RELEASE=1`.
 Current release artifacts:
 
 ```text
-dist/AceM2L2-2.1.6.zip
-/mnt/r/AceM2L2-2.1.6.zip
-SHA-256: b11def6043feb7a66d58af61bb461084df1ff48df905b0ce47ca2246cc68acff
+dist/AceM2L2-2.4.4.zip
+/mnt/r/AceM2L2-2.4.4.zip
+SHA-256: ec65950135f1c6675e175e1aee64d7225080734a88969e0b00b1b755f1c68938
 ```
 
 Both copies are validated when present. Copy the `dist/` zip to `/mnt/r/` when
@@ -607,20 +654,31 @@ Bindings, Libs, `README.txt`, or `LICENSE`).
   that verification.
 - If Midnight hides target/death identity, the kill is skipped rather than
   recorded as a fake Unknown entry.
+- Downgrading after recording 64x64 heatmap data is not supported; older builds
+  may ignore or drop those cells.
 - Area and level rows are derived views; deletion is offered only for mob rows.
 - Per-client caps: 2000 mobs, 200 quests, 200 `levelHistory` records, 240 rate
   samples, 100 deaths, 300 respawn NPCs (20 intervals each), 40 heatmap zones
-  (32x32 cells each), and 12 calibration contexts per mob (pruned after 120
-  days). Older entries are pruned by recency.
+  (64x64 cells each), and 12 calibration contexts per mob (pruned after 120
+  days). Older entries are pruned by recency. These are fixed engineering safety
+  caps, not values derived from measured usage; a 2-6x scope review is tracked in
+  `PLAN.md`.
+- The mob cap is global for the character/client, not per zone. Quests are
+  unique quest-ledger entries; deaths are the last 100 death locations; heatmap
+  zones/cells are a separate store.
 - Heatmap recording and death locations need a readable map-position API
   (`C_Map.GetPlayerMapPosition` or `GetPlayerMapPosition`). Respawn intervals
   also need GUID identity and nameplate/capture sightings. Without them, only
   those features are unavailable.
 - Nameplate levels need `C_NamePlate` and are available only on Midnight.
-- Heatmap zone art is best-effort through `C_Map.GetMapArtLayers`,
-  `C_Map.GetMapArtLayerTextures`, or legacy `GetMapInfo`; the 32x32 grid still
-  renders when art is unavailable. This is stored zone art with kill cells, not
-  a live map or minimap.
+- Heatmap zone art is best-effort through `C_Map.GetMapArtLayers` and
+  `C_Map.GetMapArtLayerTextures`, with the character's explored overlays from
+  `C_MapExplorationInfo.GetExploredMapTextures` and generated full overlays from
+  `KillHistory/MapOverlayData.lua`. The 64x64 grid still renders when art is
+  unavailable. This is stored zone art with kill cells, not a live map or
+  minimap.
+- The generated overlay data is build-specific. Regenerate it after a supported
+  client patch so map art IDs and texture fileDataIDs stay current.
 - Grinding spots need at least 5 rate samples spanning 120 seconds and are
   Forever-only. Midnight never recommends one.
 - Well Fed XP Boost (`1243969`), Well-Rested/Cozy Sleeping Bag (`429959`), and

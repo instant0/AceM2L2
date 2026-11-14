@@ -971,6 +971,7 @@ function XPTooltip:PrintHelp()
   AceM2L2:SafePrint("/acem2l2 xpt status")
   AceM2L2:SafePrint("/acem2l2 xpt probe")
   AceM2L2:SafePrint("/acem2l2 xpt ui")
+  AceM2L2:SafePrint("/acem2l2 xpt data")
   AceM2L2:SafePrint("/acem2l2 xpt kills [name]")
   AceM2L2:SafePrint("/acem2l2 xpt deaths [count]")
   AceM2L2:SafePrint("/acem2l2 xpt respawns [name]")
@@ -1022,6 +1023,10 @@ function XPTooltip:HandleCommand(input)
     self:PrintProbe()
   elseif command == "ui" then
     self:OpenUI()
+  elseif command == "data" then
+    if type(self.ToggleDiagnosticsUI) == "function" then
+      self:ToggleDiagnosticsUI()
+    end
   elseif command == "kills" then
     self:PrintKills(rest)
   elseif command == "deaths" then
