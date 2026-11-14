@@ -120,6 +120,7 @@ end
 
 function XPTooltip:OnZoneChanged(event)
   self.lastPool = self:GetRestedPool()
+  self:ScheduleInstanceStateRefresh(0.75)
   if self.ui and self.ui:IsShown() then
     self:RequestUIUpdate()
   end
@@ -140,6 +141,7 @@ function XPTooltip:OnLogin(event)
   self:EnsureLevelHistory()
   self.lastPool = self:GetRestedPool()
   self:SchedulePrune()
+  self:ScheduleInstanceStateRefresh(1.0)
 end
 
 function XPTooltip:OnEnteringWorld(event)
@@ -147,6 +149,11 @@ function XPTooltip:OnEnteringWorld(event)
   if not self.active then
     self:Refresh()
   end
+  self:ScheduleInstanceStateRefresh(0.75)
+end
+
+function XPTooltip:OnInstanceInfoUpdated(event)
+  self:ScheduleInstanceStateRefresh(0.5)
 end
 
 function XPTooltip:OnXPGainEnabled(event)
@@ -174,6 +181,12 @@ function XPTooltip:StartSession()
   end
   dungeon.sessionXP = 0
   dungeon.sessionKills = 0
+  for _, instance in pairs(db.instances or {}) do
+    if type(instance) == "table" then
+      instance.sessionXP = 0
+      instance.sessionKills = 0
+    end
+  end
   local economy = db.economy
   if type(economy) ~= "table" then
     economy = {}

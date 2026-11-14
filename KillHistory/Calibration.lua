@@ -166,7 +166,8 @@ function XPTooltip:RecordObservation(mob, info, rawBase, buffedXP, totalXP)
   end
 
   local contextKey = info.contextKey or ContextKey(
-    playerLevel, mobLevel, info.groupSize or 1, info.mapID or 0, classification, info.buffSignature or "none"
+    playerLevel, mobLevel, info.groupSize or 1, info.mapID or 0, classification,
+    info.buffSignature or "none", info.instanceKey
   )
   local context = mob.contexts[contextKey]
   if type(context) ~= "table" then
@@ -175,6 +176,7 @@ function XPTooltip:RecordObservation(mob, info, rawBase, buffedXP, totalXP)
       mobLevel = mobLevel,
       groupSize = info.groupSize or 1,
       mapID = info.mapID or 0,
+      instanceKey = info.instanceKey,
       classification = classification,
       buffSig = info.buffSignature or "none",
       samples = 0,

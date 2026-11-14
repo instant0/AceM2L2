@@ -16,7 +16,7 @@ local FormatPercent = Util.FormatPercent
 local SafeCall = Util.SafeCall
 local SafeString = Util.SafeString
 
-local ROW_COUNT = 13
+local ROW_COUNT = 17
 local ROW_HEIGHT = 24
 local ESTIMATE_ENTRY_LIMIT = 200000
 
@@ -145,6 +145,24 @@ function XPTooltip:GetDataStats()
   local rates = type(db.rates) == "table" and db.rates or {}
   local respawnNpcs, respawnSamples = CountRespawns(db.respawns)
   local heatmapZones, heatmapCells = CountHeatmaps(db.heatmaps)
+  local heatmapEnabled = true
+  if type(self.GetSettings) == "function" then
+    local ok, settings = pcall(self.GetSettings, self)
+    if ok and type(settings) == "table" then
+      heatmapEnabled = settings.heatmapEnabled ~= false
+    end
+  end
+  local heatmapEstimate = EstimateSize(
+    type(db.heatmaps) == "table" and db.heatmaps or {},
+    { entries = 0, seen = {}, truncated = false }
+  )
+  local instanceCount, instanceKills = 0, 0
+  for _, instance in pairs(type(db.instances) == "table" and db.instances or {}) do
+    if type(instance) == "table" then
+      instanceCount = instanceCount + 1
+      instanceKills = instanceKills + (tonumber(instance.kills) or 0)
+    end
+  end
   local contexts = CountContexts(mobs)
   local calibrationEntries = CountCalibration(db.calibration)
 
@@ -158,6 +176,10 @@ function XPTooltip:GetDataStats()
     respawnSamples = respawnSamples,
     heatmapZones = heatmapZones,
     heatmapCells = heatmapCells,
+    heatmapEnabled = heatmapEnabled,
+    estimatedHeatmapBytes = heatmapEstimate,
+    instances = instanceCount,
+    instanceKills = instanceKills,
     contexts = contexts,
     calibrationEntries = calibrationEntries,
     maxMobs = Util.MAX_MOBS or 0,
@@ -169,6 +191,7 @@ function XPTooltip:GetDataStats()
     maxRespawnNpcs = XPTooltip.MAX_RESPAWN_NPCS or 0,
     maxRespawnSamples = XPTooltip.MAX_RESPAWN_SAMPLES or 0,
     maxHeatmapZones = XPTooltip.MAX_HEATMAP_MAPS or 0,
+    maxInstances = Util.MAX_INSTANCE_RECORDS or 0,
     client = self.clientProfile and self.clientProfile.name or "Unknown",
     projectID = self:GetProjectID(),
     character = SafeString(SafeCall(UnitName, "player")) or "Unknown",
@@ -239,6 +262,14 @@ function XPTooltip:CreateDiagnosticsUI()
     frame:Hide()
   end)
 
+  local clearHeatmap = CreateTextButton(frame, "Clear heatmap", 120, 24)
+  clearHeatmap:SetPoint("BOTTOMLEFT", 16, 42)
+  clearHeatmap:SetScript("OnClick", function()
+    if type(self.RequestClearHeatmaps) == "function" then
+      pcall(self.RequestClearHeatmaps, self)
+    end
+  end)
+
   local note = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   note:SetPoint("BOTTOMLEFT", 16, 18)
   note:SetPoint("BOTTOMRIGHT", -16, 18)
@@ -300,6 +331,10 @@ function XPTooltip:RefreshDiagnosticsUI()
     { "Respawn samples", LimitText(stats.respawnSamples, stats.maxRespawnNpcs * stats.maxRespawnSamples) },
     { "Heatmap zones", LimitText(stats.heatmapZones, stats.maxHeatmapZones) },
     { "Heatmap cells", FormatNumber(stats.heatmapCells) },
+    { "Heatmap collection", stats.heatmapEnabled and "On" or "Off" },
+    { "Heatmap bytes", FormatBytes(stats.estimatedHeatmapBytes) },
+    { "Instances", LimitText(stats.instances, stats.maxInstances) },
+    { "Instance kills", FormatNumber(stats.instanceKills) },
     { "Level records", LimitText(stats.levelRecords, stats.maxLevelRecords) },
     { "Rate samples", LimitText(stats.rateSamples, stats.maxRateSamples) },
     { "Mob contexts", LimitText(stats.contexts, stats.mobs * stats.maxContexts) },

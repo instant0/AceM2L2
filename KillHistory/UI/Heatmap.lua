@@ -845,8 +845,24 @@ function XPTooltip:RefreshHeatmap()
   end
 
   local theme = self:GetTheme()
+  local settings = self:GetSettings()
   local zones = ReadZones(self)
   local supported = SupportsMapPosition(self)
+
+  if settings and settings.heatmapEnabled == false then
+    heatmap.noData:SetText("Heatmap collection is disabled. Enable it in Settings > Heatmap.")
+    heatmap.noData:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
+    heatmap.noData:Show()
+    heatmap.selector:Hide()
+    heatmap.grid:Hide()
+    heatmap.legend:Hide()
+    HideHeatCells(heatmap)
+    HideHeatmapArt(heatmap)
+    if heatmap.artCaption then
+      heatmap.artCaption:Hide()
+    end
+    return
+  end
 
   if #zones == 0 then
     heatmap.noData:SetText(supported and "No heatmap data" or "Heatmap unavailable on this client.")
@@ -954,7 +970,6 @@ function XPTooltip:RefreshHeatmap()
   local offsetX = max(0, floor((availableWidth - extent) / 2))
   local offsetY = max(0, floor((availableHeight - extent) / 2))
 
-  local settings = self:GetSettings()
   local intensity = tonumber(settings and settings.heatmapIntensity) or 100
   intensity = max(50, min(200, intensity)) / 100
   local warm = settings and settings.heatmapWarmColors == true
@@ -1062,6 +1077,10 @@ function XPTooltip:RefreshHeatmap()
 end
 
 function XPTooltip:OnMapExplorationUpdated()
+  local settings = self:GetSettings()
+  if settings and settings.heatmapEnabled == false then
+    return
+  end
   if self.tab == "heatmap" and self.ui and self.ui.heatmap then
     pcall(self.RefreshHeatmap, self)
   end

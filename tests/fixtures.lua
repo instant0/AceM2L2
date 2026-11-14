@@ -68,6 +68,10 @@ local state = {
   critter = false,
   inInstance = false,
   instanceType = nil,
+  instanceName = nil,
+  instanceMapID = nil,
+  difficultyID = 0,
+  zoneName = nil,
   mapX = 0.5,
   mapY = 0.5,
   money = 0,
@@ -349,6 +353,30 @@ function IsInInstance()
   return state.inInstance == true, state.instanceType
 end
 
+function GetInstanceInfo()
+  if state.inInstance ~= true then
+    return nil
+  end
+  return state.instanceName or "Test Instance",
+    state.instanceType or "party",
+    state.difficultyID or 0,
+    "Normal",
+    5,
+    0,
+    false,
+    state.instanceMapID or 947,
+    1,
+    nil
+end
+
+function GetRealZoneText()
+  return state.zoneName
+end
+
+function GetZoneText()
+  return state.zoneName
+end
+
 function GetMoney()
   return state.money or 0
 end
@@ -394,10 +422,19 @@ C_Map = {
     }
   end,
   GetMapInfo = function(mapID)
-    if tonumber(mapID) == 12 then
-      return { name = "Westfall", mapID = 12 }
+    local id = tonumber(mapID)
+    if id == 12 then
+      return { name = "Westfall", mapID = 12, mapType = 3 }
+    elseif id == 947 then
+      return { name = "Azeroth", mapID = 947, mapType = 1 }
+    elseif id == 1421 then
+      return { name = "Hillsbrad Foothills", mapID = 1421, mapType = 3 }
+    elseif id == 1420 then
+      return { name = "Tirisfal Glades", mapID = 1420, mapType = 3 }
+    elseif id == 1234 then
+      return { name = "Test Dungeon", mapID = 1234, mapType = 4 }
     end
-    return { name = "Map " .. tostring(mapID), mapID = mapID }
+    return { name = "Map " .. tostring(mapID), mapID = mapID, mapType = 3 }
   end,
 }
 

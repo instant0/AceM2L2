@@ -1584,6 +1584,290 @@ assert(pcall(module.RefreshDiagnosticsUI, module),
   "diagnostics UI refresh failed")
 module:ToggleDiagnosticsUI()
 
+-- G-4a: instance detection, attribution, migration, caps, and cache.
+module:ResetKills()
+state.inInstance = false
+state.instanceType = nil
+state.instanceName = nil
+state.instanceMapID = nil
+state.difficultyID = 0
+state.mapID = 12
+module:RefreshInstanceState()
+module:RecordKill({
+  name = "Defias Pillager", playerLevel = 10, classification = "normal",
+  mapID = 12,
+}, 10, 10, 10, "test")
+assert(module.char.areas["12"] == 1, "open-world kill was not attributed to map 12")
+assert(module.char.instances["unknown"] == nil, "open-world kill created an instance")
+
+module:ResetKills()
+state.inInstance = true
+state.instanceType = "party"
+state.mapID = 947
+state.instanceName = "Ruins of Lordaeron"
+state.instanceMapID = 1234
+state.difficultyID = 2
+module:RefreshInstanceState()
+module:RecordKill({
+  name = "Skeleton", playerLevel = 20, classification = "normal",
+  mapID = 947, x = 0.5, y = 0.5,
+}, 50, 50, 50, "test")
+local lordaeron = module.char.instances["id:1234:2"]
+assert(lordaeron and lordaeron.kills == 1, "instance kill was not stored")
+assert(module.char.areas["947"] == nil, "instance kill leaked into Azeroth area")
+assert(module.char.mobs["name:skeleton"].killsByInstance["id:1234:2"] == 1,
+  "instance kill was not attributed to the mob")
+assert(module.char.dungeon.kills == 1, "PvE instance kill did not increment dungeon")
+assert(module.char.dungeon.lastInstanceName == "Ruins of Lordaeron",
+  "instance name was not recorded")
+assert(module.char.dungeon.lastInstance == 0 and
+  module.char.dungeon.lastInstanceKey == "id:1234:2",
+  "instance numeric map was not cleared")
+assert(module:GetDataStats().instances == 1, "diagnostics did not count the instance")
+module.tab = "areas"
+module:BuildList()
+local sawInstanceRow = false
+for _, row in ipairs(module.currentList or {}) do
+  if row.kind == "instance" and row.label == "Ruins of Lordaeron" then
+    sawInstanceRow = true
+  end
+  assert(row.label ~= "Azeroth", "Areas list still shows Azeroth")
+end
+assert(sawInstanceRow, "Areas list did not show the instance")
+
+-- A real dungeon map keeps its UiMap and heatmap entry.
+module:ResetKills()
+state.inInstance = true
+state.instanceType = "party"
+state.mapID = 1234
+state.instanceName = "Test Dungeon"
+state.instanceMapID = 555
+state.difficultyID = 1
+module:RefreshInstanceState()
+module:RecordKill({
+  name = "Ghoul", playerLevel = 20, classification = "normal",
+  mapID = 1234, x = 0.5, y = 0.5,
+}, 10, 10, 10, "test")
+assert(module.char.instances["id:555:1"].mapID == 1234,
+  "real dungeon map was not preserved")
+assert(module.char.heatmaps["1234"], "real dungeon heatmap was not recorded")
+assert(module.char.areas["1234"] == nil, "real dungeon was double-counted as an area")
+
+-- PvP instances are attributed but do not increment PvE dungeon totals.
+module:ResetKills()
+state.inInstance = true
+state.instanceType = "pvp"
+state.mapID = 947
+state.instanceName = "Warsong Gulch"
+state.instanceMapID = 9999
+state.difficultyID = 0
+module:RefreshInstanceState()
+module:RecordKill({
+  name = "Enemy", playerLevel = 20, classification = "normal", mapID = 947,
+}, 0, 0, 0, "test")
+assert(module.char.instances["id:9999:0"].instanceType == "pvp",
+  "PvP instance was not recorded")
+assert(module.char.dungeon.kills == 0, "PvP kill incremented PvE dungeon totals")
+
+-- A world map outside an instance must not become an area or an instance.
+module:ResetKills()
+state.inInstance = false
+state.instanceType = nil
+state.mapID = 947
+module:RefreshInstanceState()
+module:RecordKill({ name = "Wolf", playerLevel = 20, mapID = 947 }, 0, 0, 0, "test")
+assert(module.char.areas["947"] == nil, "world map leaked into areas")
+assert(module.char.instances["unknown"] == nil, "world map leaked into instances")
+
+-- Death-time state freezing survives leaving the instance before commit.
+module:ResetKills()
+state.inInstance = true
+state.instanceType = "party"
+state.mapID = 947
+state.instanceName = "Ruins of Lordaeron"
+state.instanceMapID = 1234
+state.difficultyID = 2
+module:RefreshInstanceState()
+local frozen = { name = "Skeleton", playerLevel = 20, classification = "normal" }
+module:AttachInstanceState(frozen)
+state.inInstance = false
+state.mapID = 12
+module:RecordKill(frozen, 0, 0, 0, "test")
+assert(frozen.instanceKey == "id:1234:2"
+  and module.char.instances["id:1234:2"].kills == 1,
+  "frozen death state did not survive leaving the instance")
+
+-- Historical world-map attribution migrates once, preserving levels.
+module:ResetKills()
+module.char.areas["947"] = 145
+module.char.areaLevels["947"] = { ["20"] = 145 }
+module.char.mobs["name:ghoul"] = {
+  name = "Ghoul", kills = 145, killsAtLevel = { ["20"] = 145 },
+  killsByMap = { ["947"] = 145 },
+  killsByAreaLevel = { ["947"] = { ["20"] = 145 } },
+  killsByInstance = {}, killsByInstanceLevel = {},
+}
+module.char.dungeon.lastInstance = 947
+module.char.instanceMigration = nil
+module:MigrateInstanceAttribution(module.char)
+local legacy = module.char.instances["legacy:947"]
+assert(module.char.areas["947"] == nil and legacy and legacy.kills == 145,
+  "legacy area was not migrated")
+assert(legacy.killsAtLevel["20"] == 145, "legacy level breakdown was lost")
+assert(module.char.mobs["name:ghoul"].killsByInstance["legacy:947"] == 145,
+  "legacy mob kills were not migrated")
+assert(module.char.mobs["name:ghoul"].killsByInstanceLevel["legacy:947"]["20"] == 145,
+  "legacy mob levels were not migrated")
+assert(module.char.dungeon.lastInstance == 0
+  and module.char.dungeon.lastInstanceName == "Unattributed instance (map 947)",
+  "legacy dungeon label was not corrected")
+module:MigrateInstanceAttribution(module.char)
+assert(module.char.instances["legacy:947"].kills == 145,
+  "legacy migration was not idempotent")
+
+-- Caps and per-mob pruning stay deterministic.
+module:ResetKills()
+for index = 1, 101 do
+  module.char.instances["id:" .. index .. ":0"] = {
+    instanceID = index, name = "Instance " .. index, instanceType = "party",
+    difficultyID = 0, mapID = 0, kills = 1, xp = 0, sessionKills = 0,
+    sessionXP = 0, killsAtLevel = {}, firstSeen = 0, lastSeen = index,
+  }
+end
+local cappedInstances = module:NormalizeInstances()
+local cappedCount = 0
+for _ in pairs(cappedInstances) do
+  cappedCount = cappedCount + 1
+end
+assert(cappedCount == 100 and cappedInstances["id:1:0"] == nil
+  and cappedInstances["id:101:0"], "instance cap did not prune correctly")
+local cappedMob = { killsByInstance = {}, killsByInstanceLevel = {} }
+for index = 1, 25 do
+  cappedMob.killsByInstance["id:" .. index .. ":0"] = index
+  cappedMob.killsByInstanceLevel["id:" .. index .. ":0"] = {}
+end
+module:PruneMobInstanceMaps(cappedMob)
+local mobInstanceCount = 0
+for _ in pairs(cappedMob.killsByInstance) do
+  mobInstanceCount = mobInstanceCount + 1
+end
+assert(mobInstanceCount == 20 and cappedMob.killsByInstance["id:1:0"] == nil
+  and cappedMob.killsByInstance["id:25:0"] == 25,
+  "per-mob instance cap did not prune correctly")
+
+-- Cache reuses a complete state and refreshes on a transition.
+module:ResetKills()
+state.inInstance = false
+state.instanceType = nil
+state.mapID = 12
+module:RefreshInstanceState()
+local savedGetInstanceInfo = GetInstanceInfo
+local instanceInfoCalls = 0
+GetInstanceInfo = function(...)
+  instanceInfoCalls = instanceInfoCalls + 1
+  return savedGetInstanceInfo(...)
+end
+module:GetInstanceState()
+assert(instanceInfoCalls == 0, "complete cache re-queried GetInstanceInfo")
+state.inInstance = true
+state.instanceType = "party"
+state.mapID = 947
+state.instanceName = "Cache Test"
+state.instanceMapID = 777
+state.difficultyID = 0
+local cacheState = module:GetInstanceState()
+assert(instanceInfoCalls > 0 and cacheState.inInstance
+  and cacheState.key == "id:777:0", "cache did not refresh on transition")
+GetInstanceInfo = savedGetInstanceInfo
+
+-- Overlapping transition schedules collapse into one query.
+local savedTimerAfter = C_Timer.After
+local scheduled = {}
+C_Timer.After = function(delay, callback)
+  scheduled[#scheduled + 1] = { delay = delay, callback = callback }
+end
+instanceInfoCalls = 0
+savedGetInstanceInfo = GetInstanceInfo
+GetInstanceInfo = function(...)
+  instanceInfoCalls = instanceInfoCalls + 1
+  return savedGetInstanceInfo(...)
+end
+module:ScheduleInstanceStateRefresh(0.75)
+module:ScheduleInstanceStateRefresh(0.75)
+assert(#scheduled == 2, "instance refresh was not scheduled")
+scheduled[1].callback()
+scheduled[2].callback()
+assert(instanceInfoCalls == 1, "overlapping instance refreshes queried twice")
+GetInstanceInfo = savedGetInstanceInfo
+C_Timer.After = savedTimerAfter
+
+-- Context keys separate instances without changing open-world keys.
+local formula = module.Formula
+local baseContext = formula.ContextKey(10, 10, 1, 12, "normal", "none")
+local instanceContext = formula.ContextKey(10, 10, 1, 0, "normal", "none", "id:1:0")
+assert(baseContext ~= instanceContext
+  and not baseContext:find("-i", 1, true), "instance context key mismatch")
+
+-- G-4b: heatmap collection gate, disabled tab state, event registration.
+module:ResetKills()
+local heatGateSettings = module:GetSettings()
+heatGateSettings.heatmapEnabled = true
+heatGateSettings.showHeatmap = true
+module:RefreshHeatmapEventRegistration()
+assert(heatGateSettings.heatmapEnabled == true, "heatmap collection default mismatch")
+assert(module.explorationEventAvailable == true,
+  "exploration event was not registered while collection is enabled")
+module:OpenUI()
+module:SetTab("heatmap")
+module:RefreshHeatmap()
+
+heatGateSettings.heatmapEnabled = false
+module:RefreshHeatmapEventRegistration()
+assert(module.explorationEventAvailable == false,
+  "exploration event was not unregistered when collection was disabled")
+module:RefreshHeatmap()
+local disabledHeatmap = module.ui and module.ui.heatmap
+assert(disabledHeatmap and disabledHeatmap.noData:IsShown()
+  and (disabledHeatmap.noData.text or ""):find("disabled", 1, true),
+  "heatmap tab did not show the disabled state")
+assert(not disabledHeatmap.grid:IsShown() and not disabledHeatmap.legend:IsShown(),
+  "disabled heatmap still showed the grid")
+assert(module.tab == "heatmap", "disabling collection switched away from the tab")
+assert(module:RecordHeatmapKill(12, 0.25, 0.75) == false,
+  "disabled collection still recorded a heatmap kill")
+assert(next(module.char.heatmaps or {}) == nil,
+  "disabled collection wrote heatmap data")
+local disabledStats = module:GetDataStats()
+assert(disabledStats.heatmapEnabled == false
+  and type(disabledStats.estimatedHeatmapBytes) == "number",
+  "diagnostics did not report disabled heatmap collection")
+
+heatGateSettings.heatmapEnabled = true
+module:RefreshHeatmapEventRegistration()
+assert(module.explorationEventAvailable == true,
+  "exploration event was not restored when collection was enabled")
+assert(module:RecordHeatmapKill(12, 0.25, 0.75) == true,
+  "enabled collection did not record a heatmap kill")
+
+module:ClearHeatmaps()
+assert(next(module.char.heatmaps or {}) == nil, "clear did not remove heatmap data")
+assert(module:GetDataStats().heatmapZones == 0, "clear did not update diagnostics")
+module:RefreshHeatmap()
+assert(disabledHeatmap.noData:IsShown(), "cleared heatmap did not show empty state")
+
+heatGateSettings.heatmapEnabled = true
+heatGateSettings.showHeatmap = true
+module:RefreshHeatmapEventRegistration()
+
+-- Restore open-world fixture state for the remaining tests.
+state.inInstance = false
+state.instanceType = nil
+state.instanceName = nil
+state.instanceMapID = nil
+state.difficultyID = 0
+state.mapID = 12
+module:RefreshInstanceState()
+
 local savedNamePlate = C_NamePlate
 local savedNamePlateAvailable = module.namePlateEventAvailable
 local savedShowNameplateLevel = module:GetSettings().showNameplateLevel

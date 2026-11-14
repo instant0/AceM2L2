@@ -10,6 +10,11 @@ local Util = XPTooltip.Util
 local min, max = math.min, math.max
 local CALIBRATION_VERSION = Util.CALIBRATION_VERSION
 local MAX_MOBS = Util.MAX_MOBS
+local MAX_INSTANCE_RECORDS = Util.MAX_INSTANCE_RECORDS or 100
+local MAX_MOB_INSTANCES = Util.MAX_MOB_INSTANCES or 20
+local INSTANCE_NAME_MAX = Util.INSTANCE_NAME_MAX or 80
+local INSTANCE_KEY_MAX = Util.INSTANCE_KEY_MAX or 120
+local IsAttributableMapID = Util.IsAttributableMapID
 local Lower = Util.Lower
 local CopyTable = Util.CopyTable
 local EnsureNumberMap = Util.EnsureNumberMap
@@ -17,6 +22,8 @@ local Epoch = Util.Epoch
 local SafeCall = Util.SafeCall
 local SafeNumber = Util.SafeNumber
 local SafeString = Util.SafeString
+
+local PruneMobInstanceMaps
 
 local STORAGE_SCHEMA = 2
 local CLIENT_DATA_SCHEMA = 1
@@ -44,6 +51,7 @@ local function NewEmptyClientData()
     deaths = {},
     respawns = {},
     heatmaps = {},
+    instances = {},
     areas = {},
     levels = {},
     areaLevels = {},
@@ -51,7 +59,11 @@ local function NewEmptyClientData()
     calibrationVersion = CALIBRATION_VERSION,
     totals = { kills = 0, xp = 0, uniqueMobs = 0 },
     session = { startedAt = 0, kills = 0, xp = 0 },
-    dungeon = { xp = 0, kills = 0, sessionXP = 0, sessionKills = 0, lastInstance = 0 },
+    dungeon = {
+      xp = 0, kills = 0, sessionXP = 0, sessionKills = 0,
+      lastInstance = 0, lastInstanceKey = nil, lastInstanceName = nil,
+      lastInstanceID = 0, lastDifficultyID = 0,
+    },
     goal = { targetLevel = 0, targetXP = 0, createdAt = 0 },
     economy = {
       lootValue = 0,
@@ -82,14 +94,110 @@ end
 -- Dungeon totals are a self-contained bucket. Rebuild only the five supported
 -- fields so stale or unknown keys never survive a load. Counters and the last
 -- instance map are finite and non-negative.
+local function SanitizeInstanceName(value)
+  local text = SafeString(value)
+  if not text then
+    return nil
+  end
+  text = text:gsub("[%c]", " ")
+  text = text:gsub("%s+", " ")
+  text = text:match("^%s*(.-)%s*$") or ""
+  if text == "" then
+    return nil
+  end
+  if #text > INSTANCE_NAME_MAX then
+    text = text:sub(1, INSTANCE_NAME_MAX)
+  end
+  return text
+end
+
+local function SanitizeInstanceKey(value)
+  local text = SafeString(value)
+  if not text or text == "" then
+    return nil
+  end
+  if #text > INSTANCE_KEY_MAX then
+    text = text:sub(1, INSTANCE_KEY_MAX)
+  end
+  return text
+end
+
+local function NormalizeInstanceRecord(source)
+  local entry = type(source) == "table" and source or {}
+  local mapID = NonNegativeFinite(entry.mapID)
+  if mapID > 0 and IsAttributableMapID and not IsAttributableMapID(mapID) then
+    mapID = 0
+  end
+  local instanceType = SafeString(entry.instanceType) or "unknown"
+  instanceType = Lower(instanceType) or "unknown"
+  if instanceType ~= "party" and instanceType ~= "raid"
+    and instanceType ~= "scenario" and instanceType ~= "pvp"
+    and instanceType ~= "arena" then
+    instanceType = "unknown"
+  end
+  return {
+    instanceID = NonNegativeFinite(entry.instanceID),
+    name = SanitizeInstanceName(entry.name) or "Unknown instance",
+    instanceType = instanceType,
+    difficultyID = NonNegativeFinite(entry.difficultyID),
+    mapID = mapID,
+    kills = NonNegativeFinite(entry.kills),
+    xp = NonNegativeFinite(entry.xp),
+    sessionKills = NonNegativeFinite(entry.sessionKills),
+    sessionXP = NonNegativeFinite(entry.sessionXP),
+    killsAtLevel = EnsureNumberMap(entry.killsAtLevel),
+    firstSeen = NonNegativeFinite(entry.firstSeen),
+    lastSeen = NonNegativeFinite(entry.lastSeen),
+    legacy = entry.legacy == true,
+  }
+end
+
+local function NormalizeInstances(value)
+  local source = type(value) == "table" and value or {}
+  local list = {}
+  for key, entry in pairs(source) do
+    local safeKey = SanitizeInstanceKey(key)
+    if safeKey and type(entry) == "table" then
+      local normalized = NormalizeInstanceRecord(entry)
+      normalized.key = safeKey
+      if normalized.kills > 0 or normalized.xp > 0 or normalized.name ~= "Unknown instance" then
+        list[#list + 1] = normalized
+      end
+    end
+  end
+  table.sort(list, function(a, b)
+    if a.lastSeen ~= b.lastSeen then
+      return a.lastSeen > b.lastSeen
+    end
+    if a.kills ~= b.kills then
+      return a.kills > b.kills
+    end
+    return a.key < b.key
+  end)
+  local result = {}
+  for index = 1, min(#list, MAX_INSTANCE_RECORDS) do
+    local entry = list[index]
+    result[entry.key] = entry
+  end
+  return result
+end
+
 local function NormalizeDungeon(value)
   local source = type(value) == "table" and value or {}
+  local lastInstance = NonNegativeFinite(source.lastInstance)
+  if lastInstance > 0 and IsAttributableMapID and not IsAttributableMapID(lastInstance) then
+    lastInstance = 0
+  end
   return {
     xp = NonNegativeFinite(source.xp),
     kills = NonNegativeFinite(source.kills),
     sessionXP = NonNegativeFinite(source.sessionXP),
     sessionKills = NonNegativeFinite(source.sessionKills),
-    lastInstance = NonNegativeFinite(source.lastInstance),
+    lastInstance = lastInstance,
+    lastInstanceKey = SanitizeInstanceKey(source.lastInstanceKey),
+    lastInstanceName = SanitizeInstanceName(source.lastInstanceName),
+    lastInstanceID = NonNegativeFinite(source.lastInstanceID),
+    lastDifficultyID = NonNegativeFinite(source.lastDifficultyID),
   }
 end
 
@@ -133,6 +241,15 @@ local function NormalizeDungeonInPlace(db)
   local existing = type(db.dungeon) == "table" and db.dungeon or {}
   db.dungeon = ReplaceTableContents(existing, NormalizeDungeon(existing))
   return db.dungeon
+end
+
+local function NormalizeInstancesInPlace(db)
+  if type(db) ~= "table" then
+    return nil
+  end
+  local existing = type(db.instances) == "table" and db.instances or {}
+  db.instances = ReplaceTableContents(existing, NormalizeInstances(existing))
+  return db.instances
 end
 
 local function NormalizeEconomyInPlace(db)
@@ -213,6 +330,135 @@ end
 -- corresponding client bucket in place and returns the normalized result.
 function XPTooltip:NormalizeDungeon()
   return NormalizeDungeonInPlace(self.char)
+end
+
+function XPTooltip:NormalizeInstances()
+  return NormalizeInstancesInPlace(self.char)
+end
+
+function XPTooltip:PruneInstances()
+  if type(self.char) ~= "table" then
+    return nil
+  end
+  self.char.instances = NormalizeInstances(self.char.instances)
+  return self.char.instances
+end
+
+function XPTooltip:PruneMobInstanceMaps(mob)
+  PruneMobInstanceMaps(mob)
+end
+
+function XPTooltip:MigrateInstanceAttribution(db)
+  if type(db) ~= "table" or db.instanceMigration == 1 then
+    return false
+  end
+  db.instances = type(db.instances) == "table" and db.instances or {}
+  db.areas = EnsureNumberMap(db.areas)
+  db.areaLevels = EnsureNumberMap(db.areaLevels)
+  local migrated = false
+
+  for mapKey, kills in pairs(db.areas or {}) do
+    local mapID = tonumber(mapKey)
+    local count = tonumber(kills) or 0
+    if mapID and count > 0 and not IsAttributableMapID(mapID) then
+      local key = "legacy:" .. tostring(mapID)
+      local entry = db.instances[key]
+      if type(entry) ~= "table" then
+        entry = {
+          instanceID = 0,
+          name = "Unattributed instance (map " .. tostring(mapID) .. ")",
+          instanceType = "unknown",
+          difficultyID = 0,
+          mapID = 0,
+          kills = 0,
+          xp = 0,
+          sessionKills = 0,
+          sessionXP = 0,
+          killsAtLevel = {},
+          firstSeen = 0,
+          lastSeen = 0,
+          legacy = true,
+        }
+        db.instances[key] = entry
+      end
+      entry.kills = (tonumber(entry.kills) or 0) + count
+      local levels = db.areaLevels and db.areaLevels[mapKey]
+      if type(levels) == "table" then
+        entry.killsAtLevel = EnsureNumberMap(entry.killsAtLevel)
+        for levelKey, levelCount in pairs(levels) do
+          entry.killsAtLevel[levelKey] =
+            (tonumber(entry.killsAtLevel[levelKey]) or 0) + (tonumber(levelCount) or 0)
+        end
+      end
+      db.areas[mapKey] = nil
+      if type(db.areaLevels) == "table" then
+        db.areaLevels[mapKey] = nil
+      end
+      migrated = true
+    end
+  end
+
+  for mapKey in pairs(db.areaLevels or {}) do
+    local mapID = tonumber(mapKey)
+    if mapID and not IsAttributableMapID(mapID) and not db.areas[mapKey] then
+      db.areaLevels[mapKey] = nil
+    end
+  end
+
+  for _, mob in pairs(db.mobs or {}) do
+    if type(mob) == "table" then
+      mob.killsByInstance = EnsureNumberMap(mob.killsByInstance)
+      mob.killsByInstanceLevel = EnsureNumberMap(mob.killsByInstanceLevel)
+      local maps = EnsureNumberMap(mob.killsByMap)
+      mob.killsByMap = maps
+      for mapKey, count in pairs(maps) do
+        local mapID = tonumber(mapKey)
+        if mapID and not IsAttributableMapID(mapID) then
+          local key = "legacy:" .. tostring(mapID)
+          mob.killsByInstance[key] =
+            (tonumber(mob.killsByInstance[key]) or 0) + (tonumber(count) or 0)
+          maps[mapKey] = nil
+          migrated = true
+        end
+      end
+      local joint = EnsureNumberMap(mob.killsByAreaLevel)
+      mob.killsByAreaLevel = joint
+      for mapKey, byLevel in pairs(joint) do
+        local mapID = tonumber(mapKey)
+        if mapID and not IsAttributableMapID(mapID) and type(byLevel) == "table" then
+          local key = "legacy:" .. tostring(mapID)
+          local target = mob.killsByInstanceLevel[key]
+          if type(target) ~= "table" then
+            target = {}
+            mob.killsByInstanceLevel[key] = target
+          end
+          for levelKey, levelCount in pairs(byLevel) do
+            target[levelKey] = (tonumber(target[levelKey]) or 0) + (tonumber(levelCount) or 0)
+          end
+          joint[mapKey] = nil
+          migrated = true
+        end
+      end
+      PruneMobInstanceMaps(mob)
+    end
+  end
+
+  local dungeon = db.dungeon
+  if type(dungeon) == "table" then
+    local lastInstance = tonumber(dungeon.lastInstance) or 0
+    if lastInstance > 0 and not IsAttributableMapID(lastInstance) then
+      dungeon.lastInstanceKey = "legacy:" .. tostring(lastInstance)
+      dungeon.lastInstanceName =
+        "Unattributed instance (map " .. tostring(lastInstance) .. ")"
+      dungeon.lastInstanceID = 0
+      dungeon.lastInstance = 0
+      migrated = true
+    end
+  end
+
+  NormalizeInstancesInPlace(db)
+  db.instanceMigration = 1
+  return migrated
 end
 
 function XPTooltip:NormalizeEconomy()
@@ -398,6 +644,7 @@ function XPTooltip:EnsureDB()
   db.deaths = type(db.deaths) == "table" and db.deaths or {}
   db.respawns = type(db.respawns) == "table" and db.respawns or {}
   db.heatmaps = type(db.heatmaps) == "table" and db.heatmaps or {}
+  db.instances = NormalizeInstances(db.instances)
 
   -- 1.10.x and early 1.11.x could persist inflated multiplicative
   -- calibration ratios. Discard them once, keep observations and kill counts.
@@ -421,6 +668,9 @@ function XPTooltip:EnsureDB()
   db.calibration.mobs = EnsureNumberMap(db.calibration.mobs)
 
   self.char = db
+  if type(self.MigrateInstanceAttribution) == "function" then
+    self:MigrateInstanceAttribution(db)
+  end
   -- Accounting, world, and goal buckets are normalized once the active
   -- character is in place.
   self:NormalizeAccounting()
@@ -750,12 +1000,29 @@ local function SubtractMobBreakdown(db, mob)
   db.levels = EnsureNumberMap(db.levels)
   db.areas = EnsureNumberMap(db.areas)
   db.areaLevels = EnsureNumberMap(db.areaLevels)
+  db.instances = EnsureNumberMap(db.instances)
 
   for levelKey, count in pairs(EnsureNumberMap(mob.killsAtLevel)) do
     db.levels[levelKey] = max(0, (tonumber(db.levels[levelKey]) or 0) - (tonumber(count) or 0))
   end
   for mapKey, count in pairs(EnsureNumberMap(mob.killsByMap)) do
     db.areas[mapKey] = max(0, (tonumber(db.areas[mapKey]) or 0) - (tonumber(count) or 0))
+  end
+  for instanceKey, count in pairs(EnsureNumberMap(mob.killsByInstance)) do
+    local entry = db.instances[instanceKey]
+    if type(entry) == "table" then
+      entry.kills = max(0, (tonumber(entry.kills) or 0) - (tonumber(count) or 0))
+    end
+  end
+  for instanceKey, byLevel in pairs(EnsureNumberMap(mob.killsByInstanceLevel)) do
+    local entry = db.instances[instanceKey]
+    if type(entry) == "table" and type(byLevel) == "table" then
+      entry.killsAtLevel = EnsureNumberMap(entry.killsAtLevel)
+      for levelKey, count in pairs(byLevel) do
+        entry.killsAtLevel[levelKey] =
+          max(0, (tonumber(entry.killsAtLevel[levelKey]) or 0) - (tonumber(count) or 0))
+      end
+    end
   end
 
   local joint = EnsureNumberMap(mob.killsByAreaLevel)
@@ -926,6 +1193,8 @@ function XPTooltip:MergeMobEntries(fromKey, toKey, historical)
       to.killsAtLevel = CopyTable(EnsureNumberMap(from.killsAtLevel))
       to.killsByMap = CopyTable(EnsureNumberMap(from.killsByMap))
       to.killsByAreaLevel = CopyTable(EnsureNumberMap(from.killsByAreaLevel))
+      to.killsByInstance = CopyTable(EnsureNumberMap(from.killsByInstance))
+      to.killsByInstanceLevel = CopyTable(EnsureNumberMap(from.killsByInstanceLevel))
     else
       to.kills = toKills
       to.sessionKills = toSessionKills
@@ -977,12 +1246,20 @@ function XPTooltip:MergeMobEntries(fromKey, toKey, historical)
     local toMaps = EnsureNumberMap(to.killsByMap)
     local fromJoint = EnsureNumberMap(from.killsByAreaLevel)
     local toJoint = EnsureNumberMap(to.killsByAreaLevel)
+    local fromInstances = EnsureNumberMap(from.killsByInstance)
+    local toInstances = EnsureNumberMap(to.killsByInstance)
+    local fromInstanceLevels = EnsureNumberMap(from.killsByInstanceLevel)
+    local toInstanceLevels = EnsureNumberMap(to.killsByInstanceLevel)
     from.killsAtLevel = fromLevels
     to.killsAtLevel = toLevels
     from.killsByMap = fromMaps
     to.killsByMap = toMaps
     from.killsByAreaLevel = fromJoint
     to.killsByAreaLevel = toJoint
+    from.killsByInstance = fromInstances
+    to.killsByInstance = toInstances
+    from.killsByInstanceLevel = fromInstanceLevels
+    to.killsByInstanceLevel = toInstanceLevels
 
     local fromTotalXP = EffectiveTotalXP(from)
     local toTotalXP = EffectiveTotalXP(to)
@@ -1001,6 +1278,23 @@ function XPTooltip:MergeMobEntries(fromKey, toKey, historical)
     for mapKey, value in pairs(fromMaps) do
       toMaps[mapKey] = (tonumber(toMaps[mapKey]) or 0) + (tonumber(value) or 0)
     end
+    for instanceKey, value in pairs(fromInstances) do
+      toInstances[instanceKey] =
+        (tonumber(toInstances[instanceKey]) or 0) + (tonumber(value) or 0)
+    end
+    for instanceKey, byLevel in pairs(fromInstanceLevels) do
+      if type(byLevel) == "table" then
+        local target = toInstanceLevels[instanceKey]
+        if type(target) ~= "table" then
+          target = {}
+          toInstanceLevels[instanceKey] = target
+        end
+        for levelKey, value in pairs(byLevel) do
+          target[levelKey] = (tonumber(target[levelKey]) or 0) + (tonumber(value) or 0)
+        end
+      end
+    end
+
     for mapKey, byLevel in pairs(fromJoint) do
       if type(byLevel) == "table" then
         local targetByLevel = toJoint[mapKey]
@@ -1140,6 +1434,41 @@ function XPTooltip:ConsolidateNameOnlyMobs()
   return merged
 end
 
+PruneMobInstanceMaps = function(mob)
+  if type(mob) ~= "table" then
+    return
+  end
+  local counts = EnsureNumberMap(mob.killsByInstance)
+  local levels = EnsureNumberMap(mob.killsByInstanceLevel)
+  mob.killsByInstance = counts
+  mob.killsByInstanceLevel = levels
+  local keys = {}
+  for key in pairs(counts) do
+    keys[#keys + 1] = key
+  end
+  for key in pairs(levels) do
+    if counts[key] == nil then
+      keys[#keys + 1] = key
+    end
+  end
+  if #keys <= MAX_MOB_INSTANCES then
+    return
+  end
+  table.sort(keys, function(a, b)
+    local aCount = tonumber(counts[a]) or 0
+    local bCount = tonumber(counts[b]) or 0
+    if aCount ~= bCount then
+      return aCount > bCount
+    end
+    return tostring(a) > tostring(b)
+  end)
+  for index = MAX_MOB_INSTANCES + 1, #keys do
+    local key = keys[index]
+    counts[key] = nil
+    levels[key] = nil
+  end
+end
+
 function XPTooltip:NormalizeMobFields(mob)
   if type(mob) ~= "table" then
     return mob
@@ -1152,6 +1481,9 @@ function XPTooltip:NormalizeMobFields(mob)
   mob.killsAtLevel = EnsureNumberMap(mob.killsAtLevel)
   mob.killsByMap = EnsureNumberMap(mob.killsByMap)
   mob.killsByAreaLevel = EnsureNumberMap(mob.killsByAreaLevel)
+  mob.killsByInstance = EnsureNumberMap(mob.killsByInstance)
+  mob.killsByInstanceLevel = EnsureNumberMap(mob.killsByInstanceLevel)
+  PruneMobInstanceMaps(mob)
   mob.contexts = EnsureNumberMap(mob.contexts)
   return mob
 end
@@ -1391,6 +1723,8 @@ function XPTooltip:EnsureMob(mobKey, name, npcID, classification)
       killsAtLevel = {},
       killsByMap = {},
       killsByAreaLevel = {},
+      killsByInstance = {},
+      killsByInstanceLevel = {},
       contexts = {},
       xp = { samples = 0, sumBase = 0, sumBuffed = 0, sumTotal = 0, minBase = 0, maxBase = 0, lastBase = 0, lastTotal = 0 },
     }

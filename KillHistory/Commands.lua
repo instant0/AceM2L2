@@ -17,6 +17,7 @@ local Lower = Util.Lower
 local IsSecret = Util.IsSecret
 local SafeCall = Util.SafeCall
 local SafeBool = Util.SafeBool
+local IsAttributableMapID = Util.IsAttributableMapID
 local FormatNumber = Util.FormatNumber
 local FormatPercent = Util.FormatPercent
 local FormatAgo = Util.FormatAgo
@@ -462,8 +463,21 @@ function XPTooltip:PrintAreas()
   local total = tonumber(db.totals and db.totals.kills) or 0
   local list = {}
   for mapKey, kills in pairs(db.areas or {}) do
-    if (tonumber(kills) or 0) > 0 then
-      list[#list + 1] = { mapID = mapKey, kills = tonumber(kills) or 0 }
+    if (not IsAttributableMapID or IsAttributableMapID(mapKey))
+      and (tonumber(kills) or 0) > 0 then
+      list[#list + 1] = {
+        mapID = mapKey, kills = tonumber(kills) or 0,
+        label = self:GetMapName(mapKey),
+      }
+    end
+  end
+  for instanceKey, instance in pairs(db.instances or {}) do
+    if type(instance) == "table" and (tonumber(instance.kills) or 0) > 0 then
+      list[#list + 1] = {
+        instanceKey = instanceKey,
+        kills = tonumber(instance.kills) or 0,
+        label = instance.name or "Unknown instance",
+      }
     end
   end
   table.sort(list, function(a, b) return a.kills > b.kills end)
@@ -476,7 +490,7 @@ function XPTooltip:PrintAreas()
     local entry = list[index]
     local percent = total > 0 and (entry.kills / total * 100) or 0
     AceM2L2:SafePrint(string.format(
-      "  %-30s %8s  (%.1f%%)", self:GetMapName(entry.mapID), FormatNumber(entry.kills), percent
+      "  %-30s %8s  (%.1f%%)", entry.label, FormatNumber(entry.kills), percent
     ))
   end
 end
@@ -549,8 +563,11 @@ function XPTooltip:PrintDungeon()
         .. FormatPercent(xp / totalXP * 100) .. " of total")
     end
   end
+  local lastInstanceName = dungeon.lastInstanceName
   local lastInstance = tonumber(dungeon.lastInstance) or 0
-  if lastInstance > 0 then
+  if type(lastInstanceName) == "string" and lastInstanceName ~= "" then
+    AceM2L2:SafePrint("  Last instance: " .. lastInstanceName)
+  elseif lastInstance > 0 then
     AceM2L2:SafePrint("  Last instance: " .. self:GetMapName(lastInstance))
   end
 end
@@ -665,9 +682,16 @@ function XPTooltip:PrintStats()
   end
 
   local areaCount = 0
-  for _, kills in pairs(db.areas or {}) do
-    if (tonumber(kills) or 0) > 0 then
+  for mapKey, kills in pairs(db.areas or {}) do
+    if (not IsAttributableMapID or IsAttributableMapID(mapKey))
+      and (tonumber(kills) or 0) > 0 then
       areaCount = areaCount + 1
+    end
+  end
+  local instanceCount = 0
+  for _, instance in pairs(db.instances or {}) do
+    if type(instance) == "table" and (tonumber(instance.kills) or 0) > 0 then
+      instanceCount = instanceCount + 1
     end
   end
 
@@ -688,6 +712,7 @@ function XPTooltip:PrintStats()
   end
   AceM2L2:SafePrint("  DB: mobs=" .. FormatNumber(mobCount)
     .. ", areas=" .. FormatNumber(areaCount)
+    .. ", instances=" .. FormatNumber(instanceCount)
     .. ", levels=" .. FormatNumber(levelCount)
     .. ", sessionKills=" .. FormatNumber(db.session.kills or 0))
 
@@ -799,13 +824,18 @@ function XPTooltip:ResetKills()
   db.mobs = {}
   db.quests = {}
   db.areas = {}
+  db.instances = {}
   db.levels = {}
   db.areaLevels = {}
   db.calibration = { zones = {}, levels = {}, groups = {}, classes = {}, mobs = {} }
   db.calibrationVersion = CALIBRATION_VERSION
   db.totals = { kills = 0, xp = 0, uniqueMobs = 0 }
   db.session = { startedAt = Epoch(), kills = 0, xp = 0 }
-  db.dungeon = { xp = 0, kills = 0, sessionXP = 0, sessionKills = 0, lastInstance = 0 }
+  db.dungeon = {
+    xp = 0, kills = 0, sessionXP = 0, sessionKills = 0,
+    lastInstance = 0, lastInstanceKey = nil, lastInstanceName = nil,
+    lastInstanceID = 0, lastDifficultyID = 0,
+  }
   db.goal = { targetLevel = 0, targetXP = 0, createdAt = 0 }
   db.levelHistory = {}
   db.deaths = {}
@@ -981,7 +1011,7 @@ function XPTooltip:PrintHelp()
   AceM2L2:SafePrint("/acem2l2 xpt splits")
   AceM2L2:SafePrint("/acem2l2 xpt economy")
   AceM2L2:SafePrint("/acem2l2 xpt areas")
-  AceM2L2:SafePrint("/acem2l2 xpt heatmap [zone]")
+  AceM2L2:SafePrint("/acem2l2 xpt heatmap [zone|clear]")
   AceM2L2:SafePrint("/acem2l2 xpt levels")
   AceM2L2:SafePrint("/acem2l2 xpt session")
   AceM2L2:SafePrint("/acem2l2 xpt dungeon")

@@ -42,6 +42,7 @@ local XPTOOLTIP_DEFAULTS = {
   showGearUpgrades = true,
   showGrindingSpot = true,
   showHeatmap = true,
+  heatmapEnabled = true,
   revealUnexplored = true,
   heatmapIntensity = 100,
   heatmapWarmColors = false,

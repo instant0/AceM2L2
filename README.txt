@@ -4,7 +4,7 @@ Ace Mobs 2 Level 2 (AceM2L2)
 XP, reputation, and Kill Story
 
 Author:     faslkjd56
-Version:    2.4.4
+Version:    2.5.0
 GameVer.:   Midnight 12.1.5 (Retail) / Forever 1.60.1 (Classic+)
 _____________________________________________________________________________________
 
@@ -45,9 +45,12 @@ Heatmap
   in Settings > Heatmap.
 - Zone paging, map-art fallback, and a Low-to-High gradient legend with the
   zone total.
+- Heatmap collection can be disabled in Settings > Heatmap. The tab stays
+  visible with a disabled message, and existing data can be cleared separately.
 
 Data insights
 - Kill counts by mob, area, level, and session.
+- Dungeon kills are attributed to the instance name instead of a world map.
 - Data diagnostics: middle-click the minimap icon or use
   `/acem2l2 xpt data` to see tracked counts, limits, heatmap cells, and an
   estimated store size.

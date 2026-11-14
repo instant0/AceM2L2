@@ -90,6 +90,16 @@ and keeps the non-XP history; nameplate levels are Midnight-only.
 
 ## Changelog
 
+### 2.5.0
+
+- Dungeon kills are attributed to the instance (name, map, difficulty) instead
+  of a world-map fallback such as Azeroth.
+- Historical instance data stored under a world map is migrated to an honest
+  unattributed-instance record with its level breakdown preserved.
+- Added a heatmap collection switch. Disabling it stops capture, event work,
+  normalization, and new saving; the Heatmap tab stays visible with a disabled
+  message and stored data can be cleared explicitly.
+
 ### 2.4.4
 
 - Heatmaps now use a multi-stop gradient (theme accent to gold to red) instead

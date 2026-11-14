@@ -13,6 +13,10 @@ local MAX_MOBS = 2000
 local CALIBRATION_VERSION = 2
 local MAX_CONTEXTS_PER_MOB = 12
 local MAX_PENDING_DEATHS = 50
+local MAX_INSTANCE_RECORDS = 100
+local MAX_MOB_INSTANCES = 20
+local INSTANCE_NAME_MAX = 80
+local INSTANCE_KEY_MAX = 120
 local CONTEXT_MAX_AGE = 120 * 86400
 local ROW_HEIGHT = 28
 local VISIBLE_ROWS = 13
@@ -245,6 +249,10 @@ Util.MAX_MOBS = MAX_MOBS
 Util.CALIBRATION_VERSION = CALIBRATION_VERSION
 Util.MAX_CONTEXTS_PER_MOB = MAX_CONTEXTS_PER_MOB
 Util.MAX_PENDING_DEATHS = MAX_PENDING_DEATHS
+Util.MAX_INSTANCE_RECORDS = MAX_INSTANCE_RECORDS
+Util.MAX_MOB_INSTANCES = MAX_MOB_INSTANCES
+Util.INSTANCE_NAME_MAX = INSTANCE_NAME_MAX
+Util.INSTANCE_KEY_MAX = INSTANCE_KEY_MAX
 Util.CONTEXT_MAX_AGE = CONTEXT_MAX_AGE
 Util.ROW_HEIGHT = ROW_HEIGHT
 Util.VISIBLE_ROWS = VISIBLE_ROWS
@@ -459,6 +467,237 @@ local function ReadMapPosition(mapID)
   return x, y
 end
 
+
+--[[--------------------------------------------------------------------------------
+  Instance identity
+------------------------------------------------------------------------------------]]
+
+local VALID_INSTANCE_TYPES = {
+  party = true, raid = true, scenario = true, pvp = true, arena = true,
+  unknown = true,
+}
+
+local function IsAttributableMapID(mapID)
+  local id = tonumber(mapID)
+  if not id or id <= 0 then
+    return false
+  end
+  if not C_Map or type(C_Map.GetMapInfo) ~= "function" then
+    -- Legacy clients without C_Map: keep the old permissive behavior.
+    return true
+  end
+  local info = SafeCall(C_Map.GetMapInfo, id)
+  if type(info) ~= "table" then
+    return true
+  end
+  local mapType = SafeNumber(info.mapType)
+  if not mapType then
+    return true
+  end
+  return mapType == 3 or mapType == 4
+end
+
+local function NormalizeInstanceType(value)
+  local kind = Lower(value)
+  if kind and VALID_INSTANCE_TYPES[kind] then
+    return kind
+  end
+  return nil
+end
+
+local function GetInstanceInfoSafe()
+  if type(GetInstanceInfo) ~= "function" then
+    return nil
+  end
+  local ok, name, instanceType, difficultyID, _, _, _, _, instanceMapID = pcall(GetInstanceInfo)
+  if not ok then
+    return nil
+  end
+  local result = {
+    name = SafeString(name),
+    instanceType = SafeString(instanceType),
+    difficultyID = SafeNumber(difficultyID),
+    instanceID = SafeNumber(instanceMapID),
+  }
+  if result.name == "" then
+    result.name = nil
+  end
+  return result
+end
+
+local function BuildInstanceKey(name, instanceID, difficultyID)
+  local id = tonumber(instanceID) or 0
+  local difficulty = floor(tonumber(difficultyID) or 0)
+  if id > 0 then
+    return string.format("id:%d:%d", id, difficulty)
+  end
+  local lower = Lower(name) or ""
+  if lower ~= "" then
+    local key = "name:" .. lower
+    if #key > INSTANCE_KEY_MAX then
+      key = key:sub(1, INSTANCE_KEY_MAX)
+    end
+    return key
+  end
+  return "unknown"
+end
+
+local function CopyInstanceState(state)
+  if type(state) ~= "table" then
+    return {
+      inInstance = false,
+      inDungeon = false,
+      instanceType = "none",
+      instanceID = 0,
+      difficultyID = 0,
+      mapID = 0,
+      name = nil,
+      key = nil,
+    }
+  end
+  return {
+    inInstance = state.inInstance == true,
+    inDungeon = state.inDungeon == true,
+    instanceType = state.instanceType or "none",
+    instanceID = tonumber(state.instanceID) or 0,
+    difficultyID = tonumber(state.difficultyID) or 0,
+    mapID = tonumber(state.mapID) or 0,
+    name = state.name,
+    key = state.key,
+  }
+end
+
+function XPTooltip:QueryInstanceState()
+  local rawInInstance, rawType = SafeCall(IsInInstance)
+  local inInstance = SafeBool(rawInInstance)
+  if inInstance == nil then
+    local number = SafeNumber(rawInInstance)
+    if number then
+      inInstance = number ~= 0
+    end
+  end
+
+  local instanceType = NormalizeInstanceType(rawType)
+  local info = GetInstanceInfoSafe()
+  if not instanceType and info then
+    instanceType = NormalizeInstanceType(info.instanceType)
+  end
+  if inInstance == nil then
+    inInstance = instanceType ~= nil
+  end
+  if not inInstance then
+    instanceType = "none"
+  elseif not instanceType then
+    instanceType = "unknown"
+  end
+
+  local name = info and info.name or nil
+  if not name and inInstance then
+    name = SafeString(SafeCall(GetRealZoneText)) or SafeString(SafeCall(GetZoneText))
+  end
+  name = name and Trim(name) or nil
+  if name == "" then
+    name = nil
+  end
+
+  local instanceID = info and info.instanceID or 0
+  local difficultyID = info and info.difficultyID or 0
+  local mapID = self:GetMapID() or 0
+  if mapID > 0 and not IsAttributableMapID(mapID) then
+    mapID = 0
+  end
+
+  local state = {
+    inInstance = inInstance == true,
+    instanceType = instanceType,
+    instanceID = tonumber(instanceID) or 0,
+    difficultyID = tonumber(difficultyID) or 0,
+    mapID = mapID,
+    name = name,
+    key = inInstance and BuildInstanceKey(name, instanceID, difficultyID) or nil,
+    updatedAt = Now(),
+    identityAttemptAt = Now(),
+  }
+  state.inDungeon = state.inInstance
+    and (state.instanceType == "party" or state.instanceType == "raid"
+      or state.instanceType == "scenario")
+  self.instanceState = state
+  return state
+end
+
+function XPTooltip:GetInstanceState(force)
+  local cached = self.instanceState
+  if not cached then
+    return self:QueryInstanceState()
+  end
+  if force then
+    return self:QueryInstanceState()
+  end
+
+  local rawInInstance, rawType = SafeCall(IsInInstance)
+  local inInstance = SafeBool(rawInInstance)
+  if inInstance == nil then
+    local number = SafeNumber(rawInInstance)
+    if number then
+      inInstance = number ~= 0
+    end
+  end
+  if inInstance == nil then
+    -- No readable API this time; keep the last good state.
+    return cached
+  end
+
+  local instanceType = NormalizeInstanceType(rawType)
+  if cached.inInstance ~= inInstance
+    or (instanceType and cached.instanceType ~= instanceType) then
+    return self:QueryInstanceState()
+  end
+
+  if cached.inInstance
+    and ((not cached.name) or (tonumber(cached.instanceID) or 0) <= 0) then
+    local now = Now()
+    if (now - (tonumber(cached.identityAttemptAt) or 0)) > 30 then
+      return self:QueryInstanceState()
+    end
+  end
+  return cached
+end
+
+function XPTooltip:ScheduleInstanceStateRefresh(delay)
+  if not self:IsActive() then
+    return
+  end
+  self.instanceRefreshGeneration = (self.instanceRefreshGeneration or 0) + 1
+  local generation = self.instanceRefreshGeneration
+  local function run()
+    if generation ~= self.instanceRefreshGeneration or not self:IsActive() then
+      return
+    end
+    local ok, err = pcall(self.QueryInstanceState, self)
+    if not ok then
+      self:ReportError("QueryInstanceState", err, false)
+    end
+  end
+  local wait = tonumber(delay) or 0.75
+  if C_Timer and type(C_Timer.After) == "function" then
+    local ok = pcall(C_Timer.After, wait, run)
+    if not ok then
+      run()
+    end
+  else
+    run()
+  end
+end
+
+function XPTooltip:RefreshInstanceState()
+  return self:QueryInstanceState()
+end
+
+Util.IsAttributableMapID = IsAttributableMapID
+Util.GetInstanceInfoSafe = GetInstanceInfoSafe
+Util.BuildInstanceKey = BuildInstanceKey
+Util.CopyInstanceState = CopyInstanceState
+
 local function ResolveZoneMapID(mapID)
   local id = SafeNumber(mapID)
   if not id or id <= 0 then
@@ -510,7 +749,11 @@ function XPTooltip:GetMapID()
   if not mapID or mapID <= 0 then
     return 0
   end
-  return ResolveZoneMapID(mapID)
+  local resolved = ResolveZoneMapID(mapID)
+  if not IsAttributableMapID(resolved) then
+    return 0
+  end
+  return resolved
 end
 
 function XPTooltip:IsInDungeon()

@@ -7,6 +7,7 @@ local AceM2L2 = AceM2L2
 local XPTooltip = AceM2L2.KillHistory
 local UI = XPTooltip.UI
 local Util = XPTooltip.Util
+local IsAttributableMapID = Util.IsAttributableMapID
 
 local floor, min, max = math.floor, math.min, math.max
 local CreateBackdropFrame = UI.CreateBackdropFrame
@@ -137,7 +138,8 @@ function XPTooltip:RefreshOverview()
 
   local topMap, topMapKills = nil, 0
   for mapKey, kills in pairs(db.areas or {}) do
-    if (tonumber(kills) or 0) > topMapKills then
+    if (not IsAttributableMapID or IsAttributableMapID(mapKey))
+      and (tonumber(kills) or 0) > topMapKills then
       topMapKills = tonumber(kills) or 0
       topMap = mapKey
     end

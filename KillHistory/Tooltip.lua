@@ -245,7 +245,11 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
   local mapID = self:GetMapID()
   local groupSize = self:GetGroupSize()
   local buffSignature = self:GetBuffSignature()
-  local contextKey = ContextKey(playerLevel, mobLevel, groupSize, mapID, classification, buffSignature)
+  local state = type(self.GetInstanceState) == "function" and self:GetInstanceState() or nil
+  local contextKey = ContextKey(
+    playerLevel, mobLevel, groupSize, mapID, classification, buffSignature,
+    state and state.key
+  )
 
   local profile = self.clientProfile or self:GetClientProfile()
   local function round(value)

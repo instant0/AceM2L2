@@ -23,13 +23,18 @@ local function Round(value)
   return base
 end
 
-local function ContextKey(playerLevel, mobLevel, groupSize, mapID, classification, buffSignature)
-  return "p" .. tostring(playerLevel)
+local function ContextKey(playerLevel, mobLevel, groupSize, mapID, classification,
+  buffSignature, instanceKey)
+  local key = "p" .. tostring(playerLevel)
     .. "-m" .. tostring(mobLevel)
     .. "-g" .. tostring(groupSize)
     .. "-z" .. tostring(mapID)
     .. "-c" .. tostring(classification)
     .. "-b" .. tostring(buffSignature)
+  if instanceKey and instanceKey ~= "" then
+    key = key .. "-i" .. tostring(instanceKey)
+  end
+  return key
 end
 
 Formula.Round = Round

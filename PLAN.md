@@ -1,7 +1,7 @@
 # AceM2L2 plan
 
 Updated: 2026-11-14  
-Current release: **2.4.4**
+Current release: **2.5.0**
 
 ## Plan map
 
@@ -14,7 +14,7 @@ Current release: **2.4.4**
 | Data diagnostics | Implemented in 2.4.0; static review first | HC-2; V-2 |
 | README feature guide | Completed in 2.4.1 | HC-6 |
 | Documentation claim audit | Completed | — |
-| Scope/grid/limit review | Static/offline analysis first | SC-1..SC-5, G-1..G-4b, A-1, HC-7; V-3 |
+| Scope/grid/limit review | G-4a/G-4b implemented in 2.5.0 | SC-1..SC-5, G-1..G-4b, A-1, HC-7; V-3 |
 | Data storage architecture | Static/offline investigation | DS-1..DS-16; V-2 |
 | Journey overlay | Proposed, after DS | J-1..J-6; V-4 |
 | Cell inspector | Proposed, after DS | M-1..M-6; V-4 |
@@ -326,17 +326,18 @@ size. `MAX_PENDING_DEATHS`, visible rows, grinding thresholds, and
 - [ ] **G-3 — Decide grid.** Keep 64, or implement 96/128 only if the occupancy
       study and frame-cost benchmark pass. A 128 data grid with 64 display
       fallback is allowed only if it has a concrete product benefit.
-- [ ] **G-4a — Instance identity and attribution.** Detect inside/outside
+- [x] **G-4a — Instance identity and attribution.** Implemented in 2.5.0. Detect inside/outside
       dungeon state with `IsInInstance`, cache it from zoning events, store
       instance kills in `db.instances`/`mob.killsByInstance`, stop attributing
       map-less instances to Azeroth (947), and migrate historical world-map
       rows honestly. Ship first.
-      Full specification: `docs/TASK-G-4-INSTANCE-ATTRIBUTION.md`.
-- [ ] **G-4b — Heatmap collection gate.** Add `heatmapEnabled` to stop heatmap
+- [x] **G-4b — Heatmap collection gate.** Implemented in 2.5.0.
+      Add `heatmapEnabled` to stop heatmap
       capture, normalization, event registration, and new saving when off. Keep
       the tab visible with a disabled message; `showHeatmap` remains the
       tab-only control. Ship after G-4a.
-      Full specification: `docs/TASK-G-4-INSTANCE-ATTRIBUTION.md`.
+      Residual live checks: V-2 for instance attribution, legacy migration, and
+      collection persistence; V-1 for the disabled-tab state and event gating.
 - [x] **A-1 — Static alpha-ramp review.** Verified the 2.3.1 alpha-only ramp,
       intensity multiplier, warm palette, theme accent fallback, and cache key.
       Superseded by A-3. Live visual comparison is deferred to V-1.

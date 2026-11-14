@@ -31,6 +31,17 @@ XPTooltip.HEATMAP_CELLS = HEATMAP_CELLS
 XPTooltip.MAX_HEATMAP_MAPS = MAX_HEATMAP_MAPS
 XPTooltip.MAX_HEATMAP_COUNT = MAX_HEATMAP_COUNT
 
+local function IsHeatmapEnabled(owner)
+  if type(owner.GetSettings) ~= "function" then
+    return true
+  end
+  local ok, settings = pcall(owner.GetSettings, owner)
+  if not ok or type(settings) ~= "table" then
+    return true
+  end
+  return settings.heatmapEnabled ~= false
+end
+
 --[[--------------------------------------------------------------------------------
   Validation helpers
 ------------------------------------------------------------------------------------]]
@@ -256,6 +267,9 @@ function XPTooltip:InvalidateHeatmapCache()
 end
 
 function XPTooltip:NormalizeHeatmaps(target)
+  if not IsHeatmapEnabled(self) then
+    return {}
+  end
   if target == nil then
     target = self.char
   end
@@ -338,6 +352,9 @@ end
 -- Return the normalized zones as an ordered list. Both the UI and the print
 -- helper use this list so zones are sorted exactly once.
 function XPTooltip:GetHeatmapZones()
+  if not IsHeatmapEnabled(self) then
+    return {}
+  end
   local heatmaps = self:NormalizeHeatmaps()
   local zones = {}
   for key, entry in pairs(heatmaps) do
@@ -387,7 +404,7 @@ local function DropOldestMap(heatmaps)
 end
 
 function XPTooltip:RecordHeatmapKill(mapID, x, y)
-  if not self:Supports("hasMapPosition") then
+  if not IsHeatmapEnabled(self) or not self:Supports("hasMapPosition") then
     return false
   end
 
@@ -458,7 +475,62 @@ local function ZoneName(owner, mapID)
   return "Map " .. tostring(mapID)
 end
 
+function XPTooltip:ClearHeatmaps()
+  local db = type(self.char) == "table" and self.char or nil
+  if db then
+    db.heatmaps = {}
+  end
+  self:InvalidateHeatmapCache()
+  self.heatmapZoneKey = nil
+  if type(self.RefreshHeatmap) == "function" then
+    pcall(self.RefreshHeatmap, self)
+  end
+  if type(self.RefreshUI) == "function" then
+    pcall(self.RefreshUI, self)
+  end
+  if type(self.RefreshDiagnosticsUI) == "function" then
+    pcall(self.RefreshDiagnosticsUI, self)
+  end
+  return true
+end
+
+function XPTooltip:RequestClearHeatmaps()
+  local function clear()
+    self:ClearHeatmaps()
+  end
+  if type(StaticPopupDialogs) == "table" and type(StaticPopup_Show) == "function" then
+    StaticPopupDialogs["ACEM2L2_CLEAR_HEATMAP"] = {
+      text = "Clear all stored heatmap data for this character?",
+      button1 = YES or "Yes",
+      button2 = NO or "No",
+      OnAccept = clear,
+      timeout = 0,
+      whileDead = true,
+      hideOnEscape = true,
+      preferredIndex = 3,
+    }
+    if pcall(StaticPopup_Show, "ACEM2L2_CLEAR_HEATMAP") then
+      return
+    end
+  end
+  clear()
+end
+
 function XPTooltip:PrintHeatmap(rest)
+  local requested = Trim(rest)
+  if requested and (Lower(requested) or "") == "clear" then
+    if type(self.RequestClearHeatmaps) == "function" then
+      self:RequestClearHeatmaps()
+    else
+      self:ClearHeatmaps()
+    end
+    AceM2L2:SafePrint("Kill Story: heatmap clear requested.")
+    return
+  end
+  if not IsHeatmapEnabled(self) then
+    AceM2L2:SafePrint("Kill Story: heatmap collection is disabled.")
+    return
+  end
   if not self:Supports("hasMapPosition") then
     AceM2L2:SafePrint("Kill Story: heatmap is unavailable on this client.")
     return
@@ -470,7 +542,6 @@ function XPTooltip:PrintHeatmap(rest)
     return
   end
 
-  local requested = Trim(rest)
   if requested == "" then
     requested = nil
   end

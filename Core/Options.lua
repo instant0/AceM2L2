@@ -582,6 +582,45 @@ function AceM2L2:CreateOptionsPanel()
       return
     end
 
+    local heatmapControls = {}
+    local function SetHeatmapControlsEnabled(enabled)
+      for _, control in ipairs(heatmapControls) do
+        if control and type(control.SetEnabled) == "function" then
+          pcall(control.SetEnabled, control, enabled)
+        end
+      end
+    end
+
+    addHeader("Collection")
+
+    addCheckbox(
+      "Enable heatmap collection",
+      "ACEM2L2_XPTOOLTIP_HEATMAP_ENABLED",
+      true,
+      function() return self.db.xpTooltip.heatmapEnabled ~= false end,
+      function(value)
+        local enabled = SanitizeBoolean(value, true)
+        self.db.xpTooltip.heatmapEnabled = enabled
+        if not module then
+          return
+        end
+        if type(module.RefreshHeatmapEventRegistration) == "function" then
+          pcall(module.RefreshHeatmapEventRegistration, module)
+        end
+        if type(module.RefreshHeatmap) == "function" then
+          pcall(module.RefreshHeatmap, module)
+        end
+        if type(module.RefreshUI) == "function" then
+          pcall(module.RefreshUI, module)
+        end
+        if type(module.UpdateTabs) == "function" then
+          pcall(module.UpdateTabs, module)
+        end
+        SetHeatmapControlsEnabled(enabled)
+      end,
+      "Record new heatmap data. Turning this off stops collection and saving; stored data stays until you clear it."
+    )
+
     addHeader("Display")
 
     addCheckbox(
@@ -605,10 +644,10 @@ function AceM2L2:CreateOptionsPanel()
           pcall(module.UpdateTabs, module)
         end
       end,
-      "Show the Heatmap tab in the Kill Story window. Heatmap data is always recorded."
+      "Show the Heatmap tab in the Kill Story window. This does not stop collection."
     )
 
-    addCheckbox(
+    local revealControl = addCheckbox(
       "Reveal unexplored areas",
       "ACEM2L2_XPTOOLTIP_REVEAL_UNEXPLORED",
       true,
@@ -621,8 +660,9 @@ function AceM2L2:CreateOptionsPanel()
       end,
       "Show the full zone map in the heatmap background, including areas this character has not explored."
     )
+    heatmapControls[#heatmapControls + 1] = revealControl
 
-    addSlider(
+    local intensityControl = addSlider(
       "Heatmap intensity",
       "ACEM2L2_XPTOOLTIP_HEATMAP_INTENSITY",
       100,
@@ -638,8 +678,9 @@ function AceM2L2:CreateOptionsPanel()
       end,
       "Adjusts heat contrast. 100 is the default; higher values make hot cells stand out more."
     )
+    heatmapControls[#heatmapControls + 1] = intensityControl
 
-    addCheckbox(
+    local warmControl = addCheckbox(
       "Warm heat colors",
       "ACEM2L2_XPTOOLTIP_HEATMAP_WARM",
       false,
@@ -652,6 +693,8 @@ function AceM2L2:CreateOptionsPanel()
       end,
       "Use a fire palette (amber to red) instead of the theme-accent heat gradient."
     )
+    heatmapControls[#heatmapControls + 1] = warmControl
+    SetHeatmapControlsEnabled(self.db.xpTooltip.heatmapEnabled ~= false)
   end
 
   if useSubcategory("Tooltip") then

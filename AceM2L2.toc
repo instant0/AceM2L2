@@ -5,7 +5,7 @@
 ## Author: faslkjd56
 ## Category: Quests & Leveling
 ## X-Category: Quests & Leveling
-## Version: 2.4.4
+## Version: 2.5.0
 ## SavedVariables: AceM2L2DB
 ## SavedVariablesPerCharacter: AceM2L2CharDB
 ## AddonCompartmentFunc: AceM2L2_OnCompartmentClick

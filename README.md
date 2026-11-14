@@ -5,7 +5,7 @@ and provides a **Kill Story** browser for Forever 1.60.1 and Midnight 12.1.5.
 Forever gets the full XP/tooltip experience; Midnight gets counts-focused
 history plus the non-XP features until its XP data is live-verified.
 
-- **Version:** 2.4.4
+- **Version:** 2.5.0
 - **Author:** faslkjd56
 - **Interfaces:** Midnight `120105`, Forever `16001`
 - **Clients:** Midnight 12.1.5 and Forever 1.60.1
@@ -116,12 +116,14 @@ model. Client-specific policy lives only in `KillHistory/Client.lua` and
 - Session loot value, gold/hour, and gear-upgrade notifications.
 - Death locations, respawn intervals, and grinding-spot recommendations.
 - Overview, Mobs, Areas, Heatmap, and Levels tabs. The Heatmap tab can be
-  hidden while heatmap data keeps recording.
+  hidden independently of collection, and collection can be disabled entirely.
 - Per-zone 64x64 kill heatmap with tiled zone-map art and full generated map
   overlays beneath the grid; empty cells stay hidden so the map remains visible.
   Cells use a multi-stop gradient (theme accent -> gold -> red) so the busiest
   cell is visibly hottest, with a matching legend bar. Heat intensity and the
-  optional fire palette are configurable in Settings > Heatmap.
+  optional fire palette are configurable in Settings > Heatmap. Disabling
+  collection stops new heatmap data and shows a disabled state in the tab;
+  existing data remains until cleared.
 - Resizable window with a larger default size.
 
 - Search, filters, sort modes, relative bars, and a 3D model hero card.
@@ -171,9 +173,10 @@ The Tooltip sections are client-gated:
 - **Dungeon** — dungeon activity.
 - **World** — grinding spot (Forever only) and nameplate levels (Midnight only,
   off by default).
-- **Heatmap** subpage — Show heatmap tab (shown by default; hiding it does not
-  stop recording), Reveal unexplored areas (on by default), Heatmap intensity
-  (50-200%, adjusts gradient contrast), and Warm heat colors (fire palette).
+- **Heatmap** subpage — Enable heatmap collection (on by default), Show heatmap
+  tab (shown by default; hiding it does not stop collection), Reveal unexplored
+  areas (on by default), Heatmap intensity (50-200%, adjusts gradient contrast),
+  Warm heat colors (fire palette), and Clear heatmap data.
 - **Leveling goal** — goal progress in the Overview.
 - **Level splits** — latest split in the Overview.
 - **Economy** — session loot, gold/hour, and gear upgrades where supported.
@@ -222,8 +225,12 @@ Each client namespace stores:
   lastDeath }`.
 - `heatmaps` — `[tostring(mapID)] = { gridSize = 64, cells = { [1..4096] = count },
   total, lastSeen }` for the 64x64 grid.
-- `areas` — `[mapID] = kills`; `levels` — `[playerLevel] = kills`;
-  `areaLevels` — `[mapID] = { [playerLevel] = kills }`.
+- `areas` — `[mapID] = kills` for open-world zones; `levels` —
+  `[playerLevel] = kills`; `areaLevels` — `[mapID] = { [playerLevel] = kills }`.
+- `instances` — `[instanceKey] = { instanceID, name, instanceType,
+  difficultyID, mapID, kills, xp, sessionKills, sessionXP, killsAtLevel,
+  firstSeen, lastSeen, legacy }`; instance keys use the instance map ID and
+  difficulty, then the normalized name, then `unknown`.
 - `calibration` — `zones`, `levels`, `groups`, `classes`, and `mobs` ratio
   entries `{ ratio, samples, updated }`, plus `calibrationVersion` (Forever).
 - `totals` — `{ kills, xp, uniqueMobs }`; `session` — `{ startedAt, kills,
@@ -399,7 +406,7 @@ Use `/acem2l2 xpt help` for the Kill Story command list:
 /acem2l2 xpt splits
 /acem2l2 xpt economy
 /acem2l2 xpt areas
-/acem2l2 xpt heatmap [zone]
+/acem2l2 xpt heatmap [zone|clear]
 /acem2l2 xpt levels
 /acem2l2 xpt session
 /acem2l2 xpt stats
@@ -449,8 +456,9 @@ bug reports.
 Middle-click the minimap icon or run `/acem2l2 xpt data` to open a diagnostics
 frame. It shows:
 
-- mobs, quests, deaths, respawn NPCs/samples, heatmap zones/cells, level
-  records, rate samples, contexts, and calibration entries;
+- mobs, quests, deaths, respawn NPCs/samples, heatmap zones/cells, heatmap
+  collection state/bytes, instances/instance kills, level records, rate samples,
+  contexts, and calibration entries;
 - each count against its current safety cap;
 - an approximate store size from a bounded recursive estimate, not a
   SavedVariables file-size API.
@@ -621,9 +629,9 @@ checks skip release validation unless `CHECK_RELEASE=1`.
 Current release artifacts:
 
 ```text
-dist/AceM2L2-2.4.4.zip
-/mnt/r/AceM2L2-2.4.4.zip
-SHA-256: ec65950135f1c6675e175e1aee64d7225080734a88969e0b00b1b755f1c68938
+dist/AceM2L2-2.5.0.zip
+/mnt/r/AceM2L2-2.5.0.zip
+SHA-256: e78fa3d12af66329b8c31d3009512d829136deb90a6f4a415d69f770defc341b
 ```
 
 Both copies are validated when present. Copy the `dist/` zip to `/mnt/r/` when
@@ -659,13 +667,14 @@ Bindings, Libs, `README.txt`, or `LICENSE`).
 - Area and level rows are derived views; deletion is offered only for mob rows.
 - Per-client caps: 2000 mobs, 200 quests, 200 `levelHistory` records, 240 rate
   samples, 100 deaths, 300 respawn NPCs (20 intervals each), 40 heatmap zones
-  (64x64 cells each), and 12 calibration contexts per mob (pruned after 120
-  days). Older entries are pruned by recency. These are fixed engineering safety
+  (64x64 cells each), 100 instance records, 20 instance keys per mob, and 12
+  calibration contexts per mob (pruned after 120 days). Older entries are pruned by recency. These are fixed engineering safety
   caps, not values derived from measured usage; a 2-6x scope review is tracked in
   `PLAN.md`.
 - The mob cap is global for the character/client, not per zone. Quests are
   unique quest-ledger entries; deaths are the last 100 death locations; heatmap
-  zones/cells are a separate store.
+  zones/cells and instance records are separate stores. Disabling heatmap
+  collection stops new heatmap capture and saving; clearing is explicit.
 - Heatmap recording and death locations need a readable map-position API
   (`C_Map.GetPlayerMapPosition` or `GetPlayerMapPosition`). Respawn intervals
   also need GUID identity and nameplate/capture sightings. Without them, only

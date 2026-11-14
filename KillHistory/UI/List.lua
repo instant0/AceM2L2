@@ -14,6 +14,7 @@ local VISIBLE_ROWS = Util.VISIBLE_ROWS
 local SafeNumber = Util.SafeNumber
 local Lower = Util.Lower
 local FormatNumber = Util.FormatNumber
+local IsAttributableMapID = Util.IsAttributableMapID
 
 function XPTooltip:ResetScroll()
   if self.ui and self.ui.scrollFrame and self.ui.scrollFrame.SetVerticalScroll then
@@ -34,7 +35,7 @@ function XPTooltip:BuildList()
   if self.tab == "areas" then
     for mapKey, kills in pairs(db.areas or {}) do
       local value = tonumber(kills) or 0
-      if value > 0 then
+      if value > 0 and (not IsAttributableMapID or IsAttributableMapID(mapKey)) then
         list[#list + 1] = {
           kind = "area",
           key = mapKey,
@@ -43,6 +44,21 @@ function XPTooltip:BuildList()
           sortValue = value,
           kills = value,
         }
+      end
+    end
+    for instanceKey, instance in pairs(db.instances or {}) do
+      if type(instance) == "table" then
+        local value = tonumber(instance.kills) or 0
+        if value > 0 then
+          list[#list + 1] = {
+            kind = "instance",
+            key = instanceKey,
+            label = instance.name or "Unknown instance",
+            value = FormatNumber(value) .. " kills",
+            sortValue = value,
+            kills = value,
+          }
+        end
       end
     end
     table.sort(list, function(a, b) return a.sortValue > b.sortValue end)

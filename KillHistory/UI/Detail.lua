@@ -132,6 +132,9 @@ function XPTooltip:UpdateDetail()
   elseif selected.kind == "area" then
     self:HideModel("")
     self:UpdateAreaDetail(selected.key)
+  elseif selected.kind == "instance" then
+    self:HideModel("")
+    self:UpdateInstanceDetail(selected.key)
   else
     self:HideModel("")
     self:UpdateLevelDetail(selected.key)
@@ -227,6 +230,42 @@ function XPTooltip:UpdateMobDetail(mobKey)
 
   lines[#lines + 1] = "First seen: " .. FormatDate(mob.firstSeen)
   lines[#lines + 1] = "Last seen: " .. FormatAgo(mob.lastSeen)
+  self.ui.details:SetText(table.concat(lines, "\n"))
+end
+
+function XPTooltip:UpdateInstanceDetail(instanceKey)
+  self:SetDetailMode(false)
+  local db = self.char
+  local instance = db.instances and db.instances[instanceKey]
+  if type(instance) ~= "table" then
+    return
+  end
+  local kills = tonumber(instance.kills) or 0
+  local total = tonumber(db.totals.kills) or 0
+  local percent = total > 0 and (kills / total * 100) or 0
+  self.ui.heroName:SetText(instance.name or "Unknown instance")
+  local subtitle = "Kills: " .. FormatNumber(kills)
+    .. "  ·  " .. string.format("%.1f%%", percent) .. " of total"
+  if self:Supports("hasPerMobXP") and (tonumber(instance.xp) or 0) > 0 then
+    subtitle = subtitle .. "  ·  XP: " .. FormatNumber(instance.xp)
+  end
+  if instance.instanceType and instance.instanceType ~= "unknown" then
+    subtitle = subtitle .. "  ·  " .. tostring(instance.instanceType)
+  end
+  self.ui.heroSub:SetText(subtitle)
+
+  local top = TopMobsByField(db, "killsByInstance", instanceKey)
+  local lines = { "Top mobs:" }
+  for index = 1, min(#top, 6) do
+    lines[#lines + 1] = "  " .. tostring(top[index].name) .. " - "
+      .. FormatNumber(top[index].kills) .. " kills"
+  end
+
+  local minLevel, maxLevel = LevelRange(instance.killsAtLevel)
+  if minLevel then
+    lines[#lines + 1] = "Level range: " .. tostring(minLevel) .. "-" .. tostring(maxLevel)
+  end
+  lines[#lines + 1] = "Last seen: " .. FormatAgo(instance.lastSeen)
   self.ui.details:SetText(table.concat(lines, "\n"))
 end
 

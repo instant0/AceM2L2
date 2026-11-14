@@ -266,6 +266,34 @@ function XPTooltip:Refresh()
   self:RefreshUI()
 end
 
+function XPTooltip:RefreshHeatmapEventRegistration()
+  local enabled = true
+  if type(self.GetSettings) == "function" then
+    local ok, settings = pcall(self.GetSettings, self)
+    if ok and type(settings) == "table" then
+      enabled = settings.heatmapEnabled ~= false
+    end
+  end
+  if enabled and type(self.Supports) == "function" then
+    local ok, supported = pcall(self.Supports, self, "hasMapPosition")
+    if ok and supported ~= true then
+      enabled = false
+    end
+  end
+  if enabled then
+    if not self.explorationEventAvailable then
+      local ok = pcall(
+        self.RegisterEvent, self, "MAP_EXPLORATION_UPDATED", "OnMapExplorationUpdated"
+      )
+      self.explorationEventAvailable = ok
+    end
+  elseif self.explorationEventAvailable then
+    pcall(self.UnregisterEvent, self, "MAP_EXPLORATION_UPDATED")
+    self.explorationEventAvailable = false
+  end
+  return self.explorationEventAvailable == true
+end
+
 function XPTooltip:Install()
   if self.installed then
     return
@@ -302,12 +330,16 @@ function XPTooltip:Install()
     end
   end
 
-  -- Explored-map overlays change as the character discovers new areas. The
-  -- event is optional so a client without it can still use the heatmap.
-  local explorationOK = pcall(
-    self.RegisterEvent, self, "MAP_EXPLORATION_UPDATED", "OnMapExplorationUpdated"
+  -- Instance info can change independently of a zone event (for example,
+  -- difficulty changes). The event is optional.
+  local instanceInfoOK = pcall(
+    self.RegisterEvent, self, "UPDATE_INSTANCE_INFO", "OnInstanceInfoUpdated"
   )
-  self.explorationEventAvailable = explorationOK
+  self.instanceInfoEventAvailable = instanceInfoOK
+
+  -- Explored-map overlays are only needed while heatmap collection is enabled.
+  self.explorationEventAvailable = false
+  self:RefreshHeatmapEventRegistration()
 
   -- Nameplates also feed respawn sightings, so these events are registered even
   -- when the level display is off. Both registrations must succeed; a partial

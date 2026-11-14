@@ -14,8 +14,11 @@ local SafeCall = Util.SafeCall
 local SafeNumber = Util.SafeNumber
 local SafeString = Util.SafeString
 local SafeBool = Util.SafeBool
+local IsAttributableMapID = Util.IsAttributableMapID
+local CopyInstanceState = Util.CopyInstanceState
 local Lower = Util.Lower
 local CopyInfo = Util.CopyInfo
+local EnsureNumberMap = Util.EnsureNumberMap
 local Now = Util.Now
 local Epoch = Util.Epoch
 local ContextKey = Formula.ContextKey
@@ -86,12 +89,46 @@ local function EnsureDungeonBucket(db)
   dungeon.sessionXP = tonumber(dungeon.sessionXP) or 0
   dungeon.sessionKills = tonumber(dungeon.sessionKills) or 0
   dungeon.lastInstance = tonumber(dungeon.lastInstance) or 0
+  dungeon.lastInstanceID = tonumber(dungeon.lastInstanceID) or 0
+  dungeon.lastDifficultyID = tonumber(dungeon.lastDifficultyID) or 0
   return dungeon
 end
 
 --[[--------------------------------------------------------------------------------
   Buffs and rest
 ------------------------------------------------------------------------------------]]
+
+local function EnsureInstancesBucket(db)
+  local instances = type(db.instances) == "table" and db.instances or {}
+  db.instances = instances
+  return instances
+end
+
+function XPTooltip:AttachInstanceState(info)
+  if type(info) ~= "table" then
+    return nil
+  end
+  local state = info.instanceState
+  if type(state) ~= "table" then
+    state = CopyInstanceState(self:GetInstanceState())
+    info.instanceState = state
+  end
+  info.instanceKey = state.inInstance and state.key or nil
+  info.instanceType = state.instanceType
+  info.instanceName = state.name
+  info.instanceID = state.instanceID
+  info.difficultyID = state.difficultyID
+  info.inDungeon = state.inDungeon == true
+  if info.mapID == nil and state.inInstance and state.mapID and state.mapID > 0 then
+    info.mapID = state.mapID
+  end
+  local mapID = tonumber(info.mapID) or 0
+  if mapID > 0 and not IsAttributableMapID(mapID) then
+    mapID = 0
+  end
+  info.mapID = mapID
+  return state
+end
 
 function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObservation)
   if not info then
@@ -100,12 +137,25 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
   local supportsPerMobXP = self:Supports("hasPerMobXP")
   local db = self.char
   local playerLevel = info.playerLevel or self:GetPlayerLevel() or 0
-  local mapID = info.mapID or self:GetMapID() or 0
-  local inDungeon = info.inDungeon
-  if inDungeon == nil then
-    inDungeon = self:IsInDungeon()
+  local state = self:AttachInstanceState(info)
+  local inInstance = state and state.inInstance == true
+  local inDungeon = state and state.inDungeon == true
+  if not state then
+    inDungeon = info.inDungeon
+    if inDungeon == nil then
+      inDungeon = self:IsInDungeon()
+    end
+    inInstance = inDungeon == true
   end
   info.inDungeon = inDungeon
+  local mapID = tonumber(info.mapID) or self:GetMapID() or 0
+  if mapID > 0 and not IsAttributableMapID(mapID) then
+    mapID = 0
+  end
+  info.mapID = mapID
+  local instanceKey = inInstance
+    and (info.instanceKey or (state and state.key) or "unknown") or nil
+  local instanceEntry
   local dungeon = EnsureDungeonBucket(db)
   local mobKey = info.mobKey or self:GetMobKey(info.name, info.npcID)
   local lowerName = Lower(info.name)
@@ -146,7 +196,66 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
     mob.killsAtLevel[levelKey] = (tonumber(mob.killsAtLevel[levelKey]) or 0) + 1
     db.levels[levelKey] = (tonumber(db.levels[levelKey]) or 0) + 1
   end
-  if mapID > 0 then
+  if inInstance and instanceKey then
+    local instances = EnsureInstancesBucket(db)
+    local isNew = type(instances[instanceKey]) ~= "table"
+    instanceEntry = instances[instanceKey]
+    if isNew then
+      instanceEntry = {
+        instanceID = tonumber(info.instanceID) or 0,
+        name = info.instanceName or "Unknown instance",
+        instanceType = info.instanceType or "unknown",
+        difficultyID = tonumber(info.difficultyID) or 0,
+        mapID = mapID,
+        kills = 0,
+        xp = 0,
+        sessionKills = 0,
+        sessionXP = 0,
+        killsAtLevel = {},
+        firstSeen = now,
+        lastSeen = now,
+        legacy = false,
+      }
+      instances[instanceKey] = instanceEntry
+    end
+    instanceEntry.kills = (tonumber(instanceEntry.kills) or 0) + 1
+    instanceEntry.sessionKills = (tonumber(instanceEntry.sessionKills) or 0) + 1
+    instanceEntry.lastSeen = now
+    if (tonumber(instanceEntry.firstSeen) or 0) <= 0 then
+      instanceEntry.firstSeen = now
+    end
+    if mapID > 0 then
+      instanceEntry.mapID = mapID
+    end
+    if info.instanceName and info.instanceName ~= "" then
+      instanceEntry.name = info.instanceName
+    end
+    if info.instanceType and info.instanceType ~= "" then
+      instanceEntry.instanceType = info.instanceType
+    end
+    if (tonumber(info.difficultyID) or 0) > 0 then
+      instanceEntry.difficultyID = tonumber(info.difficultyID)
+    end
+    mob.killsByInstance[instanceKey] =
+      (tonumber(mob.killsByInstance[instanceKey]) or 0) + 1
+    if playerLevel > 0 then
+      local levelKey = tostring(playerLevel)
+      instanceEntry.killsAtLevel = EnsureNumberMap(instanceEntry.killsAtLevel)
+      instanceEntry.killsAtLevel[levelKey] =
+        (tonumber(instanceEntry.killsAtLevel[levelKey]) or 0) + 1
+      local byInstance = mob.killsByInstanceLevel[instanceKey]
+      if type(byInstance) ~= "table" then
+        byInstance = {}
+        mob.killsByInstanceLevel[instanceKey] = byInstance
+      end
+      byInstance[levelKey] = (tonumber(byInstance[levelKey]) or 0) + 1
+    end
+    if isNew then
+      self:PruneInstances()
+      instanceEntry = db.instances[instanceKey]
+    end
+    self:PruneMobInstanceMaps(mob)
+  elseif mapID > 0 then
     local mapKey = tostring(mapID)
     mob.killsByMap[mapKey] = (tonumber(mob.killsByMap[mapKey]) or 0) + 1
     db.areas[mapKey] = (tonumber(db.areas[mapKey]) or 0) + 1
@@ -170,7 +279,7 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
   -- RecordKill is the sole heatmap accounting point: pending-death commits, late
   -- chat XP, and nameplates do not write here.
   if type(self.RecordHeatmapKill) == "function" then
-    local ok, err = pcall(self.RecordHeatmapKill, self, info.mapID or mapID, info.x, info.y)
+    local ok, err = pcall(self.RecordHeatmapKill, self, mapID, info.x, info.y)
     if not ok then
       self:ReportError("RecordHeatmapKill", err, false)
     end
@@ -181,9 +290,13 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
   if inDungeon then
     dungeon.kills = (tonumber(dungeon.kills) or 0) + 1
     dungeon.sessionKills = (tonumber(dungeon.sessionKills) or 0) + 1
-    if mapID > 0 then
-      dungeon.lastInstance = mapID
+    if instanceKey then
+      dungeon.lastInstanceKey = instanceKey
+      dungeon.lastInstanceName = info.instanceName or dungeon.lastInstanceName
+      dungeon.lastInstanceID = tonumber(info.instanceID) or 0
+      dungeon.lastDifficultyID = tonumber(info.difficultyID) or 0
     end
+    dungeon.lastInstance = mapID > 0 and mapID or 0
   end
   self:AddLevelHistoryKill()
   if totalXP and supportsPerMobXP then
@@ -195,6 +308,13 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
     if inDungeon then
       dungeon.xp = (tonumber(dungeon.xp) or 0) + totalXP
       dungeon.sessionXP = (tonumber(dungeon.sessionXP) or 0) + totalXP
+    end
+    if inInstance and instanceKey then
+      instanceEntry = db.instances and db.instances[instanceKey] or instanceEntry
+      if instanceEntry then
+        instanceEntry.xp = (tonumber(instanceEntry.xp) or 0) + totalXP
+        instanceEntry.sessionXP = (tonumber(instanceEntry.sessionXP) or 0) + totalXP
+      end
     end
     self:AddLevelHistoryXP(totalXP)
     self:RecordRateSample(totalXP, "kill")
@@ -365,9 +485,10 @@ function XPTooltip:CommitUnidentifiedKill(entry)
   info.groupSize = info.groupSize or self:GetGroupSize()
   info.mapID = info.mapID or self:GetMapID()
   info.buffSignature = info.buffSignature or self:GetBuffSignature()
+  self:AttachInstanceState(info)
   info.contextKey = ContextKey(
     info.playerLevel, info.level, info.groupSize, info.mapID,
-    info.classification, info.buffSignature
+    info.classification, info.buffSignature, info.instanceKey
   )
   if not info.mobKey then
     info.mobKey = self:GetMobKey(info.name, info.npcID)
@@ -559,6 +680,11 @@ function XPTooltip:HandleXPChat(message)
       ),
       at = now,
     }
+    self:AttachInstanceState(info)
+    info.contextKey = ContextKey(
+      playerLevel, playerLevel, groupSize, mapID, "normal", buffSignature,
+      info.instanceKey
+    )
     self.lastPool = poolAfter
     self:QueueUnidentifiedKill(info, total, rawBase, buffedXP, skipObservation, true)
     return
@@ -607,7 +733,11 @@ function XPTooltip:HandleXPChat(message)
   info.groupSize = groupSize
   info.mapID = mapID
   info.buffSignature = buffSignature
-  info.contextKey = ContextKey(playerLevel, mobLevel, groupSize, mapID, classification, buffSignature)
+  self:AttachInstanceState(info)
+  info.contextKey = ContextKey(
+    playerLevel, mobLevel, groupSize, mapID, classification, buffSignature,
+    info.instanceKey
+  )
   if not info.mobKey then
     info.mobKey = self:GetMobKey(info.name, info.npcID)
   end
@@ -795,9 +925,10 @@ function XPTooltip:HandleUnitDied(guid)
     info.groupSize = stored.groupSize or self:GetGroupSize()
     info.mapID = stored.mapID or self:GetMapID()
     info.buffSignature = stored.buffSignature or self:GetBuffSignature()
+    self:AttachInstanceState(info)
     info.contextKey = ContextKey(
       info.playerLevel, info.level or info.playerLevel, info.groupSize, info.mapID,
-      info.classification or "normal", info.buffSignature
+      info.classification or "normal", info.buffSignature, info.instanceKey
     )
     local _, resolvedKey = self:RecordKill(
       info, pendingXP.totalXP, pendingXP.rawBase, pendingXP.buffedXP,
@@ -825,8 +956,10 @@ function XPTooltip:HandleUnitDied(guid)
     countZero = true
   end
 
+  local deathInfo = CopyInfo(candidate) or {}
+  self:AttachInstanceState(deathInfo)
   local entry = {
-    info = candidate,
+    info = deathInfo,
     guid = safeGUID,
     at = now,
     counted = false,
@@ -885,8 +1018,10 @@ function XPTooltip:CommitPendingDeath(entry)
     info.groupSize = self:GetGroupSize()
     info.mapID = info.mapID or self:GetMapID()
     info.buffSignature = self:GetBuffSignature()
+    self:AttachInstanceState(info)
     info.contextKey = ContextKey(
-      info.playerLevel, info.level, info.groupSize, info.mapID, info.classification, info.buffSignature
+      info.playerLevel, info.level, info.groupSize, info.mapID,
+      info.classification, info.buffSignature, info.instanceKey
     )
     local _, resolvedKey = self:RecordKill(info, nil, nil, nil, "death")
     entry.dungeon = info.inDungeon == true
