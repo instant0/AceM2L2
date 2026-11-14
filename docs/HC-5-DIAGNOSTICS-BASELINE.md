@@ -92,7 +92,7 @@ per-store counts. It is a diagnostic utility, not part of `run_all.sh`.
 
 ## Follow-up
 
-- `SC-1` and `DS-2` should reuse this baseline and add long-lived/zone-heavy
-  characters.
+- `SC-1` and `DS-2` should reuse this baseline. Add zone-heavy or projected
+  profiles; a long-lived save is optional, not a prerequisite.
 - `DS-3` should use the moderate and extreme shapes for the 1x/2x/4x/6x matrix.
 - Live SavedVariables comparison remains in `V-2`.

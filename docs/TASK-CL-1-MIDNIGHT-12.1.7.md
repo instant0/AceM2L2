@@ -64,7 +64,9 @@ Check these from the 12.1.7 client/source and official notes:
 - `C_Map.GetMapArtLayers`, `GetMapArtLayerTextures`, `GetMapArtID`
 - `C_MapExplorationInfo.GetExploredMapTextures`
 - `GetInstanceInfo`, `IsInInstance`, `GetRealZoneText`
-- `C_AddOns` loading/saving APIs and `SAVED_VARIABLES_TOO_LARGE`
+- `C_AddOns` loading/saving APIs and `SAVED_VARIABLES_TOO_LARGE`; use
+  `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md` as the baseline and recheck only
+  for 12.1.7 changes
 - Nameplate APIs: `C_NamePlate`, `NAME_PLATE_UNIT_ADDED/REMOVED`
 - Item/equipment APIs used by gear comparison
 - Aura/rested/buff APIs

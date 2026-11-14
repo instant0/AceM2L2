@@ -1,13 +1,13 @@
 # AceM2L2 plan
 
 Updated: 2026-11-14  
-Current release: **2.5.1**
+Current release: **2.5.2**
 
 ## Plan map
 
 | Workstream | Status | Task group |
 |---|---|---|
-| 64x64 heatmap | Implemented; static audit done, benchmark open | H64-9/H64-10; V-1 |
+| 64x64 heatmap | Measured; follow-up optimizations open | H64-9-F1..F6, H64-10; V-1 |
 | Full generated map overlays | Implemented in 2.3.0; static audit open | R-4/R-5/R-9/R-10; V-5 |
 | Heat alpha | Superseded by the 2.4.4 gradient | A-3; V-1 |
 | Heat intensity/warm colors | Implemented in 2.4.0; gradient in 2.4.4 | HC-1/A-2/A-3; V-1 |
@@ -15,11 +15,12 @@ Current release: **2.5.1**
 | README feature guide | Completed in 2.4.1 | HC-6 |
 | Documentation claim audit | Completed | — |
 | Instance attribution and heatmap collection | Implemented in 2.5.0 | G-4a/G-4b; V-1/V-2 |
-| UI responsiveness | UI-1 confirmed; UI-2 keybinding removal unreleased | UI-1/UI-2; V-6 |
+| UI responsiveness | UI-1 confirmed; UI-2 released in 2.5.2 | UI-1/UI-2; V-6 |
 | Client compatibility | 120107 interface added; 12.1.7 API/live audit pending | CL-1; V-6 |
-| Release hygiene | 2.5.2 package pending | REL-1; V-6 |
+| Release hygiene | Released 2.5.2 | REL-1; V-6 |
+| Memory budget | 3.2–3.85MB real samples; load/unload policy open | MEM-1/MEM-2; V-2 |
 | Scope/grid/limit review | Static/offline analysis first | SC-1..SC-5, G-1..G-3, A-1, HC-7; V-3 |
-| Data storage architecture | Static/offline investigation | DS-1..DS-17.6; V-2 |
+| Data storage architecture | DS-1/DS-3/DS-4/DS-5 done; DS-2 baseline next | DS-1..DS-17.6; V-2 |
 | Character lifecycle and cross-character data | Sub-task files ready | DS-17.0..DS-17.6; V-2 |
 | Journey overlay | Proposed, after DS | J-1..J-6; V-4 |
 | Cell inspector | Proposed, after DS | M-1..M-6; V-4 |
@@ -86,34 +87,42 @@ Done:
 
 Next:
 
-1. **H64-9 — Offline dense-zone benchmark.** Synthetic refresh/memory check,
-   including max-rescale frequency and map-cap pruning. Build it as the reusable
-   harness for SC-2/DS-3.
+1. **H64-9-F1 + F2 — Heatmap rescale/disabled fixes.** H64-9 is measured:
+   dense rescale ~6.4ms, 41-map rescale ~11.6ms, disabled refresh still hides
+   ~4,100 cells. Optimize rescale geometry/Show work and hide once when
+   collection is disabled.
 2. **R-4 — Static overlay/art audit.** Art-ID selection, overlay bucketing,
    phases, tile coordinates, cache keys.
+3. **H64-9-F4 — Zone-scoped/lazy normalization.** 40/41 dense maps normalize in
+   ~91–93ms; move this into DS-15/SC-1.
+4. **MEM-1 — Real memory measurement.** Compare AceM2L2 with ATT/FLG and decide
+   whether H64-9-F3 is needed; do not optimize from the 20MB fixture figure.
 
 ### Phase 2 — storage evidence
 
 This is the critical path for limits, Journey, and the inspector.
 
-1. **DS-1 — Consumer inventory.**
+1. **DS-1 — Feature contract and consumer inventory.**
 2. **DS-2 — Real-store baseline.**
-3. **DS-5 — SavedVariables/loading API matrix.**
-4. **DS-6 — Static metadata feasibility.**
-5. **DS-3 — Synthetic scale matrix.**
-6. **DS-17.1 — Aggregation and 64x64 sufficiency.**
-7. **DS-7 — Packing/compression feasibility.**
+3. **DS-4 — Storage representation and retrieval design.**
+4. **DS-5 — SavedVariables/loading API matrix.**
+5. **DS-6 — Static metadata feasibility.**
+6. **DS-3 — Storage sanity check.**
+7. **DS-17.1 — Aggregation and 64x64 sufficiency.**
+8. **DS-7 — Packing/compression feasibility.**
 
-After the Phase 1 loose ends, **DS-1 (consumer inventory)** is the first
-critical-path storage task. It must include the new `db.instances`,
-`mob.killsByInstance`, `mob.killsByInstanceLevel`, and heatmap collection
-consumers.
+**DS-1, DS-3, DS-4, and DS-5 are complete.** DS-1 is in
+`docs/tasks/DS-1-CONSUMER-CONTRACT.md`; DS-3 is in
+`docs/DS-3-STORAGE-SANITY-RESULT.md`; DS-4 is in
+`docs/STORAGE-DIRECTION.md`; DS-5 is in
+`docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Next: DS-2 baseline
+consolidation, then DS-17.1.
 
 ### Phase 3 — storage design and prototypes
 
 1. **DS-17.2 — Modes and lifecycle.**
 2. **DS-17.3 — Retention and compression.**
-3. **DS-4 — Schema prototypes.**
+3. **DS-4P — Schema prototypes (only if DS-4/DS-3 need one).**
 4. **DS-8 — Display redesign study.**
 5. **DS-9 — Retention and migration.**
 6. **DS-17.4 — Cross-character knowledge and route recommendations.**
@@ -156,41 +165,91 @@ Only after all static work:
 
 - **V-1..V-6**, plus deferred Carbonite checks if reopened.
 
+### Storage design objectives
+
+The goal is not "store 350k entries"; it is the best data organization for:
+
+| Objective | What it means |
+|---|---|
+| **Efficiency** | few bytes per retained fact; sparse cells; short/repeated keys; avoid duplicate views; compression only where it pays |
+| **Speed** | fast login/load, kill write, zone/mob/level queries, heatmap normalization, UI refresh, and save/reload |
+| **Correctness** | stable mob/instance identity, no double counting, deterministic pruning, aggregation fidelity, migration/backup, client isolation |
+| **Reuse** | one canonical store feeding Mobs/Areas/Levels/Heatmap/Journey/Inspector; shared leveling knowledge for alts; static metadata not duplicated per character |
+| **Simplicity** | debuggable schema, bounded caches, clear hot/warm/cold boundaries, no per-kill log |
+
+Capacity tiers (100 / 1k / 10k / 100k entries; 350k external reference) are
+stress tests, not the design target. A design that only handles 350k rows but is
+slow, duplicative, or hard to query is not acceptable.
+
+### Zone-scoped loading and query requirements
+
+The runtime should not need every zone/mob resident for ordinary play:
+
+- **Tooltip:** resolve the hovered mob from the current zone or a compact global
+  identity index; never scan/decode every zone. If the zone subset is not
+  loaded, fall back to formula/global summary without claiming no data.
+- **Heatmap:** load the current zone; on zone switch, load the selected zone and
+  evict the previous one unless it fits a small LRU budget.
+- **Startup:** load account settings and active-character metadata, not all
+  zones, archives, or alts.
+- **Switching:** decode only the selected zone block; release or bound the old
+  block.
+- **Correctness:** a missing subset must fall back predictably, not silently
+  show zero kills.
+- **Feasibility:** zone-first indexes may require a schema change; DS-4/DS-15
+  must prove the query/index design before implementation.
+
+The goal is on-demand subsets that are fast and low-memory **if possible**,
+without breaking correctness for tooltip, heatmap, or lists.
+
 ### Work packages and grouping
 
 Use these groups to avoid duplicate harnesses and release churn:
 
 | Package | Tasks | Why grouped |
 |---|---|---|
-| **REL-1** 2.5.2 release hygiene | UI-2, CL-1 interface, HC-5 `totalTracked` fix | Three validated changes are unreleased in the current workspace |
-| **WP-1** heatmap measurement | H64-9, SC-2, DS-3, then G-2/G-3 | One synthetic harness for grid density, aspect ratio, caps, and 64/96/128 |
-| **WP-2** real store and consumers | DS-1, SC-1, DS-2 | HC-5 baseline already exists; one real-store/consumer pass |
-| **WP-3** storage lifecycle | DS-17.1..DS-17.6, DS-4/9/11/12/13/14/15/16 | Sequential design: aggregation → modes → compression → shared data → schema → decision |
+| **REL-1** 2.5.2 release hygiene | UI-2, CL-1 interface, HC-5 fix | **Released 2.5.2** |
+| **WP-1** heatmap measurement/fixes | H64-9 (done), H64-9-F1/F2/F3/F4, SC-2, DS-3, then G-2/G-3 | One synthetic harness; measured rescale/disabled/normalize follow-ups |
+| **WP-2** research and targeted evidence | DS-1, DS-4, DS-3, SC-1, DS-2 | Use Lua/WoW docs and code first; test only unresolved behavior |
+| **WP-3** storage lifecycle | DS-17.1..DS-17.6, DS-4P/9/11/12/13/14/15/16 | Sequential design: aggregation → modes → compression → shared data → schema → decision |
 | **WP-4** overlay audit | R-4 (with R-5/R-9/R-10 already complete) | Static art/data audit, independent of storage |
 | **WP-5** limits and grid decision | SC-3/SC-4/SC-5, G-1/G-3, HC-7 | Depends on WP-1/WP-2 measurements |
-| **WP-6** future features | J-1..J-6, M-1..M-6 | Blocked by DS-11 |
+| **WP-6** memory | MEM-1, MEM-2, H64-9-F3 (gated) | Measure real memory and define load/unload/eviction |
+| **WP-7** future features | J-1..J-6, M-1..M-6 | Blocked by DS-11 |
 
 #### Recommended next sequence
 
-1. **REL-1 — release 2.5.2** with UI-2, CL-1 interface `120107`, and the HC-5
-   `totalTracked` fix. Do not mix in unfinished storage work.
-2. **WP-1 / H64-9** — build the reusable heatmap measurement harness, including
-   aspect ratios, empty cells, cap pruning, and rescale/UI operation counts.
-3. **WP-4 / R-4** — static overlay/art audit while H64-9 results are reviewed.
-4. **WP-2 / DS-1 + SC-1 + DS-2** — consumer inventory and real-store baseline;
-   reuse HC-5 and the `/mnt/r` reference corpus.
-5. **WP-3 / DS-17.1** — aggregation and 64×64 sufficiency; then DS-17.2..17.6.
-6. **WP-5** — limits/grid decisions after measurements.
-7. **WP-6 / J/M** — only after DS-11.
+1. **REL-1 — released 2.5.2** with UI-2, CL-1 interface `120107`, and the HC-5
+   `totalTracked` fix. Remaining: V-6 runtime installation/UI check.
+2. **WP-2 / DS-1 — Consumer inventory and player scenarios.** Define every field
+   that must survive for level 1, level 20, max-level/endgame, first alt, and
+   10-year-veteran scenarios. No exact content census is needed.
+3. **WP-2 / DS-4 — Representation and retrieval design.** **Done 2026-11-14.**
+   Working answers in `docs/STORAGE-DIRECTION.md`; no new representation check.
+4. **WP-2 / DS-3 — Targeted sanity check.** **Done 2026-11-14.** Save/reload and
+   size/cost passed; keep the current layout. DS-2 can use the result.
+5. **WP-2 / DS-5 — SavedVariables/loading API matrix.** **Done 2026-11-14.**
+   Constraints in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`.
+6. **WP-2 / DS-2 — Real-store baseline.** Consolidate the DS-3/HC-5 numbers and
+   projections; closes the last DS-17.1 input.
+7. **WP-3 / DS-17.1** — aggregation and 64×64 sufficiency; then DS-17.2..17.6.
+8. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
+   evidence is scoped.
+9. **WP-4 / R-4** — static overlay/art audit.
+10. **WP-5** — limits/grid decisions after measurements.
+11. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
+12. **WP-7 / J/M** — only after DS-11.
 
 ### Consolidation candidates
 
 Before executing Phase 2/4, merge overlapping work where practical:
 
-- **H64-9 + SC-2 + DS-3:** one synthetic measurement harness for 64/96/128 grids,
-  1x/2x/4x/6x caps, and sparse/dense zones.
+- **H64-9 + SC-2:** one synthetic heatmap harness for 64/96/128 grids,
+  1x/2x/4x/6x caps, and sparse/dense zones. DS-3 only uses the storage checks
+  that remain unresolved.
 - **HC-5 + SC-1 + DS-2:** one real-store/offline diagnostics measurement pass, including the `/mnt/r` reference corpus.
-- **DS-4 + DS-10:** one schema prototype harness; the live prototype is V-2.
+- **DS-4 + DS-10:** one schema prototype harness only if DS-3 leaves a real
+  representation question; the live prototype is V-2.
 - **DS-7 + DS-12:** one packing study that chooses the codec before implementing
   it.
 
@@ -238,8 +297,16 @@ Live checks are consolidated in V-1. Carbonite work is deferred.
         `<= 256` is inferred as 16x16. Saves written since 2.2.0 always carry
         `gridSize = 64`, so this only affects a user skipping 2.2.0. Keep the
         current 16x16 default and document it under H64-10.
-- [ ] **H64-9 — Offline dense-zone benchmark.** Build a reusable harness for
-      the 64x64 data/UI paths and the later SC-2/DS-3 matrix. Record:
+- [x] **H64-9 — Offline dense-zone benchmark.** Executed; results in
+      `docs/H64-9-BENCHMARK-REPORT.md`; follow-ups in
+      `docs/tasks/H64-9-05-FOLLOWUP-WORK.md`. Task documents:
+      `docs/tasks/H64-9-00-OVERVIEW.md` (master),
+      `docs/tasks/H64-9-01-HARNESS-AND-DATA.md`,
+      `docs/tasks/H64-9-02-SCENARIO-MATRIX.md`,
+      `docs/tasks/H64-9-03-MEASUREMENTS-AND-REPORT.md`,
+      `docs/tasks/H64-9-04-FOLLOWUP-DECISIONS.md`.
+      Build a reusable harness for the 64x64 data/UI paths and the later
+      SC-2/DS-3 matrix. Record:
       - sparse/medium/dense zones (about 100, 1k, and 4,096 active cells);
       - aspect ratios 1:1, 4:1, 1:4, and irregular map/land shapes, recording
         occupied versus empty cells and effective resolution per axis;
@@ -255,6 +322,25 @@ Live checks are consolidated in V-1. Carbonite work is deferred.
       Report relative scaling and operation counts, not live frame rate. Live
       frame cost remains in V-1. Output: reusable benchmark harness plus a short
       report usable by SC-2/DS-3.
+  - [x] **H64-9.1 — Harness and data.**
+  - [x] **H64-9.2 — Scenario matrix.**
+  - [x] **H64-9.3 — Measurements and report.**
+  - [x] **H64-9.4 — Follow-up decisions.**
+  - [ ] **H64-9-F1 — Rescale path optimization.** Dense rescale ~6.4ms and
+    41-map rescale ~11.6ms; avoid geometry/Show work when only color changes.
+    `docs/tasks/H64-9-05-FOLLOWUP-WORK.md`.
+  - [ ] **H64-9-F2 — Disabled-state hide guard.** Disabled refreshes still hide
+    ~4,100 cells and cost ~0.6ms; hide once.
+  - [ ] **H64-9-F3 — Display detail/cell-pool study.** Gated by MEM-1. Dense
+    fixture memory ~20MB is fixture-object memory, far below ATT 51/65MB and
+    FLG 48MB; evaluate 32x32 display only if real client memory or V-1 warrants
+    it. `docs/tasks/MEM-1-MEMORY-BUDGET.md`.
+  - [ ] **H64-9-F4 — Zone-scoped/lazy normalization.** 40/41 dense maps normalize
+    in ~91–93ms; normalize only the active zone. Feed DS-15/SC-1.
+  - [ ] **H64-9-F5 — Aspect/occupied-mask follow-up.** Wide/tall use 1,024 of
+    4,096 cells; empty cells cost no storage but reduce resolution. Feed G-2/G-3.
+  - [ ] **H64-9-F6 — Art/overlay cost follow-up.** Offline art cost inconclusive;
+    feed R-4/V-5.
 - [ ] **H64-10 — Schema/downgrade decision.** Decide whether to bump the
       per-client data schema for 64x64. It is currently `1`; the downgrade caveat
       is documented. Record the legacy 16/32 inference ambiguity here and decide
@@ -263,12 +349,24 @@ Live checks are consolidated in V-1. Carbonite work is deferred.
 
 ### Client compatibility — 12.1.7 readiness
 
-- [ ] **REL-1 — 2.5.2 release hygiene.** Package the unreleased UI-2 keybinding
-  removal, CL-1 `120107` interface support, and HC-5 `totalTracked` fix. Update
-  version/docs/SHA, build both archives, run `CHECK_RELEASE=1`, and complete V-6.
-  Do not include unfinished DS-17 storage work.
+- [x] **REL-1 — 2.5.2 release hygiene.** Released 2.5.2 with UI-2 keybinding
+  removal, CL-1 `120107` interface support, and HC-5 `totalTracked` fix.
+  Version/docs/SHA updated; both archives built; `CHECK_RELEASE=1` passed.
+  Remaining: V-6 runtime installation/UI check.
+- [ ] **MEM-2 — Load/unload and eviction policy.** Define active-character-only
+  loading, lazy zone normalization, LRU/eviction, UI cell/art release, companion
+  loading, save checkpoints, and a measured memory budget. Depends on MEM-1,
+  DS-15, DS-16, DS-17.3; feeds DS-11/V-2.
+  `docs/tasks/MEM-2-LOAD-UNLOAD-POLICY.md`.
+- [ ] **MEM-1 — Memory footprint and budget.** Real samples: latest 2.5.2
+  Hunter 389 kills / 25 mobs, UI open = **3.2 MB**; Priest 762 kills / 85 mobs,
+  Silverpine heatmap open (408 kills) = **3.85 MB**. Compare with ATT (51MB
+  loaded/65MB open, several hundred MB on Midnight) and ForeverLevelingGuide
+  (48MB). Ordinary-play samples do not justify H64-9-F3; keep it gated for
+  unusually dense or future Midnight profiles.
+  `docs/tasks/MEM-1-MEMORY-BUDGET.md`.
 - [ ] **CL-1 — Midnight 12.1.7 readiness.** Interface `120107` confirmed by an
-  external TOC and added alongside `120105`/`16001`. Retail is still
+  external TOC and shipped in 2.5.2 alongside `120105`/`16001`. Retail is still
   **12.1.5.70783**; 12.1.7 is PTR **12.1.7.70892** as of 2026-11-14. Remaining:
   API audit, map-overlay decision, PTR/live install check, V-6. Full task:
   `docs/TASK-CL-1-MIDNIGHT-12.1.7.md`.
@@ -433,7 +531,10 @@ size. `MAX_PENDING_DEATHS`, visible rows, grinding thresholds, and
 
 - [ ] **SC-1 — Measure the current real store.** Add a diagnostic that reports
       SavedVariables/table size, mob count, context count, heatmap cells, and
-      largest stores. Run it on a long-lived character.
+      largest stores. Use the existing 762-kill/85-mob and 389-kill/25-mob
+      samples and derive kill/hour, unique-mobs/kill, instance rate, and
+      zones/heatmap growth for projections. Long-lived/dense/Midnight saves are
+      optional future samples, not prerequisites.
 - [ ] **SC-2 — Benchmark 2x/4x/6x.** Use synthetic and real data to measure
       login/load, pruning, list build, heatmap normalization, and UI refresh.
 - [ ] **SC-3 — Choose a tier.** Approve 2x only if measured; make 4x/6x optional
@@ -542,7 +643,7 @@ checks in V-1/V-2.
       real 70,661-byte store (82,614 estimate, +16.9%), a moderate synthetic
       profile, and an extreme truncated profile. Fixed `totalTracked` to include
       instances. Baseline: `docs/HC-5-DIAGNOSTICS-BASELINE.md`. Live
-      long-lived-character comparison is deferred to V-2.
+      real-character comparison is deferred to V-2.
 - [x] **HC-6 — Player README rewrite.** README.txt is now a concise feature
       guide with a short performance/data note.
 - [x] **HC-8 — Heatmap Settings subpage.** Heatmap tab/reveal/intensity/warm
@@ -553,7 +654,8 @@ checks in V-1/V-2.
 
 ### Data storage architecture investigation — plan only
 
-**Status:** investigation plan; no storage changes implemented.
+**Status:** investigation plan; no storage changes implemented. Working
+direction and answers: `docs/STORAGE-DIRECTION.md`.
 
 **Why:** the 2000-mob cap is **per character, per client, across all zones**.
 A zone with 500 unique mobs consumes 25% of that character's entire mob budget,
@@ -602,9 +704,9 @@ cap and the shape of the tables**, not per-kill storage.
   strings or compressed blobs, decode lazily; reduces file size, increases CPU
   and migration complexity.
 - **G — Multiple SavedVariables / LoadOnDemand.** Split settings, per-character
-  history, and cold zone data. Multiple SV variables are supported, but the
-  client has no per-zone SV files; LoadOnDemand saved-variable timing must be
-  measured.
+  history, and cold zone data. Multiple SV variables are supported but load
+  together; only a LoadOnDemand companion can defer. The client has no per-zone
+  SV files, and companion saved-variable timing is a V-2 measurement.
 
 #### WoW API surface to use
 
@@ -613,19 +715,32 @@ The design should be driven by the client API, not by another addon's data.
 - **SavedVariables directives:** `SavedVariables` and
   `SavedVariablesPerCharacter` accept comma-separated names. Multiple variables
   are allowed; account and character scopes are separate.
-- **Load order:** `LoadSavedVariablesFirst: 1` makes a variable available before
-  the addon's files execute. Otherwise it is available after `ADDON_LOADED`.
+- **Load order:** default is addon files → SavedVariables → `ADDON_LOADED`;
+  `ADDON_LOADED` is the earliest reliable read point. `LoadSavedVariablesFirst: 1`
+  moves SavedVariables before the addon files. It exists on the targeted
+  retail/PTR/Forever clients.
+- **Multiple variables:** all normal SavedVariables load together. Adding
+  variables does not defer them; only a LoadOnDemand companion can defer.
 - **On-demand addon:** `## LoadOnDemand: 1` plus
-  `C_AddOns.LoadAddOn(name)`; detect with `C_AddOns.DoesAddOnExist`,
-  `C_AddOns.IsAddOnLoadOnDemand`, `C_AddOns.IsAddOnLoadable`, and
-  `C_AddOns.IsAddOnLoaded`. Its `ADDON_LOADED` event marks availability.
+  `C_AddOns.LoadAddOn(name)`, which returns `loaded, reason`. Detect with
+  `C_AddOns.DoesAddOnExist`, `C_AddOns.IsAddOnLoadOnDemand`,
+  `C_AddOns.IsAddOnLoadable`, and `C_AddOns.IsAddOnLoaded` (returns
+  `loadedOrLoading, loaded`). Do not call `LoadAddOn` inside an `ADDON_LOADED`
+  handler; the companion may never receive its own `ADDON_LOADED`. Use
+  `PLAYER_LOGIN`, a user action, or a later timer/event. Its `ADDON_LOADED`
+  marks availability.
 - **Metadata:** `C_AddOns.GetAddOnInfo`, `GetAddOnMetadata`,
   `GetAddOnInterfaceVersion`, `GetAddOnDependencies`, and
   `GetAddOnOptionalDependencies` for compatibility and capability checks.
 - **Explicit save/compaction:** `C_AddOns.SaveAddOns()` requests a save. Treat
-  it as a checkpoint, not a per-kill write.
-- **Oversize signal:** register `SAVED_VARIABLES_TOO_LARGE` and degrade
-  gracefully. The client also emits `ADDONS_UNLOADING` before unload.
+  it as a checkpoint, not a per-kill write; no synchronous disk-durability
+  guarantee is documented.
+- **Oversize signal:** `SAVED_VARIABLES_TOO_LARGE` fires after `ADDON_LOADED`
+  when saved variables cannot load because of an out-of-memory error. It can
+  affect account and/or per-character variables, and the variables will not save
+  on the next logout. Treat it as a load-failure/recovery path, not a normal size
+  warning. The client also emits `ADDONS_UNLOADING: closingClient` before unload;
+  use it for a final checkpoint, not as a guaranteed flush.
 - **Practical limits:** there is no documented hard file-size limit, but the
   Lua VM's constant-table limit is roughly 262,144 unique literal values per
   file. Large plain tables can also hit practical 50-60 MB write problems. This
@@ -690,7 +805,7 @@ budget.
    respawns, and migration.
 2. **Measure the current store.** Use the 2.4.0 Data diagnostics panel plus a
    real SavedVariables file to record counts, contexts, heatmap cells, and
-   bytes for a long-lived character and a Silverpine-heavy character.
+   bytes for the available real samples and projected zone-heavy characters.
 3. **Build synthetic datasets.** One zone with 500 mobs, many zones, sparse and
    dense levels, 1x/2x/4x/6x caps. Record bytes, load time, prune time, UI
    build time, and heatmap normalize/refresh time.
@@ -712,10 +827,21 @@ budget.
 
 #### Tasks to investigate
 
-- [ ] **DS-1 — Consumer inventory and invariants.** Document every reader and
-  required field; mark optional/derived fields.
+- [x] **DS-1 — Feature contract and consumer inventory.** Contract in
+  `docs/tasks/DS-1-CONSUMER-CONTRACT.md`; quality pass verified against the
+  current UI, tooltip, commands, diagnostics, calibration, and world modules.
+  Follow-ups in `docs/tasks/DS-1-FOLLOWUP-TASKS.md`:
+  - [ ] **DS-1-F1 — Canonical versus derived ownership.**
+  - [ ] **DS-1-F2 — Zone-scoped identity/query index.**
+  - [ ] **DS-1-F3 — Instance/area separation and count rules.**
+  - [ ] **DS-1-F4 — Missing-subset/archive fallback.**
+  - [ ] **DS-1-F5 — Diagnostics count-only access.**
 - [ ] **DS-2 — Real-store baseline.** Capture current counts/estimated bytes and
-  actual SavedVariables size for representative characters. Include the
+  actual SavedVariables size from the 762-kill save plus the 389-kill memory
+  sample (the latter has no save file). Derive only ratios the save supports:
+  unique mobs/kill, kills/unique mob, instance share, contexts. Project at
+  DS-17.1 entry tiers. Do **not** label kills/hour as measured; the save has no
+  playtime. Do not wait for an exhaustive save; the addon is new. Include the
   external reference corpus copied to `/mnt/r/`; use it only as a shape/size
   benchmark, never copy its data into the addon.
 
@@ -724,7 +850,8 @@ budget.
   | `AceM2L2.lua` (current) | 70,661 | 729 | 3,366 | 7 | 21.6 KB key text; 2,326 numbers; 2.6 KB strings |
   | `Blizzard_Console.lua` | 1,328,130 | 1,057 | 3,168 | 2 | 1,295 KB strings; 1,054 message/timestamp pairs |
   | `TradeSkillMaster.lua` | 234,786 | 688 | 2,415 | 4 | 2,237 string keys / 30.8 KB; one 166.7 KB item-info string; nested UI state |
-  | `AllTheThings.lua` | 204,987 | 1,724 | 11,433 | 5 | sparse numeric ID sets; 50.5 KB key text; account/character/cache/UI roots |
+  | `AllTheThings.lua` (old sample) | 204,987 | 1,724 | 11,433 | 5 | sparse numeric ID sets; 50.5 KB key text; account/character/cache/UI roots |
+  | `AllTheThings.lua` (new retail previous-expansion sample) | 2,673,713 | ~2,500 | ~186,000 | 5 | sparse numeric ID sets; ~57 KB key text; large account/character roots |
 
   For each store record:
 
@@ -754,16 +881,28 @@ budget.
   and static metadata roots; prefer numeric ID keys for sets; keep long text in
   blobs; avoid repeated long prefixes; and split reconstructable metadata from
   player history. Combine these findings with DS-5 and DS-14.
-- [ ] **DS-3 — Synthetic scale matrix.** Generate 1x/2x/4x/6x datasets and record
-  bytes, load/prune/UI costs. Model the three DS-2 shapes: blob/history,
-  namespaced nested state, and sparse numeric ID sets, including account versus
-  per-character scope and long-key overhead.
-- [ ] **DS-4 — Schema prototypes.** Implement and compare A–D offline; include
-  per-zone vs global cap behavior.
-- [ ] **DS-5 — SavedVariables/loading API matrix.** Document multiple variables,
-  per-character scope, `LoadSavedVariablesFirst`, `C_AddOns.LoadAddOn`,
-  `SaveAddOns`, `SAVED_VARIABLES_TOO_LARGE`, and LoadOnDemand semantics from API
-  docs and client source. Runtime timing/persistence checks are deferred to V-2.
+- [x] **DS-3 — Storage sanity check.** Executed 2026-11-14; passed. Real 762-kill
+  save plus 10× synthetic: save/reload identical, aggregate invariants hold,
+  empty store invents nothing, 10× reloads in ~12 ms and saves in ~51 ms offline.
+  Keep the current layout; no schema change. Result:
+  `docs/DS-3-STORAGE-SANITY-RESULT.md`; harness: `tests/storage_sanity.lua`.
+- [x] **DS-4 — Storage representation and retrieval design.** Reviewed
+  2026-11-14. Answers in `docs/tasks/DS-4-STORAGE-REPRESENTATION.md` and
+  `docs/STORAGE-DIRECTION.md`: keep nested Lua hot tables, stable IDs, sparse
+  64×64 cells, derived `areas`/`levels` caches, in-memory indexes; reject JSON,
+  Base64, and checksum identity for hot data. Mobs spanning multiple zones stay
+  one global record with per-zone/instance breakdowns and many-to-many indexes.
+  Derived-cache invariants are already covered by `tests/smoke.lua`; no new
+  representation check is needed.
+- [x] **DS-4P — Optional schema prototype.** Skipped: DS-3 passed; no unresolved
+  representation question. A live prototype remains V-2.
+- [x] **DS-5 — SavedVariables/loading API matrix.** Executed 2026-11-14.
+  Result: `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Key conclusions:
+  account + per-character split is correct; multiple normal variables still load
+  together; only a LoadOnDemand companion can defer, and its exact variable
+  timing is a V-2 check; `SaveAddOns` is a checkpoint, not per-kill durability;
+  `SAVED_VARIABLES_TOO_LARGE` is a load-failure/recovery path; no per-zone SV
+  files; do not load a companion from inside `ADDON_LOADED`.
 - [ ] **DS-6 — Static metadata feasibility.** Size, source, licensing, version
   pinning, and regeneration process.
 - [ ] **DS-7 — Packing/compression feasibility.** Measure size/CPU; decide
@@ -774,7 +913,7 @@ budget.
   downgrade behavior, schema version, reset paths, and the DS-17 hot/warm/cold
   lifecycle.
 - [ ] **DS-10 — Offline prototype.** Use saved-variable fixtures and synthetic
-  zone-heavy/long-lived profiles to exercise packing, decode, and query paths.
+  zone-heavy/projected profiles to exercise packing, decode, and query paths.
   Live client verification is deferred to V-2.
 - [ ] **DS-11 — Decision record.** Choose current, identity/count split,
   zone-first, static DB, packing, lifecycle/archive, cross-character knowledge,
@@ -783,16 +922,30 @@ budget.
   versioning, checksums, encode/decode functions, and corruption handling.
 - [ ] **DS-13 — On-demand companion packaging.** Design the LoadOnDemand
   companion, its TOC, SavedVariables, load call, missing-companion fallback, and
-  release packaging from API docs/source. Runtime timing is deferred to V-2.
+  release packaging from `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Use
+  `DoesAddOnExist`, `IsAddOnLoadOnDemand`, `IsAddOnLoadable`, and
+  `IsAddOnLoaded`; handle `LoadAddOn`'s `loaded, reason`. Load from
+  `PLAYER_LOGIN` or a user action, not the main addon's `ADDON_LOADED` handler.
+  Runtime companion variable timing is deferred to V-2.
 - [ ] **DS-14 — Constant-table/oversize guard.** Stay below the Lua constant
-  limit, register `SAVED_VARIABLES_TOO_LARGE`, keep a previous backup, and define
-  automatic compaction/pruning.
-- [ ] **DS-15 — Lazy retrieval/cache.** Decode only the selected zone, keep a
-  bounded LRU, expose query APIs to Mobs/Areas/Levels/tooltips, and measure
-  decode/UI latency.
-- [ ] **DS-16 — Explicit save/checkpoint policy.** Review `C_AddOns.SaveAddOns`
-  documentation and define checkpoint triggers from code. Runtime save behavior
-  is deferred to V-2.
+  limit. Handle `SAVED_VARIABLES_TOO_LARGE` as an out-of-memory load failure:
+  keep a previous backup, stop normal saving, and define a compaction/reset
+  recovery path. There is no documented hard byte limit; do not present the
+  event as a normal size warning. `SAVED_VARIABLES_TOO_LARGE` fires after
+  `ADDON_LOADED`, can affect account and/or per-character variables, and the
+  variables will not save on the next logout.
+- [ ] **DS-15 — Lazy retrieval, zone-scoped queries, and cache.** Decode only the
+  selected zone; provide tooltip lookup from the current zone or a compact
+  global identity index; load the heatmap's current/selected zone; keep a
+  bounded LRU; expose query APIs to Mobs/Areas/Levels/tooltips; measure
+  decode/UI latency and fallback correctness. There are no per-zone
+  SavedVariables files: laziness is decode/normalize/UI, or a LoadOnDemand
+  companion. Coordinate with MEM-2's load/unload/eviction policy.
+- [ ] **DS-16 — Explicit save/checkpoint policy.** Define checkpoint triggers
+  around `C_AddOns.SaveAddOns`, logout/reload, and
+  `ADDONS_UNLOADING: closingClient`. Do not save per kill. Do not promise
+  synchronous durability; verify actual behavior in V-2. Include the
+  `SAVED_VARIABLES_TOO_LARGE` stop-saving path.
 - [ ] **DS-17 — Character lifecycle, compression, and cross-character data.**
   Model a full 1–60/1–max leveling life, leveling vs endgame modes, hot/warm/cold
   archive tiers, and account-wide aggregate leveling knowledge for alts. Includes
@@ -800,8 +953,10 @@ budget.
   `docs/TASK-DS-17-CHARACTER-LIFECYCLE-DATA.md`.
   - [ ] **DS-17.1 — Aggregation and 64x64 sufficiency.** Prove 12k–25k kills can
     be stored as aggregates; research feature fields, cardinality, quantization,
-    and whether 64x64 holds. Depends DS-1/DS-2/DS-3/DS-5; blocks DS-17.2/3 and
-    DS-4. `docs/tasks/DS-17-01-AGGREGATION-AND-GRID.md`.
+    and whether 64x64 holds. Apply DS-5: normal SavedVariables load together,
+    per-character scope is active-only, no per-zone files, and only a
+    LoadOnDemand companion can defer. Depends DS-1/DS-2/DS-3/DS-5; blocks
+    DS-17.2/3. `docs/tasks/DS-17-01-AGGREGATION-AND-GRID.md`.
   - [ ] **DS-17.2 — Modes and lifecycle.** Define leveling vs endgame, archive
     generations, mode switch, and level-cap generations. Depends DS-17.1; blocks
     DS-17.3/DS-9/DS-11. `docs/tasks/DS-17-02-MODES-AND-LIFECYCLE.md`.
@@ -813,9 +968,12 @@ budget.
     use, and an explainable efficient-route recommendation with data-sufficiency
     gates and held-out backtesting. Depends DS-17.1/2/3; blocks DS-17.5.
     `docs/tasks/DS-17-04-CROSS-CHARACTER-KNOWLEDGE.md`.
-  - [ ] **DS-17.5 — Schema and migration.** Choose roots/files, versions,
-    backup, downgrade, companion, and codec envelope. Depends DS-17.1..4, DS-4,
-    DS-9; blocks DS-11. `docs/tasks/DS-17-05-SCHEMA-AND-MIGRATION.md`.
+  - [ ] **DS-17.5 — Schema and migration.** Finalize field-level ownership,
+    versions, backup, downgrade, companion, and codec envelope. High-level
+    account/per-character/static/memory/companion split is already in
+    `docs/STORAGE-DIRECTION.md`; this task resolves the exact fields and
+    migration. Depends DS-17.1..4, DS-4, DS-5, DS-9; blocks DS-11.
+    `docs/tasks/DS-17-05-SCHEMA-AND-MIGRATION.md`.
   - [ ] **DS-17.6 — Validation and decision.** Measure 1–60/1–max and alt
     profiles; produce the DS-11 recommendation. Depends DS-17.1..5, SC-1/SC-2.
     `docs/tasks/DS-17-06-VALIDATION-AND-DECISION.md`.
@@ -1048,10 +1206,12 @@ in-game tasks to each feature section.
       minimum/default/maximum window sizes, map art on/off, full reveal,
       gradient hue/alpha at 50/100/200% intensity, warm palette, gradient
       legend, heat-cell alignment, and frame cost.
-- [ ] **V-2 — Storage/diagnostics runtime.** Compare diagnostics estimate with
-      actual SavedVariables sizes on long-lived and zone-heavy characters; check
-      LoadOnDemand companion timing, `SaveAddOns`, `SAVED_VARIABLES_TOO_LARGE`,
-      and Forever 1.60.1 persistence.
+- [ ] **V-2 — Storage/diagnostics runtime.** Compare the diagnostics estimate
+      with actual SavedVariables sizes on available real and projected
+      zone-heavy characters. Verify LoadOnDemand companion variable timing and
+      its `ADDON_LOADED` delivery, `SaveAddOns` durability before immediate
+      logout, `SAVED_VARIABLES_TOO_LARGE` threshold/recovery, and Forever 1.60.1
+      persistence.
 - [ ] **V-3 — Coordinate/grid confirmation.** Only if G-1/G-2 propose changes:
       compare death-time position capture and 64 vs 96/128 occupancy/noise and
       latency.

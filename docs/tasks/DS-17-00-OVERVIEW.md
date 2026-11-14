@@ -47,10 +47,11 @@ DS-5  loading API ─────────┘        ├─> DS-17.2 modes / 
 
 ## Research index
 
-- **Cards:** official zone/instance counts, unique mobs per level, heatmap
-  occupancy, wide/tall/irregular zones and empty-cell ratios.
-- **Kills:** 12k minimum, 18–25k realistic; aggregate per cell/mob/level/zone/
-  instance; no per-kill log.
+- **Cards:** player scenarios (level 1, level 20, max level, first alt,
+  10-year veteran), entry tiers 100–100k, heatmap occupancy, wide/tall/
+  irregular zones and empty-cell ratios. Exact content counts are not required.
+- **Kills:** 12k minimum; 18–25k Forever 1–60; 25.5–32.5k Midnight 1–90 with
+  instances; aggregate per cell/mob/level/zone/instance; no per-kill log.
 - **Modes:** leveling vs endgame, max-level archive, level-cap generations.
 - **Compression:** hot/warm/cold, heatmap downsampling, context collapse,
   packed blocks.

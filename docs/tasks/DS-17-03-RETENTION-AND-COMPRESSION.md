@@ -9,6 +9,17 @@
 
 Define how earlier leveling state is compressed while remaining useful.
 
+### DS-5 loading constraints
+
+- A normal addon loads all of its SavedVariables together. Compression reduces
+  file size, but does not remove the file parse cost unless the cold data is in
+  a LoadOnDemand companion.
+- There are no per-zone SavedVariables files. Packed zone blocks are decoded in
+  memory or loaded from a companion.
+- Only a companion can defer cold data; its variable timing is a V-2 check.
+- `SAVED_VARIABLES_TOO_LARGE` is a load failure, not a warning; the next logout
+  will not save. A pre-compression backup is mandatory.
+
 Tiers:
 
 - **Hot:** current + recent 5 levels; full detail; 64×64.
@@ -36,7 +47,9 @@ Tiers:
    - mob/zone dictionaries;
    - level bands;
    - text blobs?
-6. What is the CPU cost of compression at login, at mode switch, and at save?
+6. What is the CPU cost of compression/decode at login, at mode switch, and at
+   save? Separate file parse from in-memory decode. Only a LoadOnDemand companion
+   removes the cold-data file cost from login.
 7. What is the restore/backup path before destructive compression?
 8. How do caps apply per tier and per client?
 9. What happens when a compressed archive is loaded by an older build?
@@ -88,3 +101,7 @@ Exact numbers come from DS-2/DS-3/SC measurements.
 - Context collapse may bias XP/level estimates.
 - Downsampling can hide narrow high-activity cells.
 - Compression CPU may hurt login/save.
+- A cold archive in the normal character file still loads at login; compression
+  only reduces parse/file cost, not residency.
+- `SAVED_VARIABLES_TOO_LARGE` can make the next logout fail to save; keep the
+  previous archive and a recovery path.

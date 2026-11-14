@@ -5,7 +5,7 @@ and provides a **Kill Story** browser for Forever 1.60.1 and Midnight 12.1.x.
 Forever gets the full XP/tooltip experience; Midnight gets counts-focused
 history plus the non-XP features until its XP data is live-verified.
 
-- **Version:** 2.5.1
+- **Version:** 2.5.2
 - **Author:** faslkjd56
 - **Interfaces:** Midnight `120105`/`120107`, Forever `16001`
 - **Clients:** Midnight 12.1.5 retail, 12.1.7 PTR interface-ready, Forever 1.60.1
@@ -628,9 +628,9 @@ checks skip release validation unless `CHECK_RELEASE=1`.
 Current release artifacts:
 
 ```text
-dist/AceM2L2-2.5.1.zip
-/mnt/r/AceM2L2-2.5.1.zip
-SHA-256: 83f990162d6e3a100545a72793a9716f7966e19462ba39efa49f60b213664e58
+dist/AceM2L2-2.5.2.zip
+/mnt/r/AceM2L2-2.5.2.zip
+SHA-256: 4ab90a92d20ce23399c8f7f36daa738261b4dd223fa2689e4d0cc0a763548aec
 ```
 
 Both copies are validated when present. Copy the `dist/` zip to `/mnt/r/` when

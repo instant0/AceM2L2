@@ -15,14 +15,20 @@ kills (250 × 48 levels is already 12,000; 1–60 at 250/level is 15,000), but t
 addon does not need one record per kill while the 64×64 heatmap and the
 per-mob/level/zone/instance counters hold.
 
-The design question is therefore **not** “how do we store 12,000 rows?” It is:
+The design question is therefore **not** “how do we store 12,000 or 350,000
+rows?” It is how to organize the data for efficiency, speed, correctness, and
+reuse. The size tiers are stress tests, not the objective.
+
+The question is:
 
 - which features need identity beyond a heatmap cell (mob, level, instance,
   context);
 - how many unique mobs/zones/instances a real leveling life creates;
 - whether a 64×64 cell count is sufficient resolution for heatmap, route, and
   inspector use, including wide/tall/irregular zones and empty cells;
-- how much detail must survive in hot, warm, and cold tiers.
+- how much detail must survive in hot, warm, and cold tiers;
+- whether one canonical store can feed every view without duplicate copies;
+- whether endgame/leveling/shared data can be reused without re-storing it.
 
 No task below may introduce a per-kill log unless DS-17.1 proves the aggregate
 model cannot answer a required feature.
@@ -33,7 +39,8 @@ The current schema is aggregation-first, but it is still sized around a
 single active character with a limited number of zones and instances. A full
 leveling life is much larger:
 
-- roughly **250 kills per level** from 1–60 = **15,000 kills**;
+- roughly **250 kills per level** from 1–60 = **15,000 kills**; at Midnight
+  1–90 the same rate is **22,500 kills**;
 - roughly **100 kills per instance**; a leveling route that visits 30–50
   instances adds **3,000–5,000 kills**;
 - a completionist route can visit **100+ instances**, adding ~10,000 kills;
@@ -57,47 +64,37 @@ bump.
 
 ---
 
-## 2. Game-scale evidence
+## 2. Content categories and player scenarios
 
-Counts from the official `UiMap` and `MapDifficulty` DB2 tables, checked on
-2026-11-14:
+Exact WoW census numbers are **not** required. Midnight content categories are
+enough to size the design:
 
-### Retail Midnight 12.1.5.70783
+- outdoor zones — roughly 200 unique names;
+- dungeons, raids, PvP battlegrounds/arenas, scenarios/delves are separate
+  categories and must not be collapsed into one "instance" count;
+- `UiMap` dungeon-type rows include variants/difficulties and are not a count of
+  unique dungeons;
+- AllTheThings is a useful upper-bound reference: its database is about 72 MB
+  on disk and is estimated at ~350k entries. We do not need to match it, copy
+  it, or count it exactly.
 
-| Measure | Count |
-|---|---:|
-| `UiMap` zone-type maps (`Type = 3`) | 350 |
-| Unique zone-type names | 212 |
-| Continent maps (`Type = 2`) | 46 |
-| Dungeon-type maps (`Type = 4`) | 897 |
-| Unique dungeon-type names | 308 |
-| Unique `MapDifficulty.MapID` values | 1,306 |
-| Unique `MapDifficulty.LockID` values | 177 |
+The design requirement is simpler: **handle 100 entries or 100,000 entries
+without special-casing the exact content count.**
 
-### Forever 1.60.1.69913
+### Player scenarios
 
-| Measure | Count |
-|---|---:|
-| `UiMap` zone-type maps | 55 |
-| Unique zone-type names | 54 |
-| Dungeon-type maps in `UiMap` | 0 |
-| Unique `MapDifficulty.MapID` values | 82 |
-| Unique `MapDifficulty.LockID` values | 42 |
+| Scenario | Data state | Storage/retrieval needs |
+|---|---|---|
+| **Level 1, first character** | little or no history | tiny active store; no archive; optional shared leveling knowledge |
+| **Level 4, early leveling** | one current zone, a few mobs, local tooltip | no full-zone/mob decode for tooltip; heatmap current zone only; minimal active memory |
+| **Level 20 leveling** | active mobs, zones, heatmap, instances, deaths, rates | hot detail; recent levels/zones; ordinary caps and current 64×64 grid |
+| **Max level, endgame** | leveling history complete | leveling archive read-only; current endgame tracking; XP details no longer need hot retention; AceM2L2's visible endgame value is reputation (and non-XP history), not XP |
+| **First alt, main already max level** | one full 1–60 archive + one 1–60 heatmap dataset | per-character raw data separate; shared aggregate knowledge for the alt; archive loaded lazily |
+| **10-year veteran** | many kills, zones, instances, alts, expansions | multiple archives; retention/compression; lazy load/eviction; endgame reputation/instance history; bounded active memory |
+| **Midnight endgame** | no XP model, counts-focused | same lifecycle, but no XP/leveling formula detail to retain; reputation and non-XP history are the endgame value |
 
-Notes:
-
-- `UiMap` includes phases, variants, and sub-maps. Unique names are the better
-  estimate for “zones” and “instances”.
-- Forever's custom server may add instances that are not in the official
-  `UiMap` table; its real instance count must be collected from the client or
-  server data when available.
-- Even Forever's 54 named zones exceed the current 40-zone heatmap cap. Retail's
-  212 named zones exceed it by more than 5×.
-
-The task must therefore treat **40 zones** and **100 instances** as temporary
-caps, not as a durable model.
-
----
+Endgame does not need the same detail as leveling. Leveling needs route/mob/zone
+detail; endgame needs current activity and long-lived reputation/summary history.
 
 ## 3. Storage math
 
@@ -289,6 +286,9 @@ explicit insufficient-data fallback. The detailed research is in
 
 ### Schema sketch
 
+Root/scope rules: `docs/STORAGE-DIRECTION.md`. The account root stays small; raw
+history stays per-character.
+
 ```lua
 AceM2L2DB.profile.levelingKnowledge = {
   version = 1,
@@ -425,7 +425,8 @@ Exact numbers must come from DS-2/DS-3/SC-1/SC-2, not guesswork.
 2. **DS-2** real-store baseline.
 3. **DS-3** synthetic scale matrix.
 4. **DS-17** this task: modes, tiers, cross-character model, counts.
-5. **DS-4** schema prototypes with mode/tier variants.
+5. **DS-4P** optional schema prototype with mode/tier variants; skipped after
+   DS-3 passed.
 6. **DS-9** retention/migration.
 7. **DS-12** packed block codec.
 8. **DS-13** companion packaging if the archive is split.
@@ -446,8 +447,9 @@ Exact numbers must come from DS-2/DS-3/SC-1/SC-2, not guesswork.
 4. Do players want route/zone recommendations, or only historical summaries?
 5. How should Forever custom instances be identified when they have no stable
    official map ID?
-6. Should cold archives be a separate SavedVariables file/companion or stay in
-   the character file?
+6. Should cold archives stay in the character file, use a separate normal
+   SavedVariables file, or use a LoadOnDemand companion? A separate normal file
+   does not defer load; only the companion can, and its timing is V-2.
 7. What is the minimum detail that still makes a historical heatmap useful:
    16×16, 32×32, or a top-cell list?
 8. Should shared knowledge be optional and clearable independently?
@@ -511,3 +513,13 @@ Implementation remains assigned to:
   and held-out backtesting.
 - Added missing-data and confidence questions.
 - Cross-referenced the full DS-17.4 task file.
+
+### v4 — simplify to scenarios and capacity tiers
+
+- Removed the exact-content-census dependency.
+- Separated outdoor zones, dungeons, raids, PvP, and scenarios/delves.
+- Added level-1, level-20, max-level, first-alt, 10-year veteran, and Midnight
+  endgame scenarios.
+- Replaced exact counts with entry-capacity tiers: 100 / 1,000 / 10,000 /
+  100,000 / 350,000 reference entries.
+- Kept 64×64 aggregate storage; no per-kill log.

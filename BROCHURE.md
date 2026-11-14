@@ -90,10 +90,12 @@ and keeps the non-XP history; nameplate levels are Midnight-only.
 
 ## Changelog
 
-### Unreleased
+### 2.5.2
 
 - Removed the Ctrl+Shift+X toggle keybinding; the minimap icon, addon
   compartment, and commands remain.
+- Added the Midnight 12.1.7 interface `120107` alongside `120105` and `16001`.
+- Diagnostics now includes instance records in the total tracked-entry count.
 
 ### 2.5.1
 

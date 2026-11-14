@@ -21,7 +21,10 @@ sample is too small.
 
 ## Scope
 
-Account-wide, local-only, aggregate knowledge:
+Account-wide, local-only, aggregate knowledge. It belongs in the account
+SavedVariables root, kept small because that root loads for every character;
+raw history stays in the per-character root. See the root/scope matrix in
+`docs/STORAGE-DIRECTION.md`.
 
 - XP/kill by level band and zone;
 - kills/hour / time-to-level;

@@ -11,12 +11,18 @@ Measure the proposed model and produce the evidence DS-11 needs.
 
 ## Profiles
 
-- 1–60 leveling life with 250 kills/level.
+- Player scenarios: level 1, level 20, max-level/endgame, first alt with a 1–60
+  archive, 10-year veteran with multiple alts/archives.
+- Entry-capacity tiers: 100 / 1,000 / 10,000 / 100,000; 350,000 as an external
+  AllTheThings-scale reference only.
+- 1–60 leveling life with 250 kills/level; 1–90 Midnight variant.
 - 30, 50, and 100 instances.
 - Sparse/medium/dense heatmaps.
 - 1:1, 4:1, 1:4, and irregular zones with occupied/empty-cell counts.
 - 1, 3, and 5 alts.
 - Leveling + endgame archive.
+- Endgame state where AceM2L2's visible value is reputation/non-XP history, not
+  XP detail.
 - Shared knowledge with 1/3/5 source characters.
 
 ## Measurements
