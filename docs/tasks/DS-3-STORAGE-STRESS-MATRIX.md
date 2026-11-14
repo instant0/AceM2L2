@@ -55,7 +55,9 @@ Pass: no pathological growth; load/save remain usable at 10×.
 ## Result
 
 - Real sample and 10× synthetic both passed save/reload and aggregate checks.
-- Keep the current layout; no schema change.
+- Keep the current layout for the small/medium store; this is not a massive-scale
+  design decision. Massive data needs the hybrid strategy in
+  `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`.
 - Full report: `docs/DS-3-STORAGE-SANITY-RESULT.md`.
 - Harness: `tests/storage_sanity.lua`.
 

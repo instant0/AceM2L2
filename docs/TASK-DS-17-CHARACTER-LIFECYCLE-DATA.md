@@ -425,8 +425,8 @@ Exact numbers must come from DS-2/DS-3/SC-1/SC-2, not guesswork.
 2. **DS-2** real-store baseline.
 3. **DS-3** synthetic scale matrix.
 4. **DS-17** this task: modes, tiers, cross-character model, counts.
-5. **DS-4P** optional schema prototype with mode/tier variants; skipped after
-   DS-3 passed.
+5. **DS-4P** hybrid hot/cold prototype with mode/tier variants; required for
+   massive datasets. DS-3 only proved the small/medium store.
 6. **DS-9** retention/migration.
 7. **DS-12** packed block codec.
 8. **DS-13** companion packaging if the archive is split.
@@ -497,7 +497,7 @@ Exact numbers must come from DS-2/DS-3/SC-1/SC-2, not guesswork.
 
 Implementation remains assigned to:
 
-- **DS-4** schema prototypes
+- **DS-4P** hybrid hot/cold prototype
 - **DS-9** retention/migration implementation
 - **DS-12** packed block codec
 - **DS-13** companion packaging, if archives are split

@@ -1,21 +1,32 @@
 # DS-4 — Storage representation and retrieval design
 
-**Status:** reviewed 2026-11-14; working answers complete; no new representation
-check required  
+**Status:** revised for massive scale 2026-11-14; hot-tier answers retained;
+hybrid hot/cold prototype required  
 **Consolidated summary:** `docs/STORAGE-DIRECTION.md`  
+**Capacity/strategy:** `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`  
 **Purpose:** decide representation and retrieval principles from Lua/WoW
 behavior, prior research, and current code. This is not the final schema.
 
 ## Decision
 
-Keep the current hot representation: nested Lua tables with stable IDs and
-sparse count/cell maps. Add compact in-memory indexes for name, zone, and
-instance lookup. Do not adopt JSON, Base64, checksum identity, or a per-kill
-event log. Keep 64×64 sparse heatmap cells. Keep `areas`, `levels`, and
-`areaLevels` as small derived caches. Use packing/Base64 only for a measured
-cold archive. Reuse only account-wide aggregates and static metadata on alts.
+The current nested-table hot representation is the **hot tier**, not the whole
+massive-scale solution. Keep it for the active set: stable IDs, sparse count/cell
+maps, derived summaries, and in-memory indexes. Do not adopt JSON, Base64,
+checksum identity, or a per-kill event log.
 
-No production schema change is authorized by this task.
+For massive data, the current 2,000-mob / 40-zone / 100-instance caps are too
+small. Massive scale requires a hybrid:
+
+- bounded hot index and selected-zone detail;
+- packed cold zone/level blocks;
+- name/zone/instance indexes in memory;
+- static metadata outside the character save;
+- per-zone/per-block retention instead of one global cap;
+- optional LoadOnDemand companion, timing proven in V-2.
+
+Cold packing is required for the massive tier. Base64 remains only an encoding
+wrapper for a binary block. No production schema change is authorized until the
+hybrid is prototyped.
 
 ## Why this is the default
 
@@ -25,10 +36,11 @@ No production schema change is authorized by this task.
   our code and must be versioned and tested.
 - **The current store is already aggregated.** There is no per-kill event log.
   Kills go to mob counts, level/map/instance counters, and 64×64 cells.
-- **The real store is small.** The 762-kill / 85-mob sample is 70,661 bytes
-  (`docs/HC-5-DIAGNOSTICS-BASELINE.md`). The HC-5 extreme synthetic profile is
-  estimated at about 2.1 MB with 2,000 mobs, 24,000 contexts, and 163,840
-  heatmap cells.
+- **The real store is small, but it is not the design target.** The
+  762-kill / 85-mob sample is 70,661 bytes. The capacity model in
+  `docs/DS-17-1-CAPACITY-AND-STRATEGY.md` projects 11–14 MB at 2,000 mobs,
+  40 dense zones, and 12 contexts, and 18–25 MB at 200 dense zones. The HC-5
+  2.1 MB extreme figure is truncated, so it is not a ceiling.
 - **The AllTheThings sample is a shape reference only.** 2.7 MB / ~186k entries,
   dominated by sparse numeric ID sets. It is not copied or used as a target.
 - **Direct lookup works.** Tooltip NPC lookup is already
@@ -40,13 +52,13 @@ No production schema change is authorized by this task.
 | # | Question | Decision |
 |---|---|---|
 | 1 | How to organize data for easy retrieval without excessive duplication | One canonical mob record per identity, even when the mob spans zones; stable IDs; sparse numeric count/cell maps; small derived summaries for pages; indexes rebuilt in memory, not saved |
-| 2 | How to optimize while reading correctly in Mobs, Areas, Levels, Heatmap, tooltip, diagnostics, Journey, and inspector | Keep hot data as plain Lua tables; use many-to-many zone/instance indexes; show per-zone counts in zone views and global counts in global views; decode cold data only if a packed archive is adopted |
+| 2 | How to optimize while reading correctly in Mobs, Areas, Levels, Heatmap, tooltip, diagnostics, Journey, and inspector | Keep the bounded hot working set in plain Lua tables; use many-to-many zone/instance indexes; show per-zone counts in zone views; pack and decode massive cold data on demand |
 | 3 | How to reuse data on another character | Keep raw history per character; share bounded account-wide aggregates and static metadata; never copy another character's raw history |
 | 4 | Is nested JSON the best representation | No. Nested Lua tables are the native form; depth is not the problem, repeated keys are. JSON is only for external interchange if ever needed |
-| 5 | Should data be compressed; is Base64 worthwhile | Not for hot data. Packed cold blocks only after a measured win. Base64 is not compression; it adds about 33% size plus its own encode/decode CPU, and is only a wrapper for binary cold blocks |
+| 5 | Should data be compressed; is Base64 worthwhile | Not for hot data. Packed cold blocks are required for massive data. Base64 is not compression; it adds about 33% size plus its own encode/decode CPU, and is only a wrapper for binary cold blocks |
 | 6 | Can an entry, zone, or mob name be a checksum instead of repeated text | No. Checksums are not reversible and can collide. `mapID` is already a stable compact zone key. Use `npcID`, `instanceID`, level, or a local numeric ID plus a name dictionary for mobs. A checksum may detect corruption of a packed block; it is not an identity |
 | 7 | Can kills be 64×64 zone cells instead of exact coordinates | Yes for kill heatmaps. A kill maps to one of 4,096 cells. Exact coordinates remain only for deaths and, if approved later, Journey |
-| 8 | How to deduplicate for a smaller SavedVariables | Store names/static metadata once; use numeric keys; omit zero/default fields; create optional sub-tables lazily; cap/collapse contexts; keep heatmap cells sparse; do not save indexes; pack only cold data if measured |
+| 8 | How to deduplicate for a smaller SavedVariables | Store names/static metadata once; use numeric keys; omit zero/default fields; create optional sub-tables lazily; cap/collapse contexts; keep heatmap cells sparse; do not save indexes; pack cold data |
 
 ## Representation rules
 
@@ -113,7 +125,8 @@ lifetime record.
 5. **Numeric keys** are smaller, but the current stringified numeric keys are a
    small share. Do not migrate keys just for size.
 6. **Indexes** are rebuilt in memory and not serialized.
-7. **Packed cold blocks** only if a measured cold-zone sample justifies them.
+7. **Packed cold blocks** are required for massive data; measure the codec cost
+   before choosing the format.
 
 Do not delete `areas`/`levels`/`areaLevels` just because they can be derived.
 The saving is small; the page-rebuild cost and invariant risk are not.
@@ -273,7 +286,7 @@ invariants, or cell mapping.
 - Base64 for hot data.
 - Checksums as identity.
 - A per-kill event log.
-- Packing hot data before a measured cold-data win.
+- Packing hot data instead of adding a proper cold tier.
 - Deleting `areas`/`levels`/`areaLevels` without a page-query plan.
 - Splitting SavedVariables or adding a LoadOnDemand companion before measuring
   the active-character table.
@@ -281,12 +294,12 @@ invariants, or cell mapping.
 ## Outputs
 
 - hot representation: nested Lua tables plus in-memory indexes;
-- cold representation: plain tables now; packed block only if measured;
+- cold representation: packed zone/level blocks for the massive tier;
 - dedup rules: lazy optional fields, one name, numeric keys, sparse cells, no
   saved indexes;
 - derived ownership: `areas`/`levels`/`areaLevels` remain derived caches;
 - retrieval gaps: name index, zone index, selected-zone heatmap normalization;
-- Base64 decision: rejected for hot data;
+- Base64 decision: rejected for hot data; optional binary wrapper only;
 - checksum decision: corruption detection only, never identity;
 - 64×64 decision: confirmed;
 - cross-character rule: account-wide aggregates and static metadata only;
@@ -306,4 +319,5 @@ invariants, or cell mapping.
 - Dedup rules are explicit and do not remove needed lifetime data.
 - Tooltip, zone lists, and heatmap retrieval gaps are named.
 - Cross-character reuse is defined.
-- No production schema change is made in this task.
+- No production schema change is made in this task; a hybrid hot/cold
+  prototype is required before implementation.

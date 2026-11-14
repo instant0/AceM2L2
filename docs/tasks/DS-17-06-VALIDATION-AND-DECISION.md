@@ -46,7 +46,8 @@ Measure the proposed model and produce the evidence DS-11 needs.
 - Test no per-kill log is present.
 - Verify 64×64 or the chosen grid.
 - Backtest the route recommendation and its insufficient-data fallback.
-- Verify 40-zone/100-instance replacement budgets.
+- Verify the hybrid hot-zone/instance retention budgets, not the old 40/100
+  caps.
 - Produce acceptance table.
 - Write DS-11 recommendation.
 

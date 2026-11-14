@@ -1,15 +1,39 @@
 # Storage direction
 
 **Status:** working design direction; not implemented  
-**Basis:** Lua 5.1 behavior, WoW SavedVariables/loading rules, current code, and
-the existing samples. This is the consolidated answer set for DS-4.
+**Basis:** Lua 5.1 behavior, WoW SavedVariables/loading rules, current code,
+capacity math, and the existing samples. This is the consolidated answer set for
+DS-4. Addon/method research and the full strategy are consolidated in
+`docs/STORAGE-STRATEGY.md`.
+
+## Verdict for massive datasets
+
+The current capped, hot-only model is **not massive-ready**. It handles the small
+real store and the 10×/2,000-mob working set, but its global caps are the only
+thing preventing an unsafe blow-up:
+
+- 2,000 mobs;
+- 40 heatmap zones;
+- 100 instance records;
+- 12 contexts per mob.
+
+Those caps are too small for the 200-zone/200-instance tiers, and simply raising
+them would multiply contexts, cells, load time, and all-mob scans. The massive
+solution is a hybrid:
+
+- small hot index + selected-zone hot detail;
+- packed cold zone/level blocks;
+- in-memory name/zone/instance indexes;
+- static metadata outside the character save;
+- per-zone/per-block retention instead of one global cap;
+- optional LoadOnDemand companion for cold data, timing proven in V-2.
 
 ## Answers
 
 | Question | Decision | Confidence |
 |---|---|---|
 | How to organize data for retrieval without duplicate entries | Canonical per-character aggregate records keyed by stable identity, with in-memory indexes rebuilt at load and derived views for Areas/Levels | High |
-| How to optimize and still read correctly | Hot data stays as plain Lua tables with direct lookups; pages query the active/selected zone; cold data is decoded only if a packed archive is adopted | High |
+| How to optimize and still read correctly | Hot data stays as plain Lua tables with direct lookups; pages query the active/selected zone; massive cold data is packed and decoded on demand | High |
 | How to reuse data on another character | Keep raw history per character; share account-wide aggregate leveling knowledge and static metadata; never copy one character's raw history | High |
 | Is nested JSON the best representation | No. SavedVariables are Lua tables, not JSON. JSON adds quoting/parsing and does not remove Lua key overhead | High |
 | Should data be compressed with Base64 | No for hot data. Base64 expands by about 33% and adds CPU; only use it to wrap a binary cold block if one is justified | High |
@@ -33,11 +57,10 @@ the existing samples. This is the consolidated answer set for DS-4.
 
 ### Cold/archive data
 
-- Use plain Lua tables for warm data. A packed block is a later option, not the
-  default.
-- Adopt packed blocks only if a measured cold-zone sample gives a material size
-  win without an unacceptable decode cost.
-- If a packed block is adopted: version it, checksum it for corruption, and keep
+- Use plain Lua tables for hot/warm data. Packed blocks are **required** for the
+  massive cold tier, not an optional later idea.
+- Keep the hot set bounded; archive old zones/levels into packed blocks.
+- If a packed block is used: version it, checksum it for corruption, and keep
   a plain fallback.
 - Base64 is only an encoding wrapper for a binary cold block. It is not
   compression and is not used for hot tables.
@@ -131,7 +154,7 @@ ownership table, schema version, migration, and companion decision.
 | Other characters' raw history | Their own `AceM2L2CharDB` | Not loaded | Never copy into the account root. Share only derived aggregates. |
 | Static metadata: NPC/zone names, IDs, levels, classification | TOC/Lua data, not SavedVariables | Shared code/data load | Keep outside the character save; feasibility and licensing are DS-6. |
 | Hot name/zone/instance indexes | Memory only | Rebuilt at load | Never save; derive from canonical records. |
-| Cold archives | Per-character root first; optional LoadOnDemand companion later | Active character or on demand | Only if measured. No per-zone SavedVariables files. Companion timing is V-2. |
+| Cold archives | Per-character root first; optional LoadOnDemand companion later | Active character or on demand | Required for massive data. No per-zone SavedVariables files. Companion timing is V-2. |
 | Transient caches and UI objects | Memory only | Not saved | Release on tab/window close or eviction. |
 
 Rules:

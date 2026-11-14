@@ -1,6 +1,7 @@
 # DS-17.1 — Data organization and query sufficiency
 
-**Status:** research/design task, not implemented  
+**Status:** in progress; capacity math complete; remaining feature-to-data and
+64×64 decision  
 **Parent:** DS-17  
 **Depends on:** DS-1 (consumer inventory), DS-2 (real-store baseline), DS-3
 (synthetic scale matrix), DS-5 (SavedVariables/loading API matrix)  
@@ -50,6 +51,18 @@ Use `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md` as a hard input:
   variables will not save on the next logout.
 
 Do not design a layout that assumes partial SavedVariables loading.
+
+### Capacity input
+
+The large-dataset calculation is in
+`docs/DS-17-1-CAPACITY-AND-STRATEGY.md`: 250 kills/level, 15k–32.5k kills,
+40/100/200 zones, 50/100/200 instances, 2,000 mobs, 4/8/12 contexts, and
+sparse/1k/4k cells. It found contexts and dense heatmaps are the dominant
+growth, not kill count. The current 2,000-mob / 40-zone / 100-instance caps are
+too small for the 200-zone/200-instance tiers. The decision must define a
+bounded hot tier plus packed cold archives, not just larger global caps. Use that
+document as the starting point; do not repeat the small real-store baseline as
+the design target.
 
 ## Required scale cases
 
@@ -117,6 +130,9 @@ unique dungeons. Exact counts are not required for this task.
 ## Work items
 
 - Build a feature-to-field table from DS-1.
+- Define hot/warm/cold boundaries and replace global caps with per-zone/per-block
+  retention.
+- Define the hot index fields and the cold packed-block fields separately.
 - Reuse the DS-3 harness for kill/cardinality cases; add only cases the
   aggregation decision actually needs.
 - Run 64×64 occupancy and quantization experiments on real/synthetic data,
@@ -132,13 +148,17 @@ unique dungeons. Exact counts are not required for this task.
 - Feature-to-data matrix.
 - Unique-cardinality table per profile.
 - 64×64 sufficiency recommendation.
-- Required-key list for DS-4 schema prototypes.
+- Hot/warm/cold boundary and cap-retention policy.
+- Required-key list for the hot index and cold blocks.
 
 ## Acceptance criteria
 
 - Every feature has a documented data requirement.
 - The 64×64 grid is explicitly accepted or rejected with occupancy,
   aspect-ratio, and empty-cell evidence.
+- The design does not rely on the current 2,000-mob/40-zone/100-instance caps as
+  the massive-scale limit.
+- Hot, warm, and cold storage units are explicit.
 - No per-kill log is introduced without a named feature and measured cost.
 - The required aggregate keys are stable enough for DS-4.
 - DS-17.2/DS-17.3 can proceed without guessing.

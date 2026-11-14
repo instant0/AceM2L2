@@ -20,7 +20,7 @@ Current release: **2.5.2**
 | Release hygiene | Released 2.5.2 | REL-1; V-6 |
 | Memory budget | 3.2–3.85MB real samples; load/unload policy open | MEM-1/MEM-2; V-2 |
 | Scope/grid/limit review | Static/offline analysis first | SC-1..SC-5, G-1..G-3, A-1, HC-7; V-3 |
-| Data storage architecture | DS-1/DS-3/DS-4/DS-5 done; DS-2 baseline next | DS-1..DS-17.6; V-2 |
+| Data storage architecture | DS-1..DS-5 done; DS-17.1 capacity math done | DS-1..DS-17.6; V-2 |
 | Character lifecycle and cross-character data | Sub-task files ready | DS-17.0..DS-17.6; V-2 |
 | Journey overlay | Proposed, after DS | J-1..J-6; V-4 |
 | Cell inspector | Proposed, after DS | M-1..M-6; V-4 |
@@ -109,20 +109,21 @@ This is the critical path for limits, Journey, and the inspector.
 5. **DS-6 — Static metadata feasibility.**
 6. **DS-3 — Storage sanity check.**
 7. **DS-17.1 — Aggregation and 64x64 sufficiency.**
-8. **DS-7 — Packing/compression feasibility.**
+8. **DS-7 — Packing/compression feasibility.** Required for the massive cold
+   tier, not optional.
 
-**DS-1, DS-3, DS-4, and DS-5 are complete.** DS-1 is in
-`docs/tasks/DS-1-CONSUMER-CONTRACT.md`; DS-3 is in
+**DS-1, DS-2, DS-3, DS-4, and DS-5 are complete.** DS-1 is in
+`docs/tasks/DS-1-CONSUMER-CONTRACT.md`; DS-2 is in
+`docs/tasks/DS-2-REAL-STORE-BASELINE.md`; DS-3 is in
 `docs/DS-3-STORAGE-SANITY-RESULT.md`; DS-4 is in
 `docs/STORAGE-DIRECTION.md`; DS-5 is in
-`docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Next: DS-2 baseline
-consolidation, then DS-17.1.
+`docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Next: DS-17.1.
 
 ### Phase 3 — storage design and prototypes
 
 1. **DS-17.2 — Modes and lifecycle.**
 2. **DS-17.3 — Retention and compression.**
-3. **DS-4P — Schema prototypes (only if DS-4/DS-3 need one).**
+3. **DS-4P — Hybrid hot/cold prototype (required for massive scale).**
 4. **DS-8 — Display redesign study.**
 5. **DS-9 — Retention and migration.**
 6. **DS-17.4 — Cross-character knowledge and route recommendations.**
@@ -227,18 +228,23 @@ Use these groups to avoid duplicate harnesses and release churn:
 3. **WP-2 / DS-4 — Representation and retrieval design.** **Done 2026-11-14.**
    Working answers in `docs/STORAGE-DIRECTION.md`; no new representation check.
 4. **WP-2 / DS-3 — Targeted sanity check.** **Done 2026-11-14.** Save/reload and
-   size/cost passed; keep the current layout. DS-2 can use the result.
+   size/cost passed for the small/medium store. This is not a massive-scale
+   proof; DS-4P is required for the hybrid.
 5. **WP-2 / DS-5 — SavedVariables/loading API matrix.** **Done 2026-11-14.**
    Constraints in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`.
-6. **WP-2 / DS-2 — Real-store baseline.** Consolidate the DS-3/HC-5 numbers and
-   projections; closes the last DS-17.1 input.
-7. **WP-3 / DS-17.1** — aggregation and 64×64 sufficiency; then DS-17.2..17.6.
-8. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
+6. **WP-2 / DS-2 — Real-store baseline.** **Done 2026-11-14.**
+   `docs/tasks/DS-2-REAL-STORE-BASELINE.md`.
+7. **WP-3 / DS-17.1** — aggregation and 64×64 sufficiency. Capacity math done
+   in `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`; remaining feature-to-data and
+   grid decision. Then DS-17.2/DS-17.3.
+8. **WP-3 / DS-4P + DS-7 + DS-12** — hybrid hot/cold prototype and packed-block
+   codec. Mandatory for massive data; not optional.
+9. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
    evidence is scoped.
-9. **WP-4 / R-4** — static overlay/art audit.
-10. **WP-5** — limits/grid decisions after measurements.
-11. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
-12. **WP-7 / J/M** — only after DS-11.
+10. **WP-4 / R-4** — static overlay/art audit.
+11. **WP-5** — limits/grid decisions after measurements.
+12. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
+13. **WP-7 / J/M** — only after DS-11.
 
 ### Consolidation candidates
 
@@ -655,7 +661,8 @@ checks in V-1/V-2.
 ### Data storage architecture investigation — plan only
 
 **Status:** investigation plan; no storage changes implemented. Working
-direction and answers: `docs/STORAGE-DIRECTION.md`.
+direction: `docs/STORAGE-DIRECTION.md`; consolidated addon/method research and
+strategy: `docs/STORAGE-STRATEGY.md`.
 
 **Why:** the 2000-mob cap is **per character, per client, across all zones**.
 A zone with 500 unique mobs consumes 25% of that character's entire mob budget,
@@ -836,14 +843,15 @@ budget.
   - [ ] **DS-1-F3 — Instance/area separation and count rules.**
   - [ ] **DS-1-F4 — Missing-subset/archive fallback.**
   - [ ] **DS-1-F5 — Diagnostics count-only access.**
-- [ ] **DS-2 — Real-store baseline.** Capture current counts/estimated bytes and
-  actual SavedVariables size from the 762-kill save plus the 389-kill memory
-  sample (the latter has no save file). Derive only ratios the save supports:
-  unique mobs/kill, kills/unique mob, instance share, contexts. Project at
-  DS-17.1 entry tiers. Do **not** label kills/hour as measured; the save has no
-  playtime. Do not wait for an exhaustive save; the addon is new. Include the
-  external reference corpus copied to `/mnt/r/`; use it only as a shape/size
-  benchmark, never copy its data into the addon.
+- [x] **DS-2 — Real-store baseline.** Executed 2026-11-14. Real baseline:
+  70,661 client bytes, 82,614 estimate, 85 mobs, 762 kills, 617 open / 145
+  instance, 2 heatmap zones / 193 cells, 1 instance. Ratios: 0.1115 unique
+  mobs/kill, 8.96 kills/unique mob, 19.0% instance share. Projection anchors:
+  492,835 bytes at 10×; HC-5 extreme 2,116,643 estimated but truncated, so a
+  lower bound. No measured kills/hour. Task/result:
+  `docs/tasks/DS-2-REAL-STORE-BASELINE.md`. Large-dataset strategy:
+  `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`. Reference corpus remains optional;
+  recorded figures are sufficient.
 
   | File | Bytes | Tables | Entries | Depth | Dominant shape |
   |---|---:|---:|---:|---:|---|
@@ -884,18 +892,22 @@ budget.
 - [x] **DS-3 — Storage sanity check.** Executed 2026-11-14; passed. Real 762-kill
   save plus 10× synthetic: save/reload identical, aggregate invariants hold,
   empty store invents nothing, 10× reloads in ~12 ms and saves in ~51 ms offline.
-  Keep the current layout; no schema change. Result:
+  This is a small/medium-store proof, not a massive-scale decision. Result:
   `docs/DS-3-STORAGE-SANITY-RESULT.md`; harness: `tests/storage_sanity.lua`.
-- [x] **DS-4 — Storage representation and retrieval design.** Reviewed
-  2026-11-14. Answers in `docs/tasks/DS-4-STORAGE-REPRESENTATION.md` and
-  `docs/STORAGE-DIRECTION.md`: keep nested Lua hot tables, stable IDs, sparse
-  64×64 cells, derived `areas`/`levels` caches, in-memory indexes; reject JSON,
-  Base64, and checksum identity for hot data. Mobs spanning multiple zones stay
-  one global record with per-zone/instance breakdowns and many-to-many indexes.
-  Derived-cache invariants are already covered by `tests/smoke.lua`; no new
-  representation check is needed.
-- [x] **DS-4P — Optional schema prototype.** Skipped: DS-3 passed; no unresolved
-  representation question. A live prototype remains V-2.
+- [x] **DS-4 — Storage representation and retrieval design.** Revised for
+  massive scale 2026-11-14. The current nested tables are the **hot tier**, not
+  the whole solution. Keep stable IDs, sparse cells, derived summaries, and
+  in-memory indexes; reject JSON/Base64/checksum identity for hot data. Massive
+  data requires packed cold zone/level blocks, static metadata, per-zone
+  retention, and an optional companion. See
+  `docs/tasks/DS-4-STORAGE-REPRESENTATION.md`,
+  `docs/STORAGE-DIRECTION.md`, and
+  `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`. DS-4P is required.
+- [ ] **DS-4P — Hybrid hot/cold prototype.** Required for massive scale. Prove
+  a bounded hot index plus packed cold zone/level blocks, a per-zone retention
+  rule, and no-global-scan retrieval. DS-4 hot-tier answers are retained; the
+  current 2,000-mob/40-zone/100-instance caps are not the massive design. A live
+  prototype remains V-2.
 - [x] **DS-5 — SavedVariables/loading API matrix.** Executed 2026-11-14.
   Result: `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Key conclusions:
   account + per-character split is correct; multiple normal variables still load
@@ -905,8 +917,9 @@ budget.
   files; do not load a companion from inside `ADDON_LOADED`.
 - [ ] **DS-6 — Static metadata feasibility.** Size, source, licensing, version
   pinning, and regeneration process.
-- [ ] **DS-7 — Packing/compression feasibility.** Measure size/CPU; decide
-  whether it is worth the opacity and migration cost.
+- [ ] **DS-7 — Packing/compression feasibility.** Required for massive data.
+  Measure size/CPU and select the cold-block codec; opacity and migration cost
+  are design constraints, not reasons to omit the cold tier.
 - [ ] **DS-8 — Display redesign study.** Zone-first Mobs/Areas/Levels and
   heatmap-cell detail without losing identity.
 - [ ] **DS-9 — Retention and migration.** Per-zone caps, global totals, pruning,
@@ -951,12 +964,13 @@ budget.
   archive tiers, and account-wide aggregate leveling knowledge for alts. Includes
   official zone/instance counts and cap-pressure analysis. Master:
   `docs/TASK-DS-17-CHARACTER-LIFECYCLE-DATA.md`.
-  - [ ] **DS-17.1 — Aggregation and 64x64 sufficiency.** Prove 12k–25k kills can
-    be stored as aggregates; research feature fields, cardinality, quantization,
-    and whether 64x64 holds. Apply DS-5: normal SavedVariables load together,
-    per-character scope is active-only, no per-zone files, and only a
-    LoadOnDemand companion can defer. Depends DS-1/DS-2/DS-3/DS-5; blocks
-    DS-17.2/3. `docs/tasks/DS-17-01-AGGREGATION-AND-GRID.md`.
+  - [ ] **DS-17.1 — Aggregation and 64x64 sufficiency.** Capacity math done:
+    250 kills/level, 15k–32.5k kills, 40/100/200 zones, 50/100/200 instances,
+    2,000 mobs; contexts and dense heatmaps dominate. Remaining: feature-to-data
+    matrix, cardinality table, hot/warm/cold decision, and explicit 64×64
+    recommendation. Apply DS-5 loading constraints. Depends DS-1/DS-2/DS-3/DS-5;
+    blocks DS-17.2/3. `docs/tasks/DS-17-01-AGGREGATION-AND-GRID.md`;
+    `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`.
   - [ ] **DS-17.2 — Modes and lifecycle.** Define leveling vs endgame, archive
     generations, mode switch, and level-cap generations. Depends DS-17.1; blocks
     DS-17.3/DS-9/DS-11. `docs/tasks/DS-17-02-MODES-AND-LIFECYCLE.md`.

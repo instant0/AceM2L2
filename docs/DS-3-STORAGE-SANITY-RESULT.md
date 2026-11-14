@@ -1,7 +1,8 @@
 # DS-3 — Storage sanity result
 
 **Status:** executed 2026-11-14  
-**Verdict:** current layout is sane; keep it; no schema change.
+**Verdict:** current layout is sane for the small/medium store; this is **not**
+a massive-scale decision. See `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`.
 
 ## Scope
 
@@ -94,7 +95,8 @@ snapshot is identical before and after reload.
   name-only scan and all-zone heatmap normalization, not the file shape.
 - 10× mobs, instances, and heatmap zones preserve all checked totals and
   invariants after save/reload.
-- Keep the current layout. DS-4P is not needed.
+- Keep the current layout for the small/medium store. This does not make it
+  massive-ready; DS-4P is required for the hybrid hot/cold design.
 
 ## Caveats
 
@@ -123,8 +125,14 @@ lua tests/storage_sanity.lua /mnt/r/AceM2L2.lua 10 /tmp/opencode/acem2l2-storage
 
 ## Decision
 
-Keep the current storage layout. No production schema change. No prototype
-needed from DS-4P.
+The current layout is sane for the small/medium store: 762 kills, 85 mobs,
+2 zones, 193 cells, 1 instance, and a 10× synthetic at 492,835 bytes. It does
+not prove massive-scale capacity.
 
-The next storage work is the already-known retrieval/identity follow-up:
-DS-1-F2 / DS-15 name and zone indexes, and DS-17.4 account-wide knowledge.
+Massive-scale storage needs the hybrid hot/cold strategy in
+`docs/DS-17-1-CAPACITY-AND-STRATEGY.md`: bounded hot index, packed cold
+zone/level blocks, indexes, static metadata, and per-zone retention. DS-4P is
+required to prototype that hybrid.
+
+Next: DS-17.1 feature-to-data and 64×64 decision, then DS-17.2/DS-17.3 and the
+cold-block prototype.
