@@ -1,21 +1,26 @@
 # AceM2L2 plan
 
 Updated: 2026-11-14  
-Current release: **2.5.0**
+Current release: **2.5.1**
 
 ## Plan map
 
 | Workstream | Status | Task group |
 |---|---|---|
 | 64x64 heatmap | Implemented; static audit done, benchmark open | H64-9/H64-10; V-1 |
-| Full generated map overlays | Implemented in 2.3.0; static review first | R-5/R-9/R-10; V-5 |
+| Full generated map overlays | Implemented in 2.3.0; static audit open | R-4/R-5/R-9/R-10; V-5 |
 | Heat alpha | Superseded by the 2.4.4 gradient | A-3; V-1 |
 | Heat intensity/warm colors | Implemented in 2.4.0; gradient in 2.4.4 | HC-1/A-2/A-3; V-1 |
-| Data diagnostics | Implemented in 2.4.0; static review first | HC-2; V-2 |
+| Data diagnostics | Implemented 2.4.0; instance/heatmap stats in 2.5.0; HC-5 baseline done | HC-2; V-2 |
 | README feature guide | Completed in 2.4.1 | HC-6 |
 | Documentation claim audit | Completed | — |
-| Scope/grid/limit review | G-4a/G-4b implemented in 2.5.0 | SC-1..SC-5, G-1..G-4b, A-1, HC-7; V-3 |
-| Data storage architecture | Static/offline investigation | DS-1..DS-16; V-2 |
+| Instance attribution and heatmap collection | Implemented in 2.5.0 | G-4a/G-4b; V-1/V-2 |
+| UI responsiveness | UI-1 confirmed; UI-2 keybinding removal unreleased | UI-1/UI-2; V-6 |
+| Client compatibility | 120107 interface added; 12.1.7 API/live audit pending | CL-1; V-6 |
+| Release hygiene | 2.5.2 package pending | REL-1; V-6 |
+| Scope/grid/limit review | Static/offline analysis first | SC-1..SC-5, G-1..G-3, A-1, HC-7; V-3 |
+| Data storage architecture | Static/offline investigation | DS-1..DS-17.6; V-2 |
+| Character lifecycle and cross-character data | Sub-task files ready | DS-17.0..DS-17.6; V-2 |
 | Journey overlay | Proposed, after DS | J-1..J-6; V-4 |
 | Cell inspector | Proposed, after DS | M-1..M-6; V-4 |
 | Carbonite | Deferred | CB-0..CB-6 when reopened |
@@ -30,10 +35,15 @@ Covered in this plan:
 - full generated map overlays and reveal setting (2.3.0)
 - stronger heat alpha (2.3.1)
 - heat intensity/warm colors and data diagnostics (2.4.0)
+- multi-stop heat gradient and gradient legend (2.4.4)
+- instance identity/attribution and heatmap collection gate (2.5.0)
+- responsive mob list and window layout (2.5.1)
+- toggle keybinding removed, minimap/compartment retained (unreleased)
 - feature-focused README rewrite (2.4.1)
 - grid-resolution/coordinate reliability review
 - 2x/4x/6x limit scope review
 - API-first storage architecture investigation
+- full 1-60 lifecycle, compression, and cross-character leveling-data plan
 - Journey overlay proposal
 - 4x4 hover cell inspector proposal
 - Carbonite and KillStory split deferred work
@@ -70,14 +80,16 @@ Done:
   intensity multiplier, warm palette, cache keys, and theme hook reviewed.
 - [x] **A-3 — Multi-stop heat gradient.** Hue + alpha ramp, contrast-based
   intensity, gradient legend, and offline 1..13 spread tests.
+- [x] **HC-5 — Offline diagnostics review.** Real store estimate 82,614 vs
+  70,661 actual (+16.9%), moderate and extreme synthetic profiles, `totalTracked`
+  instance fix, and baseline `docs/HC-5-DIAGNOSTICS-BASELINE.md`.
 
 Next:
 
-1. **H64-9 — Offline dense-zone benchmark.** Synthetic refresh/memory check;
-   fold the result into the later DS-3/SC-2 harness.
-2. **HC-5 — Offline diagnostics review.** Compare the size estimate with
-   synthetic/real SavedVariables data.
-3. **R-4 — Static overlay/art audit.** Art-ID selection, overlay bucketing,
+1. **H64-9 — Offline dense-zone benchmark.** Synthetic refresh/memory check,
+   including max-rescale frequency and map-cap pruning. Build it as the reusable
+   harness for SC-2/DS-3.
+2. **R-4 — Static overlay/art audit.** Art-ID selection, overlay bucketing,
    phases, tile coordinates, cache keys.
 
 ### Phase 2 — storage evidence
@@ -89,21 +101,32 @@ This is the critical path for limits, Journey, and the inspector.
 3. **DS-5 — SavedVariables/loading API matrix.**
 4. **DS-6 — Static metadata feasibility.**
 5. **DS-3 — Synthetic scale matrix.**
-6. **DS-7 — Packing/compression feasibility.**
+6. **DS-17.1 — Aggregation and 64x64 sufficiency.**
+7. **DS-7 — Packing/compression feasibility.**
+
+After the Phase 1 loose ends, **DS-1 (consumer inventory)** is the first
+critical-path storage task. It must include the new `db.instances`,
+`mob.killsByInstance`, `mob.killsByInstanceLevel`, and heatmap collection
+consumers.
 
 ### Phase 3 — storage design and prototypes
 
-1. **DS-4 — Schema prototypes.**
-2. **DS-8 — Display redesign study.**
-3. **DS-9 — Retention and migration.**
-4. **DS-12 — Packed block codec.**
-5. **DS-13 — On-demand companion packaging.**
-6. **DS-14 — Constant-table/oversize guard.**
-7. **DS-15 — Lazy retrieval/cache.**
-8. **DS-16 — Save/checkpoint policy.**
-9. **DS-10 — Offline prototype.**
-10. **DS-11 — Decision record.**
-11. **H64-10 — Schema/downgrade decision.** Decide schema `1` vs a bump after
+1. **DS-17.2 — Modes and lifecycle.**
+2. **DS-17.3 — Retention and compression.**
+3. **DS-4 — Schema prototypes.**
+4. **DS-8 — Display redesign study.**
+5. **DS-9 — Retention and migration.**
+6. **DS-17.4 — Cross-character knowledge and route recommendations.**
+7. **DS-17.5 — Schema and migration.**
+8. **DS-12 — Packed block codec.**
+9. **DS-13 — On-demand companion packaging.**
+10. **DS-14 — Constant-table/oversize guard.**
+11. **DS-15 — Lazy retrieval/cache.**
+12. **DS-16 — Save/checkpoint policy.**
+13. **DS-10 — Offline prototype.**
+14. **DS-17.6 — Validation and decision.**
+15. **DS-11 — Decision record.**
+16. **H64-10 — Schema/downgrade decision.** Decide schema `1` vs a bump after
     DS-9/DS-11; this is not a Phase 1 decision.
 
 ### Phase 4 — limits and grid decisions
@@ -133,23 +156,50 @@ Only after all static work:
 
 - **V-1..V-6**, plus deferred Carbonite checks if reopened.
 
+### Work packages and grouping
+
+Use these groups to avoid duplicate harnesses and release churn:
+
+| Package | Tasks | Why grouped |
+|---|---|---|
+| **REL-1** 2.5.2 release hygiene | UI-2, CL-1 interface, HC-5 `totalTracked` fix | Three validated changes are unreleased in the current workspace |
+| **WP-1** heatmap measurement | H64-9, SC-2, DS-3, then G-2/G-3 | One synthetic harness for grid density, aspect ratio, caps, and 64/96/128 |
+| **WP-2** real store and consumers | DS-1, SC-1, DS-2 | HC-5 baseline already exists; one real-store/consumer pass |
+| **WP-3** storage lifecycle | DS-17.1..DS-17.6, DS-4/9/11/12/13/14/15/16 | Sequential design: aggregation → modes → compression → shared data → schema → decision |
+| **WP-4** overlay audit | R-4 (with R-5/R-9/R-10 already complete) | Static art/data audit, independent of storage |
+| **WP-5** limits and grid decision | SC-3/SC-4/SC-5, G-1/G-3, HC-7 | Depends on WP-1/WP-2 measurements |
+| **WP-6** future features | J-1..J-6, M-1..M-6 | Blocked by DS-11 |
+
+#### Recommended next sequence
+
+1. **REL-1 — release 2.5.2** with UI-2, CL-1 interface `120107`, and the HC-5
+   `totalTracked` fix. Do not mix in unfinished storage work.
+2. **WP-1 / H64-9** — build the reusable heatmap measurement harness, including
+   aspect ratios, empty cells, cap pruning, and rescale/UI operation counts.
+3. **WP-4 / R-4** — static overlay/art audit while H64-9 results are reviewed.
+4. **WP-2 / DS-1 + SC-1 + DS-2** — consumer inventory and real-store baseline;
+   reuse HC-5 and the `/mnt/r` reference corpus.
+5. **WP-3 / DS-17.1** — aggregation and 64×64 sufficiency; then DS-17.2..17.6.
+6. **WP-5** — limits/grid decisions after measurements.
+7. **WP-6 / J/M** — only after DS-11.
+
 ### Consolidation candidates
 
 Before executing Phase 2/4, merge overlapping work where practical:
 
 - **H64-9 + SC-2 + DS-3:** one synthetic measurement harness for 64/96/128 grids,
   1x/2x/4x/6x caps, and sparse/dense zones.
-- **HC-5 + SC-1 + DS-2:** one real-store/offline diagnostics measurement pass.
+- **HC-5 + SC-1 + DS-2:** one real-store/offline diagnostics measurement pass, including the `/mnt/r` reference corpus.
 - **DS-4 + DS-10:** one schema prototype harness; the live prototype is V-2.
 - **DS-7 + DS-12:** one packing study that chooses the codec before implementing
   it.
 
 ## Workstreams and status
 
-### 64x64 heatmap — implementation complete; static review open
+### 64x64 heatmap — implementation complete; benchmark open
 
-**Status:** code and tests are unchanged; the 2.4.1 documentation release is done.
-Static review and offline benchmarks come first; live checks are consolidated in V-1. Carbonite work is deferred.
+**Status:** static audit done; offline benchmark and schema decision remain.
+Live checks are consolidated in V-1. Carbonite work is deferred.
 
 **Implemented**
 
@@ -188,15 +238,90 @@ Static review and offline benchmarks come first; live checks are consolidated in
         `<= 256` is inferred as 16x16. Saves written since 2.2.0 always carry
         `gridSize = 64`, so this only affects a user skipping 2.2.0. Keep the
         current 16x16 default and document it under H64-10.
-- [ ] **H64-9 — Offline dense-zone benchmark.** Use the Lua harness/synthetic
-      data to measure refresh and memory growth, including how often a new
-      maximum triggers a rescale and how map-cap pruning behaves. Live frame cost
-      is deferred to V-1.
+- [ ] **H64-9 — Offline dense-zone benchmark.** Build a reusable harness for
+      the 64x64 data/UI paths and the later SC-2/DS-3 matrix. Record:
+      - sparse/medium/dense zones (about 100, 1k, and 4,096 active cells);
+      - aspect ratios 1:1, 4:1, 1:4, and irregular map/land shapes, recording
+        occupied versus empty cells and effective resolution per axis;
+      - first render, repeated kills in one cell, new cells, a new maximum
+        (rescale), map switches, theme/intensity changes, resize, and the
+        collection-disabled state;
+      - full rebuilds vs in-place rescales vs incremental updates;
+      - normalization, capture, map-cap pruning (1/40/41 maps), and memory
+        growth (`collectgarbage("count")`, table/cell counts);
+      - UI operation counts from the fixtures (`CreateTexture`, `SetPoint`,
+        `SetSize`, `SetColorTexture`, `Show`, `Hide`) for art/cells/legend;
+      - map-art on/off and the current 40-zone cap.
+      Report relative scaling and operation counts, not live frame rate. Live
+      frame cost remains in V-1. Output: reusable benchmark harness plus a short
+      report usable by SC-2/DS-3.
 - [ ] **H64-10 — Schema/downgrade decision.** Decide whether to bump the
       per-client data schema for 64x64. It is currently `1`; the downgrade caveat
       is documented. Record the legacy 16/32 inference ambiguity here and decide
       whether to keep the 16x16 default or force `gridSize` during migration.
 - Live checks: consolidated under V-1.
+
+### Client compatibility — 12.1.7 readiness
+
+- [ ] **REL-1 — 2.5.2 release hygiene.** Package the unreleased UI-2 keybinding
+  removal, CL-1 `120107` interface support, and HC-5 `totalTracked` fix. Update
+  version/docs/SHA, build both archives, run `CHECK_RELEASE=1`, and complete V-6.
+  Do not include unfinished DS-17 storage work.
+- [ ] **CL-1 — Midnight 12.1.7 readiness.** Interface `120107` confirmed by an
+  external TOC and added alongside `120105`/`16001`. Retail is still
+  **12.1.5.70783**; 12.1.7 is PTR **12.1.7.70892** as of 2026-11-14. Remaining:
+  API audit, map-overlay decision, PTR/live install check, V-6. Full task:
+  `docs/TASK-CL-1-MIDNIGHT-12.1.7.md`.
+
+### UI responsiveness — implemented in 2.5.1
+
+- [x] **UI-1 — Responsive mob list and window layout.** Implemented in 2.5.1.
+  Live confirmation: multiple mobs, resize, and scrolling work. Fix the fixed
+  13-row list, one-time row width, clipped kills text on narrow windows, and the
+  hard 1400 px maximum width. Full specification:
+  `docs/TASK-UI-1-RESPONSIVE-LIST.md`.
+- [x] **UI-2 — Remove the toggle keybinding.** Removed `Bindings.xml`, the TOC
+  entry, binding globals, and the public binding function. Kept `Bindings.lua`
+  for the addon-compartment entry point and the minimap icon.
+
+### Instance attribution and heatmap collection — implemented in 2.5.0
+
+**Status:** released; residual live checks are in V-1/V-2.
+
+**Implemented**
+
+- `IsInInstance()` is the authoritative inside/outside-dungeon signal; the map
+  ID never decides instance state.
+- Instance state is cached from zoning events and checked cheaply per kill;
+  `GetInstanceInfo()` is queried on transitions or mismatches, not every kill.
+- Instance kills are stored in `db.instances`, `mob.killsByInstance`, and
+  `mob.killsByInstanceLevel`; open-world kills stay in `areas`/`killsByMap`.
+- Instance keys use the instance map ID and difficulty, then the normalized
+  name, then `unknown`.
+- Historical world-map rows (for example map 947/Azeroth) migrate once to an
+  "Unattributed instance" record with level breakdowns preserved.
+- `heatmapEnabled` is a master collection switch. Disabling it stops capture,
+  normalization, exploration-event registration, and new saving; the Heatmap
+  tab stays visible with a disabled message.
+- The clear action is available from diagnostics and
+  `/acem2l2 xpt heatmap clear`.
+- Diagnostics reports instances, instance kills, heatmap collection state, and
+  estimated heatmap bytes.
+
+**Validated offline**
+
+- Captured Forever data: 145 instance kills migrated to
+  `legacy:947`; level 20 kept 145; `Skeleton` kept 28 instance kills; dungeon
+  totals stayed 145 kills / 7,455 XP.
+- 334 static assertions; all seven client scenarios pass.
+
+**Residual risks**
+
+- `GetInstanceInfo()` exposes an instance map ID, not a unique instance ID;
+  clients without it fall back to the normalized name.
+- Instances without an attributable UiMap have no heatmap or death-location
+  data.
+- Live persistence and UI behavior remain in V-2/V-1.
 
 ### Documentation claim audit — completed
 
@@ -216,12 +341,12 @@ docs were corrected.
 | Heatmap and zone art | Implemented | 64x64 now; base art uses `C_Map.GetMapArtLayers`/`GetMapArtLayerTextures`, with discovered-area overlays from `C_MapExplorationInfo.GetExploredMapTextures`. No legacy `GetMapInfo` art fallback exists. |
 | Nameplate levels | Implemented, Midnight-only | Off by default; sightings still feed respawn tracking. |
 | 3D model | Implemented | A model hero card with fallback, not a browsable 3D gallery. Wording corrected. |
-| Search, filters, sort, themes, minimap, keybind, compartment | Implemented | UI/List, UI/Theme, UI/Minimap, Bindings.lua/xml, TOC. |
-| Settings sections and Tooltip subpage | Implemented | Native Settings API and client-gated sections. |
+| Search, filters, sort, themes, minimap, compartment | Implemented | UI/List, UI/Theme, UI/Minimap, Bindings.lua, TOC. |
+| Settings sections and Tooltip/Heatmap subpages | Implemented | Native Settings API and client-gated sections. |
 | Per-client storage and secret-data handling | Implemented and tested | Separate Forever/Midnight namespaces; defensive API reads. |
-| Documented caps | Implemented | 100 deaths, 300 respawn NPCs/20 samples, 200 quests, 200 level records, 240 rate samples, 2000 mobs, 40 heatmap zones. |
+| Documented caps | Implemented | 100 deaths, 300 respawn NPCs/20 samples, 200 quests, 200 level records, 240 rate samples, 2000 mobs, 40 heatmap zones, 100 instance records, 20 instance keys per mob. |
 | Midnight XP/rate/calibration/rested/grinding off | Implemented | Midnight profile capabilities are intentionally disabled. |
-| "Live verification pending" | Accurate caveat | Quest/dungeon/group XP semantics, gear compare, heatmap art/performance, and several Midnight paths still need live verification. |
+| "Live verification pending" | Accurate caveat | Quest/dungeon/group XP semantics, gear compare, heatmap art/performance, instance attribution/persistence, heatmap collection gating, and several Midnight paths still need live verification. |
 
 **Documentation corrections made**
 
@@ -322,10 +447,15 @@ size. `MAX_PENDING_DEATHS`, visible rows, grinding thresholds, and
       `UnitPosition`/`C_Map.GetMapPosFromWorldPos` from API docs. Live position
       comparison is deferred to V-3.
 - [ ] **G-2 — 64 vs 96/128 occupancy study.** Export real heatmap data and compare
-      cell occupancy, trail noise, and visual readability at the same panel size.
-- [ ] **G-3 — Decide grid.** Keep 64, or implement 96/128 only if the occupancy
-      study and frame-cost benchmark pass. A 128 data grid with 64 display
-      fallback is allowed only if it has a concrete product benefit.
+      cell occupancy, trail noise, visual readability, and **map shape**. Include
+      wide/tall/irregular zones, land-versus-empty-cell ratios, and effective
+      east-west versus north-south resolution. Compare square 64 with 96/128
+      and with an aspect-aware/rectangular or occupied-mask option.
+- [ ] **G-3 — Decide grid.** Keep 64, or implement 96/128 only if the occupancy,
+      aspect-ratio, and frame-cost studies pass. Empty cells should not be
+      counted as stored data. An aspect-aware/rectangular or occupied-mask grid
+      may be considered only with a concrete product benefit; a 128 data grid
+      with 64 display fallback remains allowed only with evidence.
 - [x] **G-4a — Instance identity and attribution.** Implemented in 2.5.0. Detect inside/outside
       dungeon state with `IsInInstance`, cache it from zoning events, store
       instance kills in `db.instances`/`mob.killsByInstance`, stop attributing
@@ -358,9 +488,10 @@ size. `MAX_PENDING_DEATHS`, visible rows, grinding thresholds, and
         span the palette.
       - Live visual confirmation remains in V-1.
 
-### Heatmap controls and data diagnostics — implemented in 2.4.0
+### Heatmap controls and data diagnostics — implemented in 2.4.0; extended in 2.5.0
 
-**Status:** implemented; static review first; live visual check in V-1.
+**Status:** static heatmap review done; offline diagnostics review open; live
+checks in V-1/V-2.
 
 **Heatmap controls**
 
@@ -376,10 +507,12 @@ size. `MAX_PENDING_DEATHS`, visible rows, grinding thresholds, and
 **Data diagnostics**
 
 - Added a diagnostics frame with per-character/per-client counts, limits, usage
-  percentages, heatmap cells, contexts, calibration entries, total tracked
-  entries, and an approximate store size.
+  percentages, heatmap cells, heatmap collection state/bytes, instances and
+  instance kills, contexts, calibration entries, total tracked entries, and an
+  approximate store size.
 - Open it with **middle-click on the minimap icon** or `/acem2l2 xpt data`.
-- The frame is draggable, Escape-closable, and has Refresh/Close buttons.
+- The frame is draggable, Escape-closable, and has Refresh/Close buttons plus a
+  Clear heatmap action.
 - Size is an estimate from a bounded recursive traversal, not a SavedVariables
   file-size API. It is labeled as approximate.
 - Counts clarify that the 2000-mob cap is **per character and per client across
@@ -405,8 +538,10 @@ size. `MAX_PENDING_DEATHS`, visible rows, grinding thresholds, and
 - [x] **HC-4 — Static visual-code review.** Verified the ramp, warm palette,
       intensity clamp, theme accent key, `renderedMaximum` rescale path, and
       `hooksecurefunc` theme refresh. Live visual comparison is deferred to V-1.
-- [ ] **HC-5 — Offline diagnostics review.** Compare estimated size with
-      synthetic datasets and real SavedVariables files offline. Live
+- [x] **HC-5 — Offline diagnostics review.** Compared the estimate with the
+      real 70,661-byte store (82,614 estimate, +16.9%), a moderate synthetic
+      profile, and an extreme truncated profile. Fixed `totalTracked` to include
+      instances. Baseline: `docs/HC-5-DIAGNOSTICS-BASELINE.md`. Live
       long-lived-character comparison is deferred to V-2.
 - [x] **HC-6 — Player README rewrite.** README.txt is now a concise feature
       guide with a short performance/data note.
@@ -580,9 +715,49 @@ budget.
 - [ ] **DS-1 — Consumer inventory and invariants.** Document every reader and
   required field; mark optional/derived fields.
 - [ ] **DS-2 — Real-store baseline.** Capture current counts/estimated bytes and
-  actual SavedVariables size for representative characters.
+  actual SavedVariables size for representative characters. Include the
+  external reference corpus copied to `/mnt/r/`; use it only as a shape/size
+  benchmark, never copy its data into the addon.
+
+  | File | Bytes | Tables | Entries | Depth | Dominant shape |
+  |---|---:|---:|---:|---:|---|
+  | `AceM2L2.lua` (current) | 70,661 | 729 | 3,366 | 7 | 21.6 KB key text; 2,326 numbers; 2.6 KB strings |
+  | `Blizzard_Console.lua` | 1,328,130 | 1,057 | 3,168 | 2 | 1,295 KB strings; 1,054 message/timestamp pairs |
+  | `TradeSkillMaster.lua` | 234,786 | 688 | 2,415 | 4 | 2,237 string keys / 30.8 KB; one 166.7 KB item-info string; nested UI state |
+  | `AllTheThings.lua` | 204,987 | 1,724 | 11,433 | 5 | sparse numeric ID sets; 50.5 KB key text; account/character/cache/UI roots |
+
+  For each store record:
+
+  - bytes, table count, entry count, max depth, key bytes, and value types;
+  - largest child subtree and whether it is player state, cache, UI, or static
+    metadata;
+  - numeric/sparse-key shape versus named-key shape;
+  - string blobs versus per-entry tables;
+  - account-wide, per-character, per-client, and profile scope;
+  - retention policy and whether the data can be reconstructed;
+  - serialization overhead from long or repeated key names.
+
+  Lessons already visible: key text can dominate structured data (our current
+  store spends ~21.6 KB of 70.7 KB on keys); one large string can be cheaper than
+  thousands of tiny records (Blizzard console); long namespaced keys and UI
+  state can dominate even with small value payloads (TSM); sparse numeric ID
+  sets are compact per entry but need clear account/character separation (ATT).
+
+  Planning ratios from this corpus (not hard limits): sparse numeric/boolean
+  maps run roughly 18-21 bytes per entry; namespaced nested/UI state roughly
+  80-100 bytes per entry; large text blobs roughly 1.2 KB per record. Our
+  current store is already at the low end per entry, so future growth will come
+  from more mob keys, contexts, instances, and heatmap cells rather than one
+  large value.
+
+  Organization consequences: separate account-wide, per-character, cache/UI,
+  and static metadata roots; prefer numeric ID keys for sets; keep long text in
+  blobs; avoid repeated long prefixes; and split reconstructable metadata from
+  player history. Combine these findings with DS-5 and DS-14.
 - [ ] **DS-3 — Synthetic scale matrix.** Generate 1x/2x/4x/6x datasets and record
-  bytes, load/prune/UI costs.
+  bytes, load/prune/UI costs. Model the three DS-2 shapes: blob/history,
+  namespaced nested state, and sparse numeric ID sets, including account versus
+  per-character scope and long-key overhead.
 - [ ] **DS-4 — Schema prototypes.** Implement and compare A–D offline; include
   per-zone vs global cap behavior.
 - [ ] **DS-5 — SavedVariables/loading API matrix.** Document multiple variables,
@@ -596,13 +771,14 @@ budget.
 - [ ] **DS-8 — Display redesign study.** Zone-first Mobs/Areas/Levels and
   heatmap-cell detail without losing identity.
 - [ ] **DS-9 — Retention and migration.** Per-zone caps, global totals, pruning,
-  downgrade behavior, schema version, and reset paths.
+  downgrade behavior, schema version, reset paths, and the DS-17 hot/warm/cold
+  lifecycle.
 - [ ] **DS-10 — Offline prototype.** Use saved-variable fixtures and synthetic
   zone-heavy/long-lived profiles to exercise packing, decode, and query paths.
   Live client verification is deferred to V-2.
 - [ ] **DS-11 — Decision record.** Choose current, identity/count split,
-  zone-first, static DB, packing, or a phased combination; include estimates and
-  a migration plan.
+  zone-first, static DB, packing, lifecycle/archive, cross-character knowledge,
+  or a phased combination; include estimates and a migration plan.
 - [ ] **DS-12 — Packed block codec.** Define the zone-block binary/string format,
   versioning, checksums, encode/decode functions, and corruption handling.
 - [ ] **DS-13 — On-demand companion packaging.** Design the LoadOnDemand
@@ -617,6 +793,32 @@ budget.
 - [ ] **DS-16 — Explicit save/checkpoint policy.** Review `C_AddOns.SaveAddOns`
   documentation and define checkpoint triggers from code. Runtime save behavior
   is deferred to V-2.
+- [ ] **DS-17 — Character lifecycle, compression, and cross-character data.**
+  Model a full 1–60/1–max leveling life, leveling vs endgame modes, hot/warm/cold
+  archive tiers, and account-wide aggregate leveling knowledge for alts. Includes
+  official zone/instance counts and cap-pressure analysis. Master:
+  `docs/TASK-DS-17-CHARACTER-LIFECYCLE-DATA.md`.
+  - [ ] **DS-17.1 — Aggregation and 64x64 sufficiency.** Prove 12k–25k kills can
+    be stored as aggregates; research feature fields, cardinality, quantization,
+    and whether 64x64 holds. Depends DS-1/DS-2/DS-3/DS-5; blocks DS-17.2/3 and
+    DS-4. `docs/tasks/DS-17-01-AGGREGATION-AND-GRID.md`.
+  - [ ] **DS-17.2 — Modes and lifecycle.** Define leveling vs endgame, archive
+    generations, mode switch, and level-cap generations. Depends DS-17.1; blocks
+    DS-17.3/DS-9/DS-11. `docs/tasks/DS-17-02-MODES-AND-LIFECYCLE.md`.
+  - [ ] **DS-17.3 — Retention and compression.** Define hot/warm/cold tiers,
+    heatmap downsampling, context collapse, and backup. Depends DS-17.1/2; blocks
+    DS-17.4/5/DS-9. `docs/tasks/DS-17-03-RETENTION-AND-COMPRESSION.md`.
+  - [ ] **DS-17.4 — Cross-character knowledge and route recommendations.**
+    Define account-wide aggregate leveling knowledge, confidence, privacy, query
+    use, and an explainable efficient-route recommendation with data-sufficiency
+    gates and held-out backtesting. Depends DS-17.1/2/3; blocks DS-17.5.
+    `docs/tasks/DS-17-04-CROSS-CHARACTER-KNOWLEDGE.md`.
+  - [ ] **DS-17.5 — Schema and migration.** Choose roots/files, versions,
+    backup, downgrade, companion, and codec envelope. Depends DS-17.1..4, DS-4,
+    DS-9; blocks DS-11. `docs/tasks/DS-17-05-SCHEMA-AND-MIGRATION.md`.
+  - [ ] **DS-17.6 — Validation and decision.** Measure 1–60/1–max and alt
+    profiles; produce the DS-11 recommendation. Depends DS-17.1..5, SC-1/SC-2.
+    `docs/tasks/DS-17-06-VALIDATION-AND-DECISION.md`.
 
 #### Review and revisions to the investigation
 
@@ -859,8 +1061,10 @@ in-game tasks to each feature section.
 - [ ] **V-5 — Map overlays/art runtime.** Fully unexplored zone on Forever and
       Midnight; art-ID/phase alignment, heat-cell alignment, overlay quality, and
       frame cost.
-- [ ] **V-6 — Documentation/release claims.** Verify player/developer docs, Data
-      diagnostics access, install from the release zip, and final release check.
+- [ ] **V-6 — Documentation/release and UI sanity.** Verify player/developer
+      docs, Data diagnostics access, install from the release zip, final release
+      check, and the Mobs list at multiple window sizes (scroll, resize, kills
+      text). The first list/resize/scroll pass has been confirmed by the user.
 
 **Carbonite live checks** remain inside the deferred Carbonite section and are
 not part of this gate until that work is reopened.

@@ -199,7 +199,7 @@ function XPTooltip:GetDataStats()
   }
   stats.totalTracked = stats.mobs + stats.quests + stats.deaths
     + stats.respawnNpcs + stats.heatmapZones + stats.levelRecords
-    + stats.rateSamples
+    + stats.rateSamples + stats.instances
 
   local estimate = { entries = 0, seen = {}, truncated = false }
   stats.estimatedBytes = EstimateSize(db, estimate)

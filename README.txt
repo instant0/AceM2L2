@@ -4,7 +4,7 @@ Ace Mobs 2 Level 2 (AceM2L2)
 XP, reputation, and Kill Story
 
 Author:     faslkjd56
-Version:    2.5.0
+Version:    2.5.1
 GameVer.:   Midnight 12.1.5 (Retail) / Forever 1.60.1 (Classic+)
 _____________________________________________________________________________________
 
@@ -65,7 +65,7 @@ Quality of life
 - Per-character history is stored separately for Forever and Midnight.
 - Native Settings sections with dedicated Tooltip and Heatmap subpages.
 - Reads safely around restricted or secret game data.
-- Minimap icon, addon-compartment entry, and Ctrl+Shift+X keybind.
+- Minimap icon and addon-compartment entry.
 - No external Ace3 install required; libraries are embedded.
 
 _____________________________________________________________________________________
@@ -95,7 +95,7 @@ ________________________________________________________________________________
 1. Copy the `AceM2L2` folder into `Interface/AddOns/`.
 2. Enable the addon and run `/reload`.
 3. Open Kill Story with `/acem2l2 xpt ui`, `/acem2l2 history`, the minimap icon,
-   the addon compartment, or Ctrl+Shift+X.
+   or the addon compartment.
 4. Open settings with `/acem2l2 config`.
 
 Commands are discoverable in game:

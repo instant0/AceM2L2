@@ -35,7 +35,7 @@ XML_REF_RE = re.compile(
 TOC_META_RE = re.compile(r"^##\s*([^:]+):\s*(.*)$")
 REQUIRED_META = {
     "Version": None,
-    "Interface": ("120105", "16001"),
+    "Interface": ("120105", "120107", "16001"),
     "SavedVariables": ("AceM2L2DB",),
     "SavedVariablesPerCharacter": ("AceM2L2CharDB",),
     "AddonCompartmentFunc": ("AceM2L2_OnCompartmentClick",),
@@ -243,18 +243,16 @@ def validate_load_order(
 def validate_bindings(root: Path, resolved: set[Path], errors: list[str]) -> None:
     bindings_xml = root / "Bindings.xml"
     bindings_lua = root / "Bindings.lua"
-    if bindings_xml.is_file() and bindings_xml.resolve() not in resolved:
-        errors.append("Bindings.xml exists but is not loaded by the TOC")
     if bindings_xml.is_file():
-        text = bindings_xml.read_text(encoding="utf-8", errors="replace")
-        for required in ("ACEM2L2_XPTOOLTIP", "AceM2L2_ToggleXPTooltip"):
-            if required not in text:
-                errors.append(f"Bindings.xml missing {required}")
-    if bindings_lua.is_file():
-        text = bindings_lua.read_text(encoding="utf-8", errors="replace")
-        for required in ("AceM2L2_ToggleXPTooltip", "AceM2L2_OnCompartmentClick"):
-            if f"function {required}" not in text:
-                errors.append(f"Bindings.lua missing function {required}")
+        errors.append("Bindings.xml should not exist; the toggle keybinding was removed")
+    if not bindings_lua.is_file():
+        errors.append("Bindings.lua is required for the addon-compartment entry point")
+        return
+    text = bindings_lua.read_text(encoding="utf-8", errors="replace")
+    if "function AceM2L2_OnCompartmentClick" not in text:
+        errors.append("Bindings.lua missing function AceM2L2_OnCompartmentClick")
+    if "AceM2L2_ToggleXPTooltip" in text:
+        errors.append("Bindings.lua still defines the removed keybinding function")
 
 
 def main() -> int:

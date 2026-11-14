@@ -1,11 +1,11 @@
-## Interface: 120105, 16001
+## Interface: 120105, 120107, 16001
 ## Title: Ace Mobs 2 Level 2 |cff7fff7f-Ace3-|r
 ## Notes: Mob XP, kills-to-level, reputation, and kill story.
 ## IconTexture: Interface\AddOns\AceM2L2\Textures\AceM2L2-icon.tga
 ## Author: faslkjd56
 ## Category: Quests & Leveling
 ## X-Category: Quests & Leveling
-## Version: 2.5.0
+## Version: 2.5.1
 ## SavedVariables: AceM2L2DB
 ## SavedVariablesPerCharacter: AceM2L2CharDB
 ## AddonCompartmentFunc: AceM2L2_OnCompartmentClick
@@ -47,4 +47,3 @@ KillHistory/UI/Minimap.lua
 KillHistory/Commands.lua
 KillHistory/Events.lua
 Bindings.lua
-Bindings.xml

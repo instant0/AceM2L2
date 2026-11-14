@@ -1623,7 +1623,12 @@ assert(module.char.dungeon.lastInstanceName == "Ruins of Lordaeron",
 assert(module.char.dungeon.lastInstance == 0 and
   module.char.dungeon.lastInstanceKey == "id:1234:2",
   "instance numeric map was not cleared")
-assert(module:GetDataStats().instances == 1, "diagnostics did not count the instance")
+local instanceStats = module:GetDataStats()
+assert(instanceStats.instances == 1, "diagnostics did not count the instance")
+assert(instanceStats.totalTracked == instanceStats.mobs + instanceStats.quests
+  + instanceStats.deaths + instanceStats.respawnNpcs + instanceStats.heatmapZones
+  + instanceStats.levelRecords + instanceStats.rateSamples + instanceStats.instances,
+  "totalTracked did not include every tracked store")
 module.tab = "areas"
 module:BuildList()
 local sawInstanceRow = false
@@ -1867,6 +1872,73 @@ state.instanceMapID = nil
 state.difficultyID = 0
 state.mapID = 12
 module:RefreshInstanceState()
+
+-- UI-1: responsive row count, row width, and kills column.
+module:ResetKills()
+for index = 1, 40 do
+  module.char.mobs["name:ui" .. index] = {
+    name = "UI Mob " .. index,
+    kills = 100 - index,
+    sessionKills = 0,
+    killsAtLevel = {},
+    killsByMap = {},
+    killsByAreaLevel = {},
+    killsByInstance = {},
+    killsByInstanceLevel = {},
+    contexts = {},
+  }
+end
+module.tab = "mobs"
+module:OpenUI()
+local responsiveUI = module.ui
+responsiveUI:SetSize(1150, 780)
+module:BuildList()
+module:UpdateRows()
+assert(responsiveUI.visibleRows > 13,
+  "taller window did not expose more than 13 list rows")
+local shownRows = 0
+for index = 1, responsiveUI.visibleRows do
+  if module.rows[index] and module.rows[index]:IsShown() then
+    shownRows = shownRows + 1
+  end
+end
+assert(shownRows == responsiveUI.visibleRows,
+  "visible row count did not match the rendered rows")
+assert(#module.rows >= responsiveUI.visibleRows,
+  "row pool did not grow for the taller window")
+assert(module.rows[1]:GetWidth() == responsiveUI.rowWidth,
+  "row width did not match the computed layout")
+assert(module.rows[1].value:GetWidth() == responsiveUI.valueWidth,
+  "kills column did not use the computed width")
+assert(responsiveUI.scrollChild:GetWidth() == responsiveUI.rowWidth,
+  "scroll child width did not match the row width")
+
+responsiveUI:SetSize(1600, 1050)
+module:UpdateRows()
+assert(responsiveUI.visibleRows > 22,
+  "wide/tall window did not add more visible rows")
+assert(responsiveUI.rowWidth > 700,
+  "wide window did not expand the row width")
+assert(responsiveUI.valueWidth <= 200,
+  "kills column exceeded its maximum width")
+
+responsiveUI:SetSize(800, 560)
+module:UpdateRows()
+assert(responsiveUI.visibleRows < 22,
+  "shorter window did not reduce the visible rows")
+assert(responsiveUI.rowWidth < 700,
+  "narrow window did not shrink the row width")
+assert(responsiveUI.valueWidth >= 70 and responsiveUI.valueWidth <= 200,
+  "kills column width is not responsive")
+assert(responsiveUI.nameWidth >= 80,
+  "name column became unreadable at the minimum width")
+assert(module.rows[responsiveUI.visibleRows + 1]
+  and not module.rows[responsiveUI.visibleRows + 1]:IsShown(),
+  "extra rows were not hidden after shrinking")
+
+responsiveUI.scrollFrame:SetVerticalScroll(5 * 28)
+module:UpdateRows()
+assert(module.rows[1].index == 6, "resize did not preserve the scroll offset")
 
 local savedNamePlate = C_NamePlate
 local savedNamePlateAvailable = module.namePlateEventAvailable

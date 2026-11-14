@@ -54,7 +54,7 @@ fi
 
 echo "== XML validation =="
 if command -v xmllint >/dev/null 2>&1; then
-  xmllint --noout embeds.xml Bindings.xml
+  xmllint --noout embeds.xml
 else
   echo "WARNING: xmllint not found; skipped XML validation."
 fi

@@ -1,7 +1,6 @@
--- AceM2L2 bindings and addon-compartment entry points.
-
-BINDING_HEADER_ACEM2L2 = "Ace Mobs 2 Level 2"
-BINDING_NAME_ACEM2L2_XPTOOLTIP = "Toggle Kill Story"
+-- AceM2L2 addon-compartment entry point.
+-- The Kill Story window is opened from the minimap icon, the addon
+-- compartment, or the /acem2l2 commands. There is no key binding.
 
 local function ToggleXPTooltip()
   local addon = _G.AceM2L2
@@ -12,10 +11,6 @@ local function ToggleXPTooltip()
   if module and type(module.ToggleUI) == "function" then
     module:ToggleUI()
   end
-end
-
-function AceM2L2_ToggleXPTooltip()
-  ToggleXPTooltip()
 end
 
 function AceM2L2_OnCompartmentClick()

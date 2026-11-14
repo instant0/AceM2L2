@@ -17,6 +17,93 @@ local FormatNumber = Util.FormatNumber
 local CreateBackdropFrame = UI.CreateBackdropFrame
 local CreateTextButton = UI.CreateTextButton
 
+local MIN_LIST_ROWS = 1
+local MAX_LIST_ROWS = 64
+local MIN_ROW_WIDTH = 240
+
+local function GetResizeBounds()
+  local screenWidth, screenHeight = 1920, 1080
+  if UIParent and type(UIParent.GetWidth) == "function" then
+    local ok, width = pcall(UIParent.GetWidth, UIParent)
+    if ok and tonumber(width) and width > 0 then
+      screenWidth = width
+    end
+  end
+  if UIParent and type(UIParent.GetHeight) == "function" then
+    local ok, height = pcall(UIParent.GetHeight, UIParent)
+    if ok and tonumber(height) and height > 0 then
+      screenHeight = height
+    end
+  end
+  local minWidth = 800
+  local minHeight = 560
+  local maxWidth = max(1000, min(1920, floor(screenWidth - 40)))
+  local maxHeight = max(700, min(1200, floor(screenHeight - 80)))
+  if maxWidth < minWidth then maxWidth = minWidth end
+  if maxHeight < minHeight then maxHeight = minHeight end
+  return minWidth, minHeight, maxWidth, maxHeight
+end
+
+local function CreateListRow(self, parent, index, rowWidth)
+  local row = CreateFrame("Button", nil, parent)
+  row:SetSize(rowWidth or MIN_ROW_WIDTH, ROW_HEIGHT)
+  row:SetPoint("TOPLEFT", 0, -((index - 1) * ROW_HEIGHT))
+  row:Hide()
+
+  local background = row:CreateTexture(nil, "BACKGROUND")
+  background:SetAllPoints()
+  background:SetColorTexture(1, 1, 1, 0.04)
+  row.background = background
+
+  local crest = row:CreateTexture(nil, "ARTWORK")
+  crest:SetSize(18, 18)
+  crest:SetPoint("LEFT", 8, 0)
+  crest:SetColorTexture(0.85, 0.66, 0.31, 0.55)
+  row.crest = crest
+
+  local crestText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  crestText:SetPoint("CENTER", crest, "CENTER", 0, 0)
+  crestText:SetJustifyH("CENTER")
+  crestText:SetText("?")
+  row.crestText = crestText
+
+  local bar = row:CreateTexture(nil, "ARTWORK")
+  bar:SetPoint("BOTTOMLEFT", 4, 2)
+  bar:SetHeight(2)
+  bar:SetColorTexture(0.2, 0.6, 1, 0.45)
+  bar:Hide()
+  row.bar = bar
+
+  local text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  text:SetPoint("LEFT", 32, 0)
+  text:SetWidth(max(80, (rowWidth or MIN_ROW_WIDTH) - 160))
+  text:SetJustifyH("LEFT")
+  row.text = text
+
+  local value = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  value:SetPoint("RIGHT", -8, 0)
+  value:SetWidth(140)
+  value:SetJustifyH("RIGHT")
+  row.value = value
+
+  row:SetScript("OnClick", function(clicked)
+    pcall(self.SelectIndex, self, clicked.index)
+  end)
+  row:SetScript("OnEnter", function(entered)
+    local theme = self:GetTheme()
+    entered.background:SetColorTexture(theme.accent[1], theme.accent[2], theme.accent[3], 0.16)
+  end)
+  row:SetScript("OnLeave", function(left)
+    local theme = self:GetTheme()
+    if left.index == self.selectedIndex then
+      left.background:SetColorTexture(theme.accentSoft[1], theme.accentSoft[2], theme.accentSoft[3], theme.accentSoft[4])
+    else
+      left.background:SetColorTexture(1, 1, 1, 0.04)
+    end
+  end)
+  return row
+end
+
 function XPTooltip:CreateUI()
   if self.ui then
     return self.ui
@@ -24,8 +111,11 @@ function XPTooltip:CreateUI()
 
   local settings = self.settings or self:GetSettings()
   local uiSettings = settings and settings.ui or DEFAULT_UI
+  local minWidth, minHeight, maxWidth, maxHeight = GetResizeBounds()
+  local width = max(minWidth, min(maxWidth, tonumber(uiSettings.width) or 1150))
+  local height = max(minHeight, min(maxHeight, tonumber(uiSettings.height) or 780))
   local frame = CreateBackdropFrame(UIParent, "AceM2L2XPTooltipFrame")
-  frame:SetSize(uiSettings.width or 1000, uiSettings.height or 680)
+  frame:SetSize(width, height)
   frame.panels = {}
   if frame.SetScale then
     frame:SetScale((settings and settings.scale) or 1.0)
@@ -38,10 +128,10 @@ function XPTooltip:CreateUI()
     frame:SetResizable(true)
   end
   if frame.SetResizeBounds then
-    pcall(frame.SetResizeBounds, frame, 900, 600, 1400, 1050)
+    pcall(frame.SetResizeBounds, frame, minWidth, minHeight, maxWidth, maxHeight)
   else
-    if frame.SetMinResize then pcall(frame.SetMinResize, frame, 900, 600) end
-    if frame.SetMaxResize then pcall(frame.SetMaxResize, frame, 1400, 1050) end
+    if frame.SetMinResize then pcall(frame.SetMinResize, frame, minWidth, minHeight) end
+    if frame.SetMaxResize then pcall(frame.SetMaxResize, frame, maxWidth, maxHeight) end
   end
   self:StylePanel(frame, "canvas")
   frame.panels[#frame.panels + 1] = frame
@@ -304,63 +394,7 @@ function XPTooltip:CreateUI()
 
   self.rows = {}
   for index = 1, VISIBLE_ROWS do
-    local row = CreateFrame("Button", nil, scrollChild)
-    row:SetSize(rowWidth, ROW_HEIGHT)
-    row:SetPoint("TOPLEFT", 0, -((index - 1) * ROW_HEIGHT))
-
-    local background = row:CreateTexture(nil, "BACKGROUND")
-    background:SetAllPoints()
-    background:SetColorTexture(1, 1, 1, 0.04)
-    row.background = background
-
-    local crest = row:CreateTexture(nil, "ARTWORK")
-    crest:SetSize(18, 18)
-    crest:SetPoint("LEFT", 8, 0)
-    crest:SetColorTexture(0.85, 0.66, 0.31, 0.55)
-    row.crest = crest
-
-    local crestText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    crestText:SetPoint("CENTER", crest, "CENTER", 0, 0)
-    crestText:SetJustifyH("CENTER")
-    crestText:SetText("?")
-    row.crestText = crestText
-
-    local bar = row:CreateTexture(nil, "ARTWORK")
-    bar:SetPoint("BOTTOMLEFT", 4, 2)
-    bar:SetHeight(2)
-    bar:SetColorTexture(0.2, 0.6, 1, 0.45)
-    bar:Hide()
-    row.bar = bar
-
-    local text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    text:SetPoint("LEFT", 32, 0)
-    text:SetWidth(max(110, rowWidth - 250))
-    text:SetJustifyH("LEFT")
-    row.text = text
-
-    local value = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    value:SetPoint("RIGHT", -8, 0)
-    value:SetWidth(200)
-    value:SetJustifyH("RIGHT")
-    row.value = value
-
-    row:SetScript("OnClick", function(clicked)
-      pcall(self.SelectIndex, self, clicked.index)
-    end)
-    row:SetScript("OnEnter", function(entered)
-      local theme = self:GetTheme()
-      entered.background:SetColorTexture(theme.accent[1], theme.accent[2], theme.accent[3], 0.16)
-    end)
-    row:SetScript("OnLeave", function(left)
-      local theme = self:GetTheme()
-      if left.index == self.selectedIndex then
-        left.background:SetColorTexture(theme.accentSoft[1], theme.accentSoft[2], theme.accentSoft[3], theme.accentSoft[4])
-      else
-        left.background:SetColorTexture(1, 1, 1, 0.04)
-      end
-    end)
-
-    self.rows[index] = row
+    self.rows[index] = CreateListRow(self, scrollChild, index, rowWidth)
   end
 
   local modelHolder = CreateBackdropFrame(detailPanel)
@@ -469,6 +503,74 @@ function XPTooltip:CreateUI()
   self:SetTab((settings and settings.startTab) or "overview")
   self:UpdateFooter()
   return frame
+end
+
+function XPTooltip:EnsureListRow(index)
+  if not self.ui or not self.ui.scrollChild then
+    return nil
+  end
+  self.rows = self.rows or {}
+  local row = self.rows[index]
+  if row then
+    return row
+  end
+  if index > MAX_LIST_ROWS then
+    return nil
+  end
+  row = CreateListRow(self, self.ui.scrollChild, index, self.ui.rowWidth or MIN_ROW_WIDTH)
+  self.rows[index] = row
+  return row
+end
+
+function XPTooltip:UpdateListLayout()
+  local ui = self.ui
+  if not ui or not ui.scrollFrame or not ui.scrollChild then
+    return nil
+  end
+
+  local viewportWidth = 0
+  if type(ui.scrollFrame.GetWidth) == "function" then
+    viewportWidth = tonumber(ui.scrollFrame:GetWidth()) or 0
+  end
+  if viewportWidth <= 0 then
+    viewportWidth = (tonumber(ui:GetWidth()) or 0) - 384
+  end
+  local rowWidth = max(MIN_ROW_WIDTH, floor(viewportWidth - 8))
+  local valueWidth = max(70, min(200, floor(rowWidth * 0.30)))
+  local nameWidth = max(80, rowWidth - 32 - valueWidth - 16)
+  ui.rowWidth = rowWidth
+  ui.valueWidth = valueWidth
+  ui.nameWidth = nameWidth
+  ui.scrollChild:SetWidth(rowWidth)
+
+  for _, row in pairs(self.rows or {}) do
+    if row then
+      row:SetWidth(rowWidth)
+      if row.text then
+        row.text:SetWidth(nameWidth)
+      end
+      if row.value then
+        row.value:SetWidth(valueWidth)
+      end
+    end
+  end
+
+  local viewportHeight = 0
+  if type(ui.scrollFrame.GetHeight) == "function" then
+    viewportHeight = tonumber(ui.scrollFrame:GetHeight()) or 0
+  end
+  if viewportHeight <= 0 then
+    viewportHeight = (tonumber(ui:GetHeight()) or 0) - 170
+  end
+  if viewportHeight <= 0 then
+    viewportHeight = VISIBLE_ROWS * ROW_HEIGHT
+  end
+  local visibleRows = math.max(
+    MIN_LIST_ROWS,
+    math.min(MAX_LIST_ROWS, math.ceil(viewportHeight / ROW_HEIGHT))
+  )
+  ui.visibleRows = visibleRows
+  return visibleRows
 end
 
 function XPTooltip:SaveUIPosition()

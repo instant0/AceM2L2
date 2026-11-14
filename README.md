@@ -1,14 +1,14 @@
 # Ace Mobs 2 Level 2 (AceM2L2)
 
 AceM2L2 is a World of Warcraft addon that reports XP and reputation progress
-and provides a **Kill Story** browser for Forever 1.60.1 and Midnight 12.1.5.
+and provides a **Kill Story** browser for Forever 1.60.1 and Midnight 12.1.x.
 Forever gets the full XP/tooltip experience; Midnight gets counts-focused
 history plus the non-XP features until its XP data is live-verified.
 
-- **Version:** 2.5.0
+- **Version:** 2.5.1
 - **Author:** faslkjd56
-- **Interfaces:** Midnight `120105`, Forever `16001`
-- **Clients:** Midnight 12.1.5 and Forever 1.60.1
+- **Interfaces:** Midnight `120105`/`120107`, Forever `16001`
+- **Clients:** Midnight 12.1.5 retail, 12.1.7 PTR interface-ready, Forever 1.60.1
 - **License:** GNU GPL v3
 
 The player-facing guide is [`README.txt`](README.txt). This document covers the
@@ -44,11 +44,12 @@ window.
 |---|---:|---:|---|---|
 | Forever 1.60.1 | `18` | `16001` | Supported | Full |
 | Midnight 12.1.5 | `1` | `120105` | Supported | Counts-focused |
+| Midnight 12.1.7 (PTR) | `1` | `120107` | Interface-ready; API audit pending | Counts-focused |
 
 The TOC intentionally lists both interface versions:
 
 ```text
-## Interface: 120105, 16001
+## Interface: 120105, 120107, 16001
 ```
 
 Both clients share the non-XP history: kill counts, heatmap, death locations,
@@ -129,7 +130,7 @@ model. Client-specific policy lives only in `KillHistory/Client.lua` and
 - Search, filters, sort modes, relative bars, and a 3D model hero card.
 - Aether Blue default theme plus dark, midnight, class-color, and
   high-contrast themes.
-- Minimap launcher, addon-compartment entry, and `Ctrl+Shift+X` keybind.
+- Minimap launcher and addon-compartment entry.
 - Single-entry deletion and Unknown-only cleanup.
 
 **Midnight 12.1.5 — counts-focused mode**
@@ -490,8 +491,7 @@ KillHistory/UI/Nameplates.lua  Optional Midnight nameplate levels
 KillHistory/UI/Heatmap.lua     Heatmap panel, zone pager, and map art
 KillHistory/UI/Diagnostics.lua Data counts, limits, and approximate size panel
 KillHistory/UI/            Theme, widgets, list, detail, overview, window, minimap
-Bindings.lua               Keybind and addon-compartment entry points
-Bindings.xml               Ctrl+Shift+X binding definition
+Bindings.lua               Addon-compartment entry point
 embeds.xml                 Embedded library load order
 Libs/                      LibStub, CallbackHandler, Ace3, LibDataBroker, LibDBIcon
 tests/snapshot.lua         Deterministic behavior snapshot
@@ -520,7 +520,7 @@ BROCHURE.md                CurseForge-style promotional brochure
 - `luac` for syntax checks
 - `xmllint` for XML validation
 - Python 3 for reproducible zip packaging
-- A Forever 1.60.1 or Midnight 12.1.5 client for live verification
+- A Forever 1.60.1 or Midnight 12.1.x client for live verification
 
 ### Offline checks
 
@@ -552,7 +552,7 @@ lua tests/smoke.lua midnight_secret_booleans
 lua tests/smoke.lua midnight_secret_name
 lua tests/smoke.lua unknown
 lua tests/libs_smoke.lua
-xmllint --noout embeds.xml Bindings.xml
+xmllint --noout embeds.xml
 python3 tests/check_layout.py
 python3 tests/check_release.py   # release-time only
 ```
@@ -570,7 +570,7 @@ schema blocking.
 - every `<Script file="...">` and `<Include file="...">` in referenced XML
   resolves with exact filename case,
 - every root-level Lua file is loaded by the TOC,
-- `Bindings.xml` is loaded when it exists,
+- `Bindings.xml` is absent after the toggle keybinding was removed,
 - the checkout folder name matches the TOC basename.
 
 It prints a warning for a local checkout named `acem2l2` because the release
@@ -606,7 +606,6 @@ The release zip has a single top-level `AceM2L2/` directory containing:
 - `Core/`
 - `KillHistory/`
 - `Bindings.lua`
-- `Bindings.xml`
 - `embeds.xml`
 - `README.txt`
 - `LICENSE`
@@ -629,9 +628,9 @@ checks skip release validation unless `CHECK_RELEASE=1`.
 Current release artifacts:
 
 ```text
-dist/AceM2L2-2.5.0.zip
-/mnt/r/AceM2L2-2.5.0.zip
-SHA-256: e78fa3d12af66329b8c31d3009512d829136deb90a6f4a415d69f770defc341b
+dist/AceM2L2-2.5.1.zip
+/mnt/r/AceM2L2-2.5.1.zip
+SHA-256: 83f990162d6e3a100545a72793a9716f7966e19462ba39efa49f60b213664e58
 ```
 
 Both copies are validated when present. Copy the `dist/` zip to `/mnt/r/` when
@@ -644,7 +643,7 @@ release artifact.
 
 Documentation-only changes to `README.md` do not require rebuilding the
 release zip. Rebuild only when a packaged file changes (Lua, TOC, embeds,
-Bindings, Libs, `README.txt`, or `LICENSE`).
+Bindings.lua, Libs, `README.txt`, or `LICENSE`).
 
 ## Known Limitations
 

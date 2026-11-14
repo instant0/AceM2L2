@@ -64,7 +64,7 @@ and keeps the non-XP history; nameplate levels are Midnight-only.
 ## A quick look
 
 - Open the window with `/acem2l2 xpt ui`, `/acem2l2 history`, the minimap icon,
-  the addon compartment, or `Ctrl+Shift+X`.
+  or the addon compartment.
 - Open settings with `/acem2l2 config`.
 - Discover commands in game with `/acem2l2 help` and `/acem2l2 xpt help`.
 - Tabs: **Overview, Mobs, Areas, Heatmap, Levels**.
@@ -89,6 +89,19 @@ and keeps the non-XP history; nameplate levels are Midnight-only.
   off until its data is live-verified.
 
 ## Changelog
+
+### Unreleased
+
+- Removed the Ctrl+Shift+X toggle keybinding; the minimap icon, addon
+  compartment, and commands remain.
+
+### 2.5.1
+
+- The mobs list now uses the available window height instead of a fixed
+  13-row limit.
+- Row, name, and kills-column widths reflow when the window is resized, so the
+  kills text stays visible on narrow windows.
+- The window can grow beyond the previous 1400 px width limit.
 
 ### 2.5.0
 

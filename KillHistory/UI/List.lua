@@ -155,6 +155,9 @@ function XPTooltip:BuildList()
 
   self.currentList = list
   if self.ui and self.ui.scrollChild then
+    if type(self.UpdateListLayout) == "function" then
+      pcall(self.UpdateListLayout, self)
+    end
     self.ui.scrollChild:SetSize(self.ui.rowWidth or 390, math.max(1, #list * ROW_HEIGHT))
     if self.ui.scrollFrame and self.ui.scrollFrame.UpdateScrollChildRect then
       pcall(self.ui.scrollFrame.UpdateScrollChildRect, self.ui.scrollFrame)
@@ -180,14 +183,24 @@ function XPTooltip:UpdateRows()
   if self.ui and self.ui.scrollFrame then
     offset = SafeNumber(self.ui.scrollFrame:GetVerticalScroll()) or 0
   end
+  if type(self.UpdateListLayout) == "function" then
+    pcall(self.UpdateListLayout, self)
+  end
+  local visibleRows = self.ui.visibleRows or VISIBLE_ROWS
   local startIndex = floor(offset / ROW_HEIGHT) + 1
   local theme = self:GetTheme()
   local eliteColor = { 1.00, 0.82, 0.20 }
   local bossColor = { 0.90, 0.30, 0.30 }
   local rareColor = { 0.30, 0.65, 0.95 }
 
-  for index = 1, #self.rows do
+  for index = 1, visibleRows do
     local row = self.rows[index]
+    if not row and type(self.EnsureListRow) == "function" then
+      row = self:EnsureListRow(index)
+    end
+    if not row then
+      break
+    end
     local data = list[startIndex + index - 1]
     row:ClearAllPoints()
     row:SetPoint("TOPLEFT", self.ui.scrollChild, "TOPLEFT", 0, -((startIndex + index - 2) * ROW_HEIGHT))
@@ -227,6 +240,14 @@ function XPTooltip:UpdateRows()
         row.background:SetColorTexture(1, 1, 1, 0.04)
       end
     else
+      row.index = nil
+      row.bar:Hide()
+      row:Hide()
+    end
+  end
+  for index = visibleRows + 1, #self.rows do
+    local row = self.rows[index]
+    if row then
       row.index = nil
       row.bar:Hide()
       row:Hide()

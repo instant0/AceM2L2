@@ -12,7 +12,6 @@ ROOT_FILES = (
     "AceM2L2.toc",
     "ACEM2L2.lua",
     "Bindings.lua",
-    "Bindings.xml",
     "embeds.xml",
     "README.txt",
     "LICENSE",
