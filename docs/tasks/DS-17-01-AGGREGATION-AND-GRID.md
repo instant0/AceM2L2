@@ -1,172 +1,199 @@
 # DS-17.1 — Data organization and query sufficiency
 
-**Status:** in progress; capacity math complete; remaining feature-to-data and
+**Status:** in progress; capacity model complete; DS-3B worst-case validation
+pending; remaining feature-to-data, hot/warm/cold boundary, required keys, and
 64×64 decision  
 **Parent:** DS-17  
-**Depends on:** DS-1 (consumer inventory), DS-2 (real-store baseline), DS-3
-(synthetic scale matrix), DS-5 (SavedVariables/loading API matrix)  
-**Blocks:** DS-17.2, DS-17.3. DS-4 representation design is complete.  
-**Question:** what organization best serves efficiency, speed, correctness, and
-reuse while representing 12k–32.5k kills without a per-kill log?
+**Depends on:** DS-1 (consumer contract), DS-2 (reference baseline only), DS-3
+(small/medium sanity check), DS-3B (massive synthetic validation), DS-5
+(loading/API matrix), `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`  
+**Blocks:** DS-17.2, DS-17.3, DS-4P, DS-17.5. DS-4 hot representation is settled.  
+**Question:** what minimum durable units and hot/warm/cold split serve
+15k–32.5k kills and the 200-zone/200-instance tiers without a per-kill log?
 
 ## Scope
 
-Determine the minimum durable data units for:
+Decide:
 
-- heatmap activity;
-- mob identity/kill counts;
-- level bands;
-- zones and instances;
-- session/rate summaries;
-- future Journey and cell-inspector use cases.
+- the feature-to-data matrix;
+- the hot/warm/cold boundary;
+- the required hot-index and cold-block fields;
+- whether 64×64 is sufficient for heatmap, route, and cell-inspector meaning;
+- the no-global-cap retention rule;
+- what must be stored per mob/level/zone/instance/context/session.
 
-Confirm whether the current 64×64 cells plus per-mob/level/zone/instance counters
-are sufficient, or whether a specific feature needs extra identity. Evaluate
-zone-first, identity/count split, packed blocks, and hybrid layouts against the
-storage objectives. Include **zone-scoped loading**:
+Do **not** reopen choices already settled by DS-4/DS-5:
+
+- Lua tables, not JSON;
+- stable IDs, not checksum identity;
+- sparse 64×64 cells, not per-kill coordinates;
+- no per-kill event log;
+- account vs per-character scope;
+- no per-zone SavedVariables files.
+
+Include zone-scoped retrieval:
 
 - tooltip lookup for the hovered mob without loading every zone;
 - current/selected heatmap zone with eviction;
 - a compact global identity/name index for fallback;
 - correct behavior when a subset is not loaded.
 
-Exact content counts are not required; capacity tiers are stress tests.
+Exact content counts are not required.
 
-### DS-5 loading constraints
+## Inputs
 
-Use `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md` as a hard input:
+- **Primary capacity input:** `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`.
+- **Pending validation:** `docs/tasks/DS-3B-MASSIVE-SYNTHETIC-VALIDATION.md`;
+  use its actual bytes before finalizing hot/cold boundaries.
+- **Consolidated research:** `docs/STORAGE-STRATEGY.md`.
+- **Consumer contract:** `docs/tasks/DS-1-CONSUMER-CONTRACT.md`.
+- **Loading/API constraints:** `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`.
+- **Reference only:** `docs/tasks/DS-2-REAL-STORE-BASELINE.md`; the 762-kill
+  store is not the design target.
+- **Small/medium proof only:** `docs/DS-3-STORAGE-SANITY-RESULT.md`.
+- **Heatmap measurements:** `docs/H64-9-BENCHMARK-REPORT.md`.
+
+## DS-5 loading constraints
 
 - A normal addon loads all of its SavedVariables together. Account data loads
-  for every character; `SavedVariablesPerCharacter` loads only the active
-  character.
+  for every character; per-character data loads only for the active character.
 - Multiple variables do not defer loading. Only a LoadOnDemand companion can
   defer its code and, subject to V-2 timing proof, its variables.
 - There are no per-zone SavedVariables files. Zone laziness is in-memory
   decode/normalize/UI, packed blocks, or a companion.
-- `LoadSavedVariablesFirst` changes only the file/`ADDON_LOADED` order. It does
-  not reduce what is loaded.
-- `SaveAddOns` is a checkpoint, not a per-kill write and not a synchronous
-  durability guarantee.
+- `LoadSavedVariablesFirst` changes order only; it does not reduce load.
+- `SaveAddOns` is a checkpoint, not a synchronous durability guarantee.
 - `SAVED_VARIABLES_TOO_LARGE` is an out-of-memory load-failure path; the
   variables will not save on the next logout.
 
 Do not design a layout that assumes partial SavedVariables loading.
 
-### Capacity input
-
-The large-dataset calculation is in
-`docs/DS-17-1-CAPACITY-AND-STRATEGY.md`: 250 kills/level, 15k–32.5k kills,
-40/100/200 zones, 50/100/200 instances, 2,000 mobs, 4/8/12 contexts, and
-sparse/1k/4k cells. It found contexts and dense heatmaps are the dominant
-growth, not kill count. The current 2,000-mob / 40-zone / 100-instance caps are
-too small for the 200-zone/200-instance tiers. The decision must define a
-bounded hot tier plus packed cold archives, not just larger global caps. Use that
-document as the starting point; do not repeat the small real-store baseline as
-the design target.
-
 ## Required scale cases
 
-Exact content counts are not required. Use entry tiers and player scenarios:
+Exact content counts are not required. Use player and dimension tiers.
 
-- 100 / 1,000 / 10,000 / 100,000 entries; 350,000 as an external upper-bound
-  reference (AllTheThings-scale), not a target.
-- Level 1, level 20, max-level/endgame, first alt with a 1–60 archive, and a
-  10-year veteran with multiple alts/archives.
-- Forever 1–60 at 250 kills/level = 15,000 kills; 18k–25k with instances.
-- Midnight 1–90 = 22,500 leveling kills; 25.5k–32.5k with instances.
-- 40/100/200 zones, 50/100/200 instances as capacity tiers, not exact game
-  counts; dungeons, raids, PvP, and scenarios are separate categories.
-- 500/1,000/2,000 tracked mobs; 4/8/12 contexts.
-- 100/1,000/4,096 heatmap cells; 1:1, 4:1, 1:4, irregular.
+| Dimension | Tier A | Tier B | Tier C |
+|---|---:|---:|---:|
+| Kills | 15,000 | 22,500 | 32,500 |
+| Unique mobs | 500 | 1,000 | 2,000 |
+| Open-world zones/areas | 40 | 100 | 200 |
+| Instance records | 50 | 100 | 200 |
+| Heatmap cells per zone | 100 | 1,000 | 4,096 |
+| Contexts per mob | 4 | 8 | 12 |
+| Mob map/instance links | 2–4 | 4–8 | 8–20 |
 
-The model must represent these totals without a per-kill row and without
+Player scenarios:
+
+- level 1, first character;
+- level 20 leveling;
+- max-level/endgame;
+- first alt with a 1–60 archive;
+- 10-year veteran with multiple alts/archives.
+
+The 100,000-entry and 350,000-entry (AllTheThings-scale) figures are stress
+ceilings, not player scenarios or targets.
+
+The design must represent these without a per-kill row and without
 special-casing a particular content count.
 
 ## Research questions
 
-1. **Kill math.** Confirm 250 kills/level × 48/60 levels, plus 100 kills ×
-   30/50/100 instances. Record the minimum, typical, and completionist totals.
-2. **Scenario cardinality.** How many unique mobs, zones, and instances do the
-   level-1, level-20, max-level, first-alt, and 10-year-veteran scenarios create?
-   Use DS-2 data and synthetic DS-3 profiles; no exact game census is required.
+1. **Kill math.** Confirm 250 kills/level × 60/90 levels, plus 100 kills ×
+   30/50/100 instances. Record minimum, typical, and completionist totals.
+2. **Scenario cardinality.** For level 1, level 20, max level, first alt, and
+   10-year veteran, record unique mobs, zones, instances, contexts, and cells
+   using the capacity tiers. Do not use the 762-kill baseline as the target.
 3. **Feature-to-data matrix.** For each feature (heatmap, mob list, area list,
-   level list, tooltip, Journey, cell inspector), list the required fields and
-   whether an aggregate can answer it.
+   level list, tooltip, diagnostics, Journey, cell inspector), record:
+   - scope;
+   - required fields;
+   - hot/warm/cold unit;
+   - query/index;
+   - fallback when a subset is absent;
+   - retention.
 4. **64×64 quantization.** How many kills per cell are realistic? Does a cell
-   aggregate preserve the route/heat/cell-inspector meaning? What is lost versus
-   a 96×96 or 128×128 grid? How do wide, tall, and irregular zones affect
-   occupied versus empty cells and effective resolution per axis?
+   aggregate preserve route/heat/cell-inspector meaning? What is lost versus
+   96×96 or 128×128? How do wide/tall/irregular zones affect occupied versus
+   empty cells and effective resolution?
 5. **Identity needs.** Which features need mob identity, level identity, or
    instance identity beyond a cell count?
 6. **Aggregation dimensions.** Confirm the minimum keys:
    `mob`, `level`, `map`, `instance`, `context`, `session`.
 7. **Kill events.** Prove that no per-kill timestamp/event log is needed. If one
    is needed, name the exact feature, retention, and cost.
-8. **Cap pressure.** Compare 40 heatmap zones/100 instances/2,000 mobs with the
-   scenario profiles and capacity tiers; treat dungeons, raids, PvP, and
-   scenarios as separate categories.
-9. **Sparse versus dense.** Estimate cells per visited zone at 100, 1k, and
-   4,096 active cells.
+8. **Cap pressure.** Compare 40/100/200 zones and 50/100/200 instances with the
+   player tiers. The current 2,000-mob/40-zone/100-instance caps are too small
+   for the massive tier; decide the replacement retention rule.
+9. **Sparse versus dense.** Estimate active cells per visited zone at 100, 1,000,
+   and 4,096.
 10. **Aspect ratio and empty cells.** Measure 1:1, 4:1, 1:4, and irregular
-    zone/land shapes. Record occupied versus empty cells, storage cost of empty
-    cells (should be zero in sparse tables), effective east-west/north-south
-    resolution, and whether a square grid wastes resolution or storage.
-11. **Grid alternatives.** Compare square 64, 96/128, rectangular, and
+    shapes. Record occupied versus empty cells, storage cost of empty cells
+    (zero in sparse tables), effective resolution per axis, and whether a square
+    grid wastes resolution or storage.
+11. **Hot/warm/cold split.** For each feature and data unit, state what stays
+    hot, what is downsampled, what is packed, and what is summarized/dropped.
+12. **Grid alternatives.** Compare square 64, 96/128, rectangular, and
     occupied-mask options only after the aspect-ratio data is collected.
-
-## Content categories
-
-Use planning buckets rather than exact counts:
-
-- outdoor zones (~200 unique names on Midnight);
-- dungeons;
-- raids;
-- PvP battlegrounds/arenas;
-- scenarios/delves.
-
-`UiMap` dungeon-type rows include variants/difficulties; do not treat them as
-unique dungeons. Exact counts are not required for this task.
 
 ## Work items
 
-- Build a feature-to-field table from DS-1.
-- Define hot/warm/cold boundaries and replace global caps with per-zone/per-block
-  retention.
-- Define the hot index fields and the cold packed-block fields separately.
-- Reuse the DS-3 harness for kill/cardinality cases; add only cases the
-  aggregation decision actually needs.
-- Run 64×64 occupancy and quantization experiments on real/synthetic data,
-  including wide/tall/irregular zones and empty-cell ratios.
+- Build the feature-to-data matrix from DS-1.
+- Consume DS-3B actual bytes/Lua heap and correct the capacity range if needed.
+- Define hot/warm/cold boundaries and replace the 2,000-mob/40-zone/100-instance
+  global caps with per-zone/per-block retention.
+- Define the hot-index fields and the cold packed-block fields separately.
+- Reuse the capacity tiers; use the DS-3/H64-9 harness only for 64×64 occupancy
+  and quantization tests.
+- Run 64×64 occupancy and quantization experiments, including wide/tall/
+  irregular zones and empty-cell ratios.
 - Decide whether 64×64 is sufficient for heatmap, route, and inspector, or
   whether an aspect-aware/occupied-mask option is justified.
-- Record what must be stored per mob/level/zone/instance.
+- Record what must be stored per mob/level/zone/instance/context/session.
 - Produce a short "do not store per kill" decision with evidence.
+- Produce the DS-4P inputs: hot-index fields, cold-block fields, per-zone
+  retention, and the query/index list.
 
 ## Deliverables
 
-- Aggregation decision note.
-- Feature-to-data matrix.
-- Unique-cardinality table per profile.
-- 64×64 sufficiency recommendation.
-- Hot/warm/cold boundary and cap-retention policy.
-- Required-key list for the hot index and cold blocks.
+- aggregation decision note;
+- feature-to-data matrix;
+- unique-cardinality table per player profile;
+- 64×64 sufficiency recommendation;
+- hot/warm/cold boundary and cap-retention policy;
+- required-key list for the hot index and cold blocks;
+- DS-4P hybrid prototype inputs;
+- named follow-ups.
 
 ## Acceptance criteria
 
-- Every feature has a documented data requirement.
+- Every feature has a documented scope, required fields, hot/cold unit, query,
+  fallback, and retention.
 - The 64×64 grid is explicitly accepted or rejected with occupancy,
   aspect-ratio, and empty-cell evidence.
 - The design does not rely on the current 2,000-mob/40-zone/100-instance caps as
   the massive-scale limit.
 - Hot, warm, and cold storage units are explicit.
 - No per-kill log is introduced without a named feature and measured cost.
-- The required aggregate keys are stable enough for DS-4.
+- Settled DS-4/DS-5 choices are not reopened.
+- Required keys are stable enough for DS-4P and DS-17.5.
 - DS-17.2/DS-17.3 can proceed without guessing.
 
 ## Risks
 
 - 64×64 may be too coarse for a future cell inspector; that is acceptable only
   if the inspector does not require finer resolution.
-- Real players may visit many more zones than 40; the cap decision belongs to
-  DS-17.3/SC.
-- Cardinality may be dominated by contexts, not kills.
+- The 40-zone hot tier is not a content limit; DS-17.3 sets retention and
+  downsampling.
+- Cardinality is dominated by contexts and heatmap cells, not kills.
+- Entry-count stress tests can mislead; use player tiers plus dimensions.
+- A single projected byte count is false precision until the hot/cold boundary
+  is chosen.
+
+## Safe execution
+
+1. Finish the feature-to-data matrix and required keys. No code.
+2. Run the 64×64/aspect-ratio decision. Offline only.
+3. Feed DS-17.2/DS-17.3 and DS-4P.
+4. Do not change production schema or global caps in this task.
+
+The first safe code task after DS-17.1 is `DS-1-F2` in-memory indexes.

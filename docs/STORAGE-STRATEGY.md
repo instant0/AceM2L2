@@ -130,11 +130,12 @@ only.
 
 | Concern | Task / status |
 |---|---|
-| Loading, unloading, eviction, UI release | MEM-2 task; DS-15/DS-16; not implemented |
+| Loading, unloading, eviction, UI release | MEM-2 task; DS-15/DS-16; design after DS-17.3; not implemented |
 | Account vs character vs static vs companion split | DS-5 done; root matrix in `docs/STORAGE-DIRECTION.md`; final schema DS-17.5 |
 | Level 1 / level 20 / max level / first alt / veteran | DS-1 contract done; DS-17 master; DS-17.1/2/3/4 pending |
 | Best storage representation | DS-4 done/revised; capacity doc done; DS-4P hybrid prototype required |
-| Retrieval and indexes | DS-1 consumer contract done; DS-1-F2 index pending; DS-15 pending |
+| Retrieval and indexes | DS-1 consumer contract done; DS-1-F2 index is the safe first code task; DS-15 pending |
+| Capacity validation | DS-3B next: one actual worst-case synthetic file; model is provisional |
 | Packed cold blocks | DS-7/DS-12 pending; required for massive |
 | Memory comparison and budget | MEM-1 partial; MEM-2 pending; V-2 live check |
 | Game/client static data | DS-6 pending; use IDs and static Lua where feasible |
@@ -214,6 +215,8 @@ cold/downsampled archives.
 
 ## Task map
 
+- **DS-3B:** one actual worst-case synthetic file to validate/correct the
+  capacity model before final hot/cold decisions.
 - **DS-17.1:** feature-to-data matrix, cardinality, hot/warm/cold boundary,
   no-global-cap policy, 64×64 decision, required keys.
 - **DS-17.2:** leveling/endgame modes and archive generations.

@@ -1,59 +1,53 @@
 # Next task
 
-## DS-17.1 — Aggregation and 64×64 sufficiency
+## DS-3B — Massive synthetic store validation
 
-**Status:** next; capacity math complete; massive hybrid decision required  
-**Task document:** `docs/tasks/DS-17-01-AGGREGATION-AND-GRID.md`  
-**Inputs:** `docs/STORAGE-STRATEGY.md`,
-`docs/DS-17-1-CAPACITY-AND-STRATEGY.md`,
-`docs/tasks/DS-2-REAL-STORE-BASELINE.md`, `docs/DS-3-STORAGE-SANITY-RESULT.md`,
-`docs/STORAGE-DIRECTION.md`, `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`,
-`docs/tasks/DS-1-CONSUMER-CONTRACT.md`
+**Status:** next; safe offline validation; no production code  
+**Task document:** `docs/tasks/DS-3B-MASSIVE-SYNTHETIC-VALIDATION.md`  
+**Inputs:** `docs/PERFORMANCE-REVIEW.md`,
+`docs/DS-17-1-CAPACITY-AND-STRATEGY.md`, `docs/DS-3-STORAGE-SANITY-RESULT.md`,
+`docs/HC-5-DIAGNOSTICS-BASELINE.md`, `tests/storage_sanity.lua`
 
 ### Why this is next
 
-- DS-1..DS-5 are complete, but the current capped hot-only store is **not**
-  massive-ready.
-- The capacity math is done: 250 kills/level, 15k–32.5k kills, 40/100/200 zones,
-  50/100/200 instances, 2,000 mobs. Contexts and dense heatmaps dominate.
-- Remaining: feature-to-data matrix, cardinality table, hot/warm/cold boundary,
-  no-global-cap policy, and explicit 64×64 decision.
+- The 11–14 MB and 18–25 MB figures are structural estimates.
+- DS-3's 10× case had zero contexts and only 1,930 cells.
+- HC-5's 2.1 MB extreme is truncated.
+- We should validate the actual huge file before finalizing hot/cold boundaries.
 
 ### Work
 
-1. Build the feature-to-data matrix from DS-1.
-2. Confirm the minimum durable units for heatmap, mob, level, zone, instance,
-   session, and shared knowledge.
-3. Use the capacity strategy to define hot, warm, cold, and archive units.
-   Replace the 2,000-mob/40-zone/100-instance global caps with per-zone/per-block
-   retention; do not just raise the caps.
-4. Test whether 64×64 cells are sufficient for heatmap, route, and cell-inspector
-   meaning; include wide/tall/irregular zones and sparse/dense occupancy.
-5. Record cardinality for level 1, level 20, max-level, first-alt, and
-   10-year-veteran profiles using the capacity tiers.
-6. Prove that no per-kill event log is required; name a feature and cost if one
-   is needed.
-7. Confirm the required keys for the final schema (DS-17.5).
-8. Apply DS-5 constraints: normal SavedVariables load together, active-character
-   scope only for per-character data, no per-zone files, companion timing is
-   V-2.
+1. Generate one offline worst-case profile:
+   - 2,000 mobs;
+   - 12 contexts/mob = 24,000 contexts;
+   - 40 zones × 4,096 cells = 163,840 cells;
+   - 100 instances;
+   - quests/deaths/respawns/rates/level history at caps.
+2. Normalize with `EnsureDB`.
+3. Record actual serialized bytes and Lua heap.
+4. Save, reload in a fresh process, and verify totals, areas, levels, instances,
+   and heatmaps.
+5. Record load/normalize/save/reload time.
+6. Compare with the capacity range and correct it if necessary.
+7. Optional only if cheap: 200 zones × 1,000 cells, 200 instances.
 
 ### Output
 
-- aggregation decision note;
-- feature-to-data matrix;
-- unique-cardinality table;
-- hot/warm/cold boundary and cap-retention policy;
-- 64×64 sufficiency recommendation;
-- required keys for the hot index and cold blocks;
-- DS-4P hybrid prototype inputs;
-- named follow-ups.
+- `docs/DS-3B-MASSIVE-SYNTHETIC-RESULT.md`;
+- actual bytes, Lua heap, timings, invariant result;
+- corrected capacity range if needed.
 
 ### Not required
 
-- exact WoW content census;
-- new live-client test;
-- schema implementation;
-- repeating DS-2/DS-3/DS-5;
-- a per-kill event log unless a feature explicitly requires it;
-- treating the current small-store caps as the massive-scale design.
+- live client test;
+- exact content census;
+- six-layout matrix;
+- schema change;
+- companion packaging;
+- production code.
+
+### After this
+
+1. DS-17.1 hot/cold boundary and required keys.
+2. DS-1-F2 in-memory indexes as the first safe code task.
+3. DS-17.2/17.3 and DS-4P.

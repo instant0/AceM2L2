@@ -20,7 +20,7 @@ Current release: **2.5.2**
 | Release hygiene | Released 2.5.2 | REL-1; V-6 |
 | Memory budget | 3.2–3.85MB real samples; load/unload policy open | MEM-1/MEM-2; V-2 |
 | Scope/grid/limit review | Static/offline analysis first | SC-1..SC-5, G-1..G-3, A-1, HC-7; V-3 |
-| Data storage architecture | DS-1..DS-5 done; DS-17.1 capacity math done | DS-1..DS-17.6; V-2 |
+| Data storage architecture | DS-1..DS-5 done; DS-3B validation next | DS-1..DS-17.6; V-2 |
 | Character lifecycle and cross-character data | Sub-task files ready | DS-17.0..DS-17.6; V-2 |
 | Journey overlay | Proposed, after DS | J-1..J-6; V-4 |
 | Cell inspector | Proposed, after DS | M-1..M-6; V-4 |
@@ -108,8 +108,9 @@ This is the critical path for limits, Journey, and the inspector.
 4. **DS-5 — SavedVariables/loading API matrix.**
 5. **DS-6 — Static metadata feasibility.**
 6. **DS-3 — Storage sanity check.**
-7. **DS-17.1 — Aggregation and 64x64 sufficiency.**
-8. **DS-7 — Packing/compression feasibility.** Required for the massive cold
+7. **DS-3B — Massive synthetic store validation.**
+8. **DS-17.1 — Aggregation and 64x64 sufficiency.**
+9. **DS-7 — Packing/compression feasibility.** Required for the massive cold
    tier, not optional.
 
 **DS-1, DS-2, DS-3, DS-4, and DS-5 are complete.** DS-1 is in
@@ -117,7 +118,8 @@ This is the critical path for limits, Journey, and the inspector.
 `docs/tasks/DS-2-REAL-STORE-BASELINE.md`; DS-3 is in
 `docs/DS-3-STORAGE-SANITY-RESULT.md`; DS-4 is in
 `docs/STORAGE-DIRECTION.md`; DS-5 is in
-`docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Next: DS-17.1.
+`docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Next: DS-3B massive synthetic
+validation, then DS-17.1.
 
 ### Phase 3 — storage design and prototypes
 
@@ -234,17 +236,42 @@ Use these groups to avoid duplicate harnesses and release churn:
    Constraints in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`.
 6. **WP-2 / DS-2 — Real-store baseline.** **Done 2026-11-14.**
    `docs/tasks/DS-2-REAL-STORE-BASELINE.md`.
-7. **WP-3 / DS-17.1** — aggregation and 64×64 sufficiency. Capacity math done
+7. **WP-2 / DS-3B — Massive synthetic validation.** One offline worst case;
+   validates or corrects the capacity model before DS-17.1.
+8. **WP-3 / DS-17.1** — aggregation and 64×64 sufficiency. Capacity math done
    in `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`; remaining feature-to-data and
    grid decision. Then DS-17.2/DS-17.3.
-8. **WP-3 / DS-4P + DS-7 + DS-12** — hybrid hot/cold prototype and packed-block
+9. **WP-3 / DS-4P + DS-7 + DS-12** — hybrid hot/cold prototype and packed-block
    codec. Mandatory for massive data; not optional.
-9. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
+10. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
    evidence is scoped.
-10. **WP-4 / R-4** — static overlay/art audit.
-11. **WP-5** — limits/grid decisions after measurements.
-12. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
-13. **WP-7 / J/M** — only after DS-11.
+11. **WP-4 / R-4** — static overlay/art audit.
+12. **WP-5** — limits/grid decisions after measurements.
+13. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
+14. **WP-7 / J/M** — only after DS-11.
+
+### Safe execution order for massive storage
+
+This is the low-risk order. Design/offline work comes before production schema or
+cap changes.
+
+1. **DS-3B — massive synthetic store validation.** Actual offline bytes,
+   memory, and save/reload for the worst-case profile.
+2. **DS-17.1 — feature-to-data matrix and required keys.** No code. Use DS-3B
+   and the capacity/strategy document.
+3. **DS-1-F2 — in-memory identity/zone/instance indexes.** First safe code
+   change: no schema, no persistence change, no data migration. Removes
+   tooltip/name/zone-list scans.
+4. **DS-17.1 — 64×64/grid decision.** Offline measurement only.
+5. **DS-17.2 / DS-17.3 — lifecycle and retention boundaries.** Design only.
+6. **DS-4P + DS-7 / DS-12 — hybrid hot/cold prototype and packed-block codec.**
+   Offline/isolated; required before production storage.
+7. **MEM-2 — load/unload/eviction policy.** Design using DS-17.3/DS-15/DS-16.
+8. **DS-15 / DS-16 / DS-14 — retrieval, save, oversize implementation.**
+9. **DS-17.5 / DS-11 — schema, migration, and final decision.**
+
+Do not start global-cap removal, schema migration, the LoadOnDemand companion,
+or a production cold tier before step 5 is proven.
 
 ### Consolidation candidates
 
@@ -839,7 +866,8 @@ budget.
   current UI, tooltip, commands, diagnostics, calibration, and world modules.
   Follow-ups in `docs/tasks/DS-1-FOLLOWUP-TASKS.md`:
   - [ ] **DS-1-F1 — Canonical versus derived ownership.**
-  - [ ] **DS-1-F2 — Zone-scoped identity/query index.**
+  - [ ] **DS-1-F2 — Zone-scoped identity/query index.** Ready; safe first code
+    task; in-memory only, no schema/persistence change.
   - [ ] **DS-1-F3 — Instance/area separation and count rules.**
   - [ ] **DS-1-F4 — Missing-subset/archive fallback.**
   - [ ] **DS-1-F5 — Diagnostics count-only access.**
@@ -894,6 +922,12 @@ budget.
   empty store invents nothing, 10× reloads in ~12 ms and saves in ~51 ms offline.
   This is a small/medium-store proof, not a massive-scale decision. Result:
   `docs/DS-3-STORAGE-SANITY-RESULT.md`; harness: `tests/storage_sanity.lua`.
+- [ ] **DS-3B — Massive synthetic store validation.** One offline worst case:
+  2,000 mobs, 24,000 contexts, 40 zones × 4,096 cells, 100 instances, other
+  stores at caps. Measure actual bytes, Lua heap, save/reload, and invariants;
+  correct the 11–14 MB model if needed. No live client, no schema change.
+  Task: `docs/tasks/DS-3B-MASSIVE-SYNTHETIC-VALIDATION.md`; review:
+  `docs/PERFORMANCE-REVIEW.md`.
 - [x] **DS-4 — Storage representation and retrieval design.** Revised for
   massive scale 2026-11-14. The current nested tables are the **hot tier**, not
   the whole solution. Keep stable IDs, sparse cells, derived summaries, and
@@ -967,9 +1001,12 @@ budget.
   - [ ] **DS-17.1 — Aggregation and 64x64 sufficiency.** Capacity math done:
     250 kills/level, 15k–32.5k kills, 40/100/200 zones, 50/100/200 instances,
     2,000 mobs; contexts and dense heatmaps dominate. Remaining: feature-to-data
-    matrix, cardinality table, hot/warm/cold decision, and explicit 64×64
-    recommendation. Apply DS-5 loading constraints. Depends DS-1/DS-2/DS-3/DS-5;
-    blocks DS-17.2/3. `docs/tasks/DS-17-01-AGGREGATION-AND-GRID.md`;
+    matrix (scope/fields/hot/cold/query/fallback/retention), cardinality, required
+    hot-index and cold-block keys, hot/warm/cold boundary, no-global-cap policy,
+    and explicit 64×64 recommendation. Do not reopen DS-4/DS-5 settled choices.
+    Consume DS-3B actual bytes before finalizing. Depends DS-1/DS-2/DS-3/DS-3B/
+    DS-5; blocks DS-17.2/3 and DS-4P.
+    `docs/tasks/DS-17-01-AGGREGATION-AND-GRID.md`;
     `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`.
   - [ ] **DS-17.2 — Modes and lifecycle.** Define leveling vs endgame, archive
     generations, mode switch, and level-cap generations. Depends DS-17.1; blocks
