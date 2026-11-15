@@ -1,15 +1,15 @@
 # DS-17.1 — Data organization and query sufficiency
 
-**Status:** in progress; capacity model complete; DS-3B worst-case validation
-pending; remaining feature-to-data, hot/warm/cold boundary, required keys, and
-64×64 decision  
+**Status:** next; capacity model and DS-3B validation complete; remaining
+feature-to-data, hot/warm/cold boundary, required keys, and 64×64 decision  
 **Parent:** DS-17  
 **Depends on:** DS-1 (consumer contract), DS-2 (reference baseline only), DS-3
 (small/medium sanity check), DS-3B (massive synthetic validation), DS-5
 (loading/API matrix), `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`  
 **Blocks:** DS-17.2, DS-17.3, DS-4P, DS-17.5. DS-4 hot representation is settled.  
 **Question:** what minimum durable units and hot/warm/cold split serve
-15k–32.5k kills and the 200-zone/200-instance tiers without a per-kill log?
+long-term play, 15k–32.5k+ kills, 200+ zones/instances, and no artificial global
+element cap?
 
 ## Scope
 
@@ -20,6 +20,7 @@ Decide:
 - the required hot-index and cold-block fields;
 - whether 64×64 is sufficient for heatmap, route, and cell-inspector meaning;
 - the no-global-cap retention rule;
+- long-term behavior beyond the current 2,000/40/100 implementation caps;
 - what must be stored per mob/level/zone/instance/context/session.
 
 Do **not** reopen choices already settled by DS-4/DS-5:
@@ -43,8 +44,11 @@ Exact content counts are not required.
 ## Inputs
 
 - **Primary capacity input:** `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`.
-- **Pending validation:** `docs/tasks/DS-3B-MASSIVE-SYNTHETIC-VALIDATION.md`;
-  use its actual bytes before finalizing hot/cold boundaries.
+- **Validated by:** `docs/DS-3B-MASSIVE-SYNTHETIC-RESULT.md` — 8.69 MB
+  compact / 9.94 MB client estimate / 23 MB stable / 27–37 MB transient Lua heap.
+- **Long-term pressure:** `docs/DS-3C-LONG-TERM-GROWTH.md` — current caps are
+  too small; 2h/day hits 2,000 mobs in ~3 months and rate samples turn over in
+  2.4h. Do not use the current-cap profile as the target.
 - **Consolidated research:** `docs/STORAGE-STRATEGY.md`.
 - **Consumer contract:** `docs/tasks/DS-1-CONSUMER-CONTRACT.md`.
 - **Loading/API constraints:** `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`.

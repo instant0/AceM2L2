@@ -99,13 +99,17 @@ and release rules need one owner.
 - Compress/archive only at defined boundaries; release buffers after save.
 - Keep a backup before destructive compaction.
 
-### Memory budget
+### Memory guardrails
 
 - Use MEM-1 real-client measurements.
 - Current samples: 3.2–3.85 MB with UI open, versus ATT ~51/65 MB and FLG ~48 MB.
-- Define a soft budget for idle, UI-open, dense-heatmap, and multiple-alt states
-  after measurement. Do not set it from fixture memory.
-- Warn in diagnostics if the active cache exceeds the budget.
+- Do not impose an arbitrary MB target. DS-3B measured ~23 MB stable / 27–37 MB
+  transient for the worst current-hot profile; that is acceptable relative to
+  ATT unless live load/save/memory shows a real problem.
+- Define measured guardrails for idle, UI-open, dense-heatmap, and multiple-alt
+  states after measurement. Do not set them from fixture memory.
+- Warn in diagnostics if the cache grows without bound or exceeds a measured
+  guardrail, not because it crossed a guessed number.
 
 ## Research questions
 
@@ -118,7 +122,7 @@ and release rules need one owner.
 6. Can a LoadOnDemand companion hold cold archives without loading them at
    login? Documented as deferrable; exact variable timing is V-2.
 7. How do we measure per-addon memory on Forever and Midnight?
-8. What is the safe budget for a long-lived, multi-alt account?
+8. What measured guardrail applies to a long-lived, multi-alt account?
 9. What is the eviction policy for active vs previous character data?
 10. What should diagnostics expose about cache size and evictions?
 
@@ -130,7 +134,7 @@ and release rules need one owner.
 - Integrate companion/archive loading rules.
 - Add memory instrumentation to diagnostics.
 - Measure idle/UI/dense/multi-alt states with MEM-1.
-- Define budget and alerts.
+- Define measured guardrails and alerts, not arbitrary MB caps.
 - Document downgrade/save behavior.
 - Feed DS-11/V-2.
 
@@ -140,7 +144,7 @@ and release rules need one owner.
 - Cache/eviction rules.
 - UI release rules.
 - Companion loading rules.
-- Memory budget and diagnostics fields.
+- Measured guardrails and diagnostics fields.
 - Test plan for lazy load/evict/reload.
 - DS-11/V-2 inputs.
 
@@ -150,7 +154,8 @@ and release rules need one owner.
 - Cold zones/archives/companions are not decoded until needed.
 - Closing the heatmap releases or bounds its UI pool.
 - Repeated tab/window open/close does not grow memory unboundedly.
-- A multi-alt/long-lived profile remains within the measured budget.
+- A multi-alt/long-lived profile remains within measured guardrails and does not
+  grow without bound.
 - Diagnostics reports cache/zone counts and memory estimate.
 - No data loss on save/evict/reload.
 - Live verification remains V-2.

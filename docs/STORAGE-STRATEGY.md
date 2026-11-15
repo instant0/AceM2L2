@@ -98,9 +98,12 @@ AceM2L2 caps are sufficient.
 The current capped, hot-only store is **not massive-ready**.
 
 - Current caps: 2,000 mobs, 40 heatmap zones, 100 instances, 12 contexts/mob.
-- 15k–32.5k kills with 2,000 mobs and 40 dense zones is roughly **11–14 MB**
-  if 12 contexts and full 64×64 grids are kept.
-- 200 zones/200 instances at 12 contexts is roughly **18–25 MB** if all hot.
+- The actual 2k/40-dense/12-context profile is **8.69 MB compact / 9.94 MB
+  client estimate**, with **23 MB stable / 27–37 MB transient Lua heap**.
+- That is a **current-cap** profile, not long-term. DS-3C: at 2h/day, 2,000 mobs
+  are reached in ~3 months and the 240-rate-sample buffer turns over in 2.4h.
+- The old 11–14 MB file estimate was high; the old 18–25 MB 200-zone figure is
+  unmeasured and remains only an upper-bound guess.
 - 200 zones at 4,096 cells each is 819,200 cells; at ~18 bytes/cell that is
   roughly 14–15 MB before mobs/contexts.
 - The 2.1 MB HC-5 extreme figure is truncated at the 200,000-entry estimator
@@ -135,7 +138,8 @@ only.
 | Level 1 / level 20 / max level / first alt / veteran | DS-1 contract done; DS-17 master; DS-17.1/2/3/4 pending |
 | Best storage representation | DS-4 done/revised; capacity doc done; DS-4P hybrid prototype required |
 | Retrieval and indexes | DS-1 consumer contract done; DS-1-F2 index is the safe first code task; DS-15 pending |
-| Capacity validation | DS-3B next: one actual worst-case synthetic file; model is provisional |
+| Capacity validation | DS-3B done: 8.69 MB compact / 9.94 MB client estimate / 23 MB stable / 27–37 MB transient heap for 2k/40/12 |
+| Long-term pressure | DS-3C done: 2h/day hits 2,000 mobs in ~3 months; rate buffer turns over in 2.4h |
 | Packed cold blocks | DS-7/DS-12 pending; required for massive |
 | Memory comparison and budget | MEM-1 partial; MEM-2 pending; V-2 live check |
 | Game/client static data | DS-6 pending; use IDs and static Lua where feasible |
@@ -159,13 +163,20 @@ only.
 ### 3. Per-character hot tier
 
 - `AceM2L2CharDB`: active-character data.
-- Bounded hot set: 2,000 mobs, 40 hot zones, 100 hot instances.
-- 4 contexts/mob default, 8 recent, 12 only for the current band if measured.
-- Sparse cells; capped per-mob zone/instance links.
+- The current implementation caps at 2,000 mobs, 40 hot zones, and 100 hot
+  instances. These are **implementation caps, not the design limit**.
+- The design stores all zones/instances in per-zone/level blocks; the hot cache
+  is dynamic and evicts by measured memory/retrieval, not a hard-coded 40/100.
+- Contexts are a tunable efficiency choice: 4/8/12 based on measured value, not
+  an arbitrary target.
+- Sparse cells; per-mob links are bounded by value, not a global count.
 - Small derived `areas`/`levels`/`areaLevels` caches.
 - In-memory name/zone/instance indexes.
 
-Target: roughly **6–8 MB hot per active character**.
+There is **no fixed file-size or heap target**. DS-3B measured 8.69 MB compact /
+9.94 MB client estimate and 23 MB stable / 27–37 MB transient for the current
+2k/40/100 implementation profile. 23 MB stable is acceptable relative to ATT
+51–65 MB. Optimize the method, not an arbitrary MB number.
 
 ### 4. Packed cold tier
 
@@ -200,23 +211,27 @@ Target: roughly **6–8 MB hot per active character**.
 - Leveling vs endgame modes; archive old level bands.
 - PvP, arenas, scenarios, and delves separate from open-world areas.
 
-## Capacity targets
+## Measured capacity
 
 | Scenario | Hot estimate |
 |---|---:|
-| 2k mobs / 40 dense zones / 4 contexts | ~6–8 MB |
-| 2k mobs / 40 dense zones / 8 contexts | ~9–11 MB |
-| 2k mobs / 40 dense zones / 12 contexts | ~11–14 MB |
-| 2k mobs / 200 dense zones / 12 contexts | ~18–25 MB all hot |
-| 2k mobs / 200 zones × 1k cells / 12 contexts | ~12–15 MB all hot |
+| 2k mobs / 40 dense zones / 4 contexts | not measured; expected lower |
+| 2k mobs / 40 dense zones / 8 contexts | not measured; expected lower |
+| 2k mobs / 40 dense zones / 12 contexts | **8.69 MB compact / 9.94 MB client estimate; 23 MB stable / 27–37 MB transient heap** |
+| 2k mobs / 200 dense zones / 12 contexts | not measured; old 18–25 MB is an upper-bound guess |
+| 2k mobs / 200 zones × 1k cells / 12 contexts | not measured; old 12–15 MB is an upper-bound guess |
 
-The 6–8 MB target comes from 4 contexts, 40 hot zones, 100 hot instances, and
-cold/downsampled archives.
+There is no fixed target. At 12 contexts the measured file is 8.69 MB compact /
+9.94 MB client estimate with 23 MB stable / 27–37 MB transient heap. Use 4/8
+contexts only if measurement shows a better retrieval/memory trade-off; use
+cold/downsampled archives to scale beyond the current hot implementation caps.
 
 ## Task map
 
 - **DS-3B:** one actual worst-case synthetic file to validate/correct the
   capacity model before final hot/cold decisions.
+- **DS-3C:** long-term 3/6/12-month growth and cap pressure. Current caps are
+  too small.
 - **DS-17.1:** feature-to-data matrix, cardinality, hot/warm/cold boundary,
   no-global-cap policy, 64×64 decision, required keys.
 - **DS-17.2:** leveling/endgame modes and archive generations.

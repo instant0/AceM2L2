@@ -22,8 +22,9 @@ The 20 MB H64-9 figure is **fixture UI-object memory**, not real in-game texture
 or Lua memory. It is already far below the reference addons. Do not optimize the
 heatmap cell pool solely because the offline fixture reached 20 MB.
 
-The real question is: **what does AceM2L2 actually use in the client, and is it
-within a sensible budget at idle, with the heatmap open, and with dense data?**
+The real question is: **what does AceM2L2 actually use in the client, and does
+the method scale efficiently?** There is no arbitrary MB target; compare measured
+states against ATT/FLG and optimize only where the measurement shows a problem.
 
 ## Measured samples
 
@@ -121,7 +122,7 @@ it total addon memory.
 - Real addon memory numbers exist for both clients.
 - Numbers are separated by UI state.
 - Comparison to ATT/FLG is recorded.
-- A simple memory budget/decision is recorded.
+- A measured guardrail/decision is recorded; no arbitrary MB target.
 - H64-9-F3 is either closed as unnecessary or scheduled with a measured reason.
 - Samples 1–2 (3.2 MB Hunter; 3.85 MB Priest with heatmap open) are below any
   reasonable budget and support closing F3 for ordinary play; keep it gated for

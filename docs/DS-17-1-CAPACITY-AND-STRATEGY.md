@@ -1,7 +1,9 @@
 # DS-17.1 — Capacity math and storage strategy
 
-**Status:** capacity calculation complete 2026-11-14  
+**Status:** capacity calculation complete 2026-11-14; validated by DS-3B
+2026-11-15  
 **Consolidated research:** `docs/STORAGE-STRATEGY.md`  
+**Validation:** `docs/DS-3B-MASSIVE-SYNTHETIC-RESULT.md`  
 **Purpose:** answer the actual storage question using 250 kills/level, zone and
 instance counts, and the large-dataset tiers. This replaces the small real-store
 baseline as the design target.
@@ -85,22 +87,21 @@ approximate.
 |---|---:|---:|---:|---:|---:|---:|
 | Real sample | 85 | 2 | 193 | 0 | 1 | 70.7 KB actual |
 | DS-3 10× | 850 | 20 | 1,930 | 0 | 10 | 492.8 KB offline |
-| 2k / 40 zones dense / 4 contexts | 2,000 | 40 | 163,840 | 8,000 | 100 | **~6–8 MB** |
-| 2k / 40 zones dense / 8 contexts | 2,000 | 40 | 163,840 | 16,000 | 100 | **~9–11 MB** |
-| 2k / 40 zones dense / 12 contexts | 2,000 | 40 | 163,840 | 24,000 | 100 | **~11–14 MB** |
-| 2k / 200 zones dense / 12 contexts | 2,000 | 200 | 819,200 | 24,000 | 200 | **~18–25 MB** |
-| 2k / 200 zones 1k cells / 12 contexts | 2,000 | 200 | 200,000 | 24,000 | 200 | **~12–15 MB** |
+| 2k / 40 zones dense / 4 contexts | 2,000 | 40 | 163,840 | 8,000 | 100 | not measured; expected lower |
+| 2k / 40 zones dense / 8 contexts | 2,000 | 40 | 163,840 | 16,000 | 100 | not measured; expected lower |
+| 2k / 40 zones dense / 12 contexts | 2,000 | 40 | 163,840 | 24,000 | 100 | **8.69 MB compact / 9.94 MB client estimate / 23 MB stable / 27–37 MB transient heap** |
+| 2k / 200 zones dense / 12 contexts | 2,000 | 200 | 819,200 | 24,000 | 200 | not measured; old model 18–25 MB is an upper-bound guess |
+| 2k / 200 zones 1k cells / 12 contexts | 2,000 | 200 | 200,000 | 24,000 | 200 | not measured; old model 12–15 MB is an upper-bound guess |
 
 Shape matters more than kill count:
 
-- **Contexts** are the largest per-mob growth: 24,000 contexts is roughly
-  8–9 MB by itself.
-- **Heatmap cells** dominate at 200 dense zones: 819,200 cells is roughly
-  14–15 MB at ~18 bytes per cell. The 40-zone dense tier is roughly 3 MB.
-- **Mobs** at 2,000 are roughly 1.2 MB including their base fields.
-- **Instances** are comparatively small: 100 records are roughly 0.2–0.3 MB.
-- **Other capped stores** (quests, deaths, respawns, rates, level history) are
-  roughly 0.1 MB in this model.
+- The **actual 12-context profile** is 8.69 MB compact / 9.94 MB client
+  estimate, so the old 11–14 MB file range was high.
+- **Lua heap** is the real pressure: 27 MB after build/normalize and 37 MB after
+  a fresh reload. The file-size target is not a heap target.
+- Contexts remain a major contributor, but the earlier 8–9 MB context-only
+  estimate was too high for this serializer.
+- Heatmap cells still dominate at 200 dense zones; that tier is unmeasured.
 - 15,000 vs 32,500 kills is not the driver. The same 2,000 mobs and same
   contexts/cells are.
 
@@ -112,54 +113,65 @@ dimensions that actually grow.
 
 ### 1. Hot per-character store
 
-Target roughly **6–8 MB per active character**:
+There is **no fixed file-size or heap target**. Use a dynamic hot working set and
+cold archives; the current 2,000/40/100 caps are implementation limits, not the
+design.
 
-- 2,000 hot mobs;
-- 40 hot heatmap zones at 64×64;
-- 100 hot instance records;
-- **4 contexts per mob by default**, 8 for active/recent, 12 only for the
-  current band if measured;
-- sparse cells only;
-- cap per-mob zone/instance links;
-- keep `areas`/`levels`/`areaLevels` as small derived caches.
+- Store all mobs/zones/instances in per-zone/level blocks.
+- Keep a dynamic hot cache based on measured memory and retrieval, not a
+  hard-coded 40/100.
+- Contexts are a tunable efficiency choice (4/8/12), not an arbitrary cap.
+- Sparse cells only.
+- Bound per-mob links by value, not a global count.
+- Keep `areas`/`levels`/`areaLevels` as small derived caches.
+- DS-3B measured 8.69 MB compact / 9.94 MB client estimate and 23 MB stable /
+  27–37 MB transient for the current implementation profile. 23 MB stable is
+  acceptable relative to ATT 51–65 MB.
 
 ### 2. Contexts
 
-Contexts are not free calibration detail:
+Contexts are not free calibration detail, but the 12 cap is not a design target:
 
-- default 4 per mob, not 12;
+- keep contexts that measurably improve XP/route estimates;
 - collapse rare contexts into a mob/zone/class aggregate;
-- keep 8–12 only for the active level band or recently seen mobs;
-- archive or drop old contexts at a lifecycle boundary;
-- measure the actual context size before raising the cap.
+- keep recent/active-band contexts; archive stale ones;
+- measure 4/8/12 variants and choose by retrieval value versus cost;
+- do not hard-code a low cap just to save a few MB.
 
-24,000 contexts is a large store for a feature that mostly needs expected XP,
-not every historical combination.
+24,000 contexts is a real cost, but 23 MB stable is acceptable; the decision is
+whether each context earns its keep, not a fixed number.
 
 ### 3. Heatmap
 
-- keep 40 hot zones at 64×64;
+- current hot cache is 40 zones at 64×64; this is an implementation cache, not a
+  content limit;
 - normalize/render only the current/selected zone;
 - downsample old zones to 32×32 or 16×16;
 - pack cold zone blocks;
-- do not raise the hot cap to 200 without a measured load/save budget;
-- keep 200 zones as a cold/archive tier, not 200 hot dense grids.
+- store 200+ zones in the cold tier; do not discard them because of the 40-zone
+  implementation cap;
+- hot cache size is set by measured memory/retrieval, not an arbitrary number.
 
 ### 4. Zones, areas, instances
 
-- open-world areas: 40 hot, more cold/summary;
-- instances: 100 hot records, more as summaries;
+- open-world areas: all stored, dynamic hot/cold split; current 40-zone cache is
+  not a limit;
+- instances: all stored, dynamic hot/cold split; current 100-record cache is not
+  a limit;
 - PvP/arenas/scenarios: separate categories;
 - one row per zone or instance in the Areas view; no double count;
 - keep top-N mobs per zone/instance, not full per-mob detail for every zone.
 
 ### 5. Mobs
 
-- 2,000 hot mobs;
-- cap `killsByMap` and `killsByInstance` links per mob;
-- keep full `killsByAreaLevel` only for hot/recent levels; aggregate or archive
-  older combinations;
-- when pruning a mob, retain its zone/level contribution in the summaries;
+- all mobs are stored; the current 2,000 hot entry cap is an implementation cap,
+  not a design limit;
+- keep a dynamic hot/cold split; archive rare/old mob detail instead of dropping
+  it;
+- bound `killsByMap`/`killsByInstance` links by value, not an arbitrary number;
+- keep full `killsByAreaLevel` for recent/hot levels; aggregate/archive older
+  combinations;
+- when moving a mob cold, retain its zone/level contribution in summaries;
 - do not duplicate a mob record per zone.
 
 ### 6. Cold archive
@@ -197,13 +209,12 @@ not every historical combination.
 - The global 2,000-mob / 40-zone / 100-instance caps are too small for the
   200-zone/200-instance tiers. Do not raise them blindly; replace them with
   per-zone/per-block retention plus cold archives.
-- At 15k–32.5k kills with 2,000 mobs and 40 dense zones, expect **~11–14 MB per
-  character** if 12 contexts and full 64×64 grids are kept. That is the real
-  target, not the 70 KB real sample.
-- At 200 zones/200 instances and 12 contexts, all-hot is **~18–25 MB**. Do not
-  make that the default hot state.
-- A **6–8 MB** active target is achievable with 4 contexts, 40 hot zones,
-  100 hot instances, and cold/downsampled archives.
+- The actual 2k/40/12 profile is **8.69 MB compact / 9.94 MB client estimate** with
+  **23 MB stable / 27–37 MB transient Lua heap**. There is no fixed MB target.
+- At 200 zones/200 instances and 12 contexts, the old model said ~18–25 MB file;
+  that tier is unmeasured. Do not make it the default hot state.
+- Contexts are a measured trade-off, not a target: 4/8 variants may be worth
+  testing for retrieval value, but do not impose an arbitrary MB cap.
 - The largest wins are context reduction and heatmap archive/downsampling, not a
   new hot table shape.
 - The small real baseline is reference only. HC-5's truncated 2.1 MB is a lower

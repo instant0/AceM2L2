@@ -92,6 +92,9 @@ Exact numbers come from DS-2/DS-3/SC measurements.
 - Compression saves a measured amount versus hot/warm data.
 - Historical heatmaps remain readable at the chosen downsample.
 - No destructive compression occurs without backup.
+- The cold tier supports 200+ zones/instances and beyond the current
+  2,000-mob/40-zone/100-instance implementation caps; there is no arbitrary
+  global element cap.
 - Downgrade behavior is documented.
 - DS-12 and DS-9 can implement without re-deciding policy.
 

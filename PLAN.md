@@ -13,14 +13,14 @@ Current release: **2.5.2**
 | Heat intensity/warm colors | Implemented in 2.4.0; gradient in 2.4.4 | HC-1/A-2/A-3; V-1 |
 | Data diagnostics | Implemented 2.4.0; instance/heatmap stats in 2.5.0; HC-5 baseline done | HC-2; V-2 |
 | README feature guide | Completed in 2.4.1 | HC-6 |
-| Documentation claim audit | Completed | — |
+| Documentation claim audit | Completed; README re-review added UI-3/UI-4 | README-CLAIM-REVIEW |
 | Instance attribution and heatmap collection | Implemented in 2.5.0 | G-4a/G-4b; V-1/V-2 |
-| UI responsiveness | UI-1 confirmed; UI-2 released in 2.5.2 | UI-1/UI-2; V-6 |
+| UI responsiveness | UI-1/UI-2 done; UI-3/UI-4 claim followups ready | UI-1..UI-4; V-6 |
 | Client compatibility | 120107 interface added; 12.1.7 API/live audit pending | CL-1; V-6 |
 | Release hygiene | Released 2.5.2 | REL-1; V-6 |
-| Memory budget | 3.2–3.85MB real samples; load/unload policy open | MEM-1/MEM-2; V-2 |
+| Memory | 3.2–3.85MB real; 23MB stable worst-case hot; guardrails/policy open | MEM-1/MEM-2; V-2 |
 | Scope/grid/limit review | Static/offline analysis first | SC-1..SC-5, G-1..G-3, A-1, HC-7; V-3 |
-| Data storage architecture | DS-1..DS-5 done; DS-3B validation next | DS-1..DS-17.6; V-2 |
+| Data storage architecture | DS-1..DS-5/DS-3B/DS-3C done; DS-17.1 next | DS-1..DS-17.6; V-2 |
 | Character lifecycle and cross-character data | Sub-task files ready | DS-17.0..DS-17.6; V-2 |
 | Journey overlay | Proposed, after DS | J-1..J-6; V-4 |
 | Cell inspector | Proposed, after DS | M-1..M-6; V-4 |
@@ -109,17 +109,18 @@ This is the critical path for limits, Journey, and the inspector.
 5. **DS-6 — Static metadata feasibility.**
 6. **DS-3 — Storage sanity check.**
 7. **DS-3B — Massive synthetic store validation.**
-8. **DS-17.1 — Aggregation and 64x64 sufficiency.**
-9. **DS-7 — Packing/compression feasibility.** Required for the massive cold
+8. **DS-3C — Long-term growth and cap pressure.**
+9. **DS-17.1 — Aggregation and 64x64 sufficiency.**
+10. **DS-7 — Packing/compression feasibility.** Required for the massive cold
    tier, not optional.
 
-**DS-1, DS-2, DS-3, DS-4, and DS-5 are complete.** DS-1 is in
+**DS-1, DS-2, DS-3, DS-3B, DS-3C, DS-4, and DS-5 are complete.** DS-1 is in
 `docs/tasks/DS-1-CONSUMER-CONTRACT.md`; DS-2 is in
 `docs/tasks/DS-2-REAL-STORE-BASELINE.md`; DS-3 is in
-`docs/DS-3-STORAGE-SANITY-RESULT.md`; DS-4 is in
-`docs/STORAGE-DIRECTION.md`; DS-5 is in
-`docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Next: DS-3B massive synthetic
-validation, then DS-17.1.
+`docs/DS-3-STORAGE-SANITY-RESULT.md`; DS-3B is in
+`docs/DS-3B-MASSIVE-SYNTHETIC-RESULT.md`; DS-3C is in
+`docs/DS-3C-LONG-TERM-GROWTH.md`; DS-4 is in `docs/STORAGE-DIRECTION.md`;
+DS-5 is in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Next: DS-17.1.
 
 ### Phase 3 — storage design and prototypes
 
@@ -236,39 +237,42 @@ Use these groups to avoid duplicate harnesses and release churn:
    Constraints in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`.
 6. **WP-2 / DS-2 — Real-store baseline.** **Done 2026-11-14.**
    `docs/tasks/DS-2-REAL-STORE-BASELINE.md`.
-7. **WP-2 / DS-3B — Massive synthetic validation.** One offline worst case;
-   validates or corrects the capacity model before DS-17.1.
-8. **WP-3 / DS-17.1** — aggregation and 64×64 sufficiency. Capacity math done
-   in `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`; remaining feature-to-data and
-   grid decision. Then DS-17.2/DS-17.3.
-9. **WP-3 / DS-4P + DS-7 + DS-12** — hybrid hot/cold prototype and packed-block
+7. **WP-2 / DS-3B — Massive synthetic validation.** **Done 2026-11-15.**
+   Actual 8.69 MB compact / 9.94 MB client estimate; 23 MB stable / 27–37 MB transient heap.
+8. **WP-2 / DS-3C — Long-term growth and cap pressure.** **Done 2026-11-15.**
+   2h/day reaches 2,000 mobs in ~3 months; rate buffer turns over in 2.4h.
+9. **WP-3 / DS-17.1** — aggregation and 64×64 sufficiency. Capacity math and
+   DS-3B actuals done; remaining feature-to-data, hot/cold boundary, required
+   keys, and grid decision. Then DS-17.2/DS-17.3.
+10. **WP-3 / DS-4P + DS-7 + DS-12** — hybrid hot/cold prototype and packed-block
    codec. Mandatory for massive data; not optional.
-10. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
+11. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
    evidence is scoped.
-11. **WP-4 / R-4** — static overlay/art audit.
-12. **WP-5** — limits/grid decisions after measurements.
-13. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
-14. **WP-7 / J/M** — only after DS-11.
+12. **WP-4 / R-4** — static overlay/art audit.
+13. **WP-5** — limits/grid decisions after measurements.
+14. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
+15. **WP-7 / J/M** — only after DS-11.
 
 ### Safe execution order for massive storage
 
 This is the low-risk order. Design/offline work comes before production schema or
 cap changes.
 
-1. **DS-3B — massive synthetic store validation.** Actual offline bytes,
-   memory, and save/reload for the worst-case profile.
-2. **DS-17.1 — feature-to-data matrix and required keys.** No code. Use DS-3B
-   and the capacity/strategy document.
-3. **DS-1-F2 — in-memory identity/zone/instance indexes.** First safe code
+1. **DS-3B — massive synthetic store validation.** **Done 2026-11-15.**
+2. **DS-3C — long-term growth/cap pressure.** **Done 2026-11-15.** Current caps
+   are too small; no fixed target.
+3. **DS-17.1 — feature-to-data matrix and required keys.** No code. Use DS-3B,
+   DS-3C, and the capacity/strategy document.
+4. **DS-1-F2 — in-memory identity/zone/instance indexes.** First safe code
    change: no schema, no persistence change, no data migration. Removes
    tooltip/name/zone-list scans.
-4. **DS-17.1 — 64×64/grid decision.** Offline measurement only.
-5. **DS-17.2 / DS-17.3 — lifecycle and retention boundaries.** Design only.
-6. **DS-4P + DS-7 / DS-12 — hybrid hot/cold prototype and packed-block codec.**
+5. **DS-17.1 — 64×64/grid decision.** Offline measurement only.
+6. **DS-17.2 / DS-17.3 — lifecycle and retention boundaries.** Design only.
+7. **DS-4P + DS-7 / DS-12 — hybrid hot/cold prototype and packed-block codec.**
    Offline/isolated; required before production storage.
-7. **MEM-2 — load/unload/eviction policy.** Design using DS-17.3/DS-15/DS-16.
-8. **DS-15 / DS-16 / DS-14 — retrieval, save, oversize implementation.**
-9. **DS-17.5 / DS-11 — schema, migration, and final decision.**
+8. **MEM-2 — load/unload/eviction policy.** Design using DS-17.3/DS-15/DS-16.
+9. **DS-15 / DS-16 / DS-14 — retrieval, save, oversize implementation.**
+10. **DS-17.5 / DS-11 — schema, migration, and final decision.**
 
 Do not start global-cap removal, schema migration, the LoadOnDemand companion,
 or a production cold tier before step 5 is proven.
@@ -414,6 +418,12 @@ Live checks are consolidated in V-1. Carbonite work is deferred.
 - [x] **UI-2 — Remove the toggle keybinding.** Removed `Bindings.xml`, the TOC
   entry, binding globals, and the public binding function. Kept `Bindings.lua`
   for the addon-compartment entry point and the minimap icon.
+- [ ] **UI-3 — Death and respawn history view.** The data and commands exist;
+  add the missing window view. No storage change.
+  `docs/tasks/UI-3-DEATH-RESPAWN-VIEW.md`.
+- [ ] **UI-4 — Quest XP ledger view.** The Forever quest data and `/xpt quests`
+  command exist; add the missing window ledger. No storage change.
+  `docs/tasks/UI-4-QUEST-XP-LEDGER-VIEW.md`.
 
 ### Instance attribution and heatmap collection — implemented in 2.5.0
 
@@ -463,13 +473,13 @@ docs were corrected.
 | Claim area | Status | Notes |
 |---|---|---|
 | XP, kills-to-level, reputation repeats | Implemented | Core XP/reputation and chat output. |
-| Kill Story tabs and mob/area/level/session history | Implemented | Overview, Mobs, Areas, Heatmap, Levels. |
-| Quest XP ledger | Implemented, Forever-only | Gated by `hasPerMobXP`; Midnight does not track quest XP. Docs now qualify it. |
+| Kill Story tabs and mob/area/level history | Implemented | Overview, Mobs, Areas, Heatmap, Levels; session shown as current totals. |
+| Quest XP ledger | Command/summary implemented, Forever-only | `/acem2l2 xpt quests` lists it; Overview shows summary. Window ledger is UI-4. Gated by `hasPerMobXP`. |
 | Level history and splits | Implemented | Level-time/kill splits, not route-segmented speedrun splits. Wording corrected. |
 | Dungeon XP, goals, splits | Implemented | Dungeon XP is Forever-only; goals/splits work on both clients. Docs now qualify it. |
 | Loot value, gold/hour, gear upgrades | Implemented | Gear alerts compare item level and depend on readable item/equipped data; live-unverified. |
-| Deaths, respawns, grinding spots | Implemented | Grinding spots are Forever-only; respawns need nameplate/capture sightings. Docs now qualify it. |
-| Heatmap and zone art | Implemented | 64x64 now; base art uses `C_Map.GetMapArtLayers`/`GetMapArtLayerTextures`, with discovered-area overlays from `C_MapExplorationInfo.GetExploredMapTextures`. No legacy `GetMapInfo` art fallback exists. |
+| Deaths, respawns, grinding spots | Commands/Overview implemented | Deaths/respawns are commands; grinding spot is Overview/Forever. Window death/respawn view is UI-3. |
+| Heatmap and zone art | Implemented where client data exists | 64x64 now; base art uses `C_Map.GetMapArtLayers`/`GetMapArtLayerTextures`, with discovered-area overlays. No legacy art fallback; README now says “where available.” |
 | Nameplate levels | Implemented, Midnight-only | Off by default; sightings still feed respawn tracking. |
 | 3D model | Implemented | A model hero card with fallback, not a browsable 3D gallery. Wording corrected. |
 | Search, filters, sort, themes, minimap, compartment | Implemented | UI/List, UI/Theme, UI/Minimap, Bindings.lua, TOC. |
@@ -922,12 +932,19 @@ budget.
   empty store invents nothing, 10× reloads in ~12 ms and saves in ~51 ms offline.
   This is a small/medium-store proof, not a massive-scale decision. Result:
   `docs/DS-3-STORAGE-SANITY-RESULT.md`; harness: `tests/storage_sanity.lua`.
-- [ ] **DS-3B — Massive synthetic store validation.** One offline worst case:
-  2,000 mobs, 24,000 contexts, 40 zones × 4,096 cells, 100 instances, other
-  stores at caps. Measure actual bytes, Lua heap, save/reload, and invariants;
-  correct the 11–14 MB model if needed. No live client, no schema change.
-  Task: `docs/tasks/DS-3B-MASSIVE-SYNTHETIC-VALIDATION.md`; review:
-  `docs/PERFORMANCE-REVIEW.md`.
+- [x] **DS-3B — Massive synthetic store validation.** Executed 2026-11-15.
+  2,000 mobs / 24,000 contexts / 40 × 4,096 cells / 100 instances: compact
+  8,689,981 bytes (~8.29 MiB), client-format estimate 9,938,701 bytes, Lua heap
+  23 MB stable / 27–37 MB transient, load ~120 ms, normalize ~105 ms, serialize ~1,068 ms offline,
+  invariants pass, no parser failure. The old 11–14 MB file estimate was high;
+  the heap is the real pressure. Result:
+  `docs/DS-3B-MASSIVE-SYNTHETIC-RESULT.md`; harness:
+  `tests/ds3b_massive.lua`.
+- [x] **DS-3C — Long-term growth and cap pressure.** Executed 2026-11-15.
+  At 100 kills/hour, 2h/day reaches ~18,000 kills in 3 months and hits the
+  2,000-mob cap; rate samples turn over in 2.4 hours. 23 MB is a current-cap
+  profile, not a long-term state. The current caps are too small; design for
+  dynamic hot/cold and archives. Result: `docs/DS-3C-LONG-TERM-GROWTH.md`.
 - [x] **DS-4 — Storage representation and retrieval design.** Revised for
   massive scale 2026-11-14. The current nested tables are the **hot tier**, not
   the whole solution. Keep stable IDs, sparse cells, derived summaries, and
@@ -940,8 +957,10 @@ budget.
 - [ ] **DS-4P — Hybrid hot/cold prototype.** Required for massive scale. Prove
   a bounded hot index plus packed cold zone/level blocks, a per-zone retention
   rule, and no-global-scan retrieval. DS-4 hot-tier answers are retained; the
-  current 2,000-mob/40-zone/100-instance caps are not the massive design. A live
-  prototype remains V-2.
+  current 2,000-mob/40-zone/100-instance caps are not the massive design. Test
+  beyond those caps: 10k/100k mobs, 200+ zones/instances, 3/6/12-month profiles,
+  and a dynamic hot cache; the design must not depend on a 2,000/40/100 stop. A
+  live prototype remains V-2.
 - [x] **DS-5 — SavedVariables/loading API matrix.** Executed 2026-11-14.
   Result: `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Key conclusions:
   account + per-character split is correct; multiple normal variables still load

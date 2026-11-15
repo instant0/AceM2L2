@@ -26,7 +26,7 @@ them are analysis or offline measurement, not implementation.
 | 2,000/40/100/12 global caps as the design | **Incorrect**; too small for the massive tier |
 | DS-3 10× as massive proof | **Incorrect**; it is small/medium only |
 | HC-5 2.1 MB as a ceiling | **Incorrect**; it is a truncated lower bound |
-| Capacity estimates 11–14 MB / 18–25 MB | **Provisional**; structural model, not an actual file |
+| Capacity estimates 11–14 MB / 18–25 MB | **Partially validated:** actual 2k/40/24k/163k profile is 8.69 MB compact / 9.94 MB client estimate, with 23 MB stable / 27–37 MB transient Lua heap |
 | 64×64 sufficiency for route/inspector | **Provisional**; only dense-heatmap measurements exist |
 | Context cap 12 per mob | **Provisional**; 24k contexts is ~8–9 MB by itself |
 | LoadOnDemand companion | **Provisional**; timing is a V-2 check |
@@ -193,8 +193,32 @@ Limits:
 - calibrated from a no-context 10× sample;
 - estimator truncation makes HC-5 unusable as a ceiling.
 
-**Conclusion:** direction is credible; the numbers need one actual large synthetic
-file before they drive schema decisions.
+**Conclusion:** direction is credible, but the model overestimated the file
+(8.69 MB compact vs 11–14 MB) and underestimated heap pressure (23 MB stable / 27–37 MB transient).
+DS-3B supplies the actual numbers.
+
+### DS-3B — massive synthetic validation
+
+Executed:
+
+- 2,000 mobs, 24,000 contexts, 40 × 4,096 cells, 100 instances;
+- compact file **8,689,981 bytes** (~8.29 MiB);
+- client-format estimate **9,938,701 bytes** (~9.48 MiB);
+- Lua heap delta **26.99 MB** write / **36.54 MB** fresh reload before GC; **23.07 MB** stable after GC;
+- load ~120 ms, normalize ~105 ms, serialize ~1,068 ms offline;
+- invariants pass, fresh-process reload passes, no parser failure.
+
+Limits:
+
+- offline serializer, not client;
+- no 200-zone hot test (current normalizer caps at 40);
+- no 4/8-context variant;
+- no live client memory/timing.
+
+**Conclusion:** the current hot profile loads. Its measured heap is ~23 MB
+stable / 27–37 MB transient, which is acceptable relative to ATT 51–65 MB. There
+is no fixed MB target; optimize the method, not an arbitrary number. It is a
+current-cap profile, not a long-term state.
 
 ## What is actually correct
 
@@ -232,25 +256,32 @@ These choices should stay:
 - Assuming the capacity model is exact without an actual large synthetic file.
 - Assuming indexes/selected-zone loading exist; they are still tasks.
 
-## Required next validation
+## Validation result
 
-Add one offline worst-case validation before final schema decisions:
+DS-3B was executed. It validated the current hot profile:
 
-- 2,000 mobs;
-- 12 contexts per mob (24,000 contexts);
-- 40 zones × 4,096 cells (163,840 cells);
-- 100 instances;
-- quests/deaths/respawns/rates/level history at caps;
-- actual serialized bytes, load/normalize/save/reload, Lua heap.
+- compact file **8.69 MB**;
+- client-format estimate **9.94 MB**;
+- Lua heap **23 MB stable / 27–37 MB transient**;
+- invariants and fresh-process reload pass;
+- no parser/constant-table failure.
 
-Optionally one 200-zone/1k-cell profile if cheap. This is not a matrix; it is the
-single missing capacity proof.
+It also showed that 23 MB stable is acceptable relative to ATT 51–65 MB; there
+is no fixed MB target.
+
+## Remaining validation
+
+- long-term 3/6/12-month profiles and cap pressure (DS-3C done; DS-3C result:
+  2h/day hits 2,000 mobs in ~3 months, rate buffer turns over in 2.4h);
+- 4/8-context variants, if DS-17.1 finds a measured retrieval or memory benefit;
+- 200-zone/200-instance and 10k/100k-mob cold-tier prototype (DS-4P/DS-17.3);
+- live client memory and save/load timing (V-2).
 
 ## Task adjustment
 
-- **DS-3B — Massive synthetic store validation** is added and should run before
-  the final hot/cold boundary.
-- **DS-17.1** remains the design task; it consumes DS-3B.
+- **DS-3B — Massive synthetic store validation** is complete.
+- **DS-3C — Long-term growth and cap pressure** is complete.
+- **DS-17.1** is next; it consumes the actual DS-3B and DS-3C numbers.
 - **DS-4P** remains required.
 - **DS-1-F2** remains the first safe code task after validation/design.
 - **DS-7/DS-12** remain required for cold packing.

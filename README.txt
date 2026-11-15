@@ -5,7 +5,7 @@ XP, reputation, and Kill Story
 
 Author:     faslkjd56
 Version:    2.5.2
-GameVer.:   Midnight 12.1.5 (Retail) / Forever 1.60.1 (Classic+)
+GameVer.:   Midnight 12.1.5 (Retail), 12.1.7 (PTR) / Forever 1.60.1 (Classic+)
 _____________________________________________________________________________________
 
 Level faster with less guesswork.
@@ -28,18 +28,22 @@ Progress at a glance
 
 Kill Story window
 - Overview, Mobs, Areas, Heatmap, and Levels tabs.
-- Kill history by mob, player level, area, and session.
-- Quest XP ledger (Forever) and per-level leveling history.
+- Kill history by mob, player level, and area, plus current-session totals.
+- Quest XP summary (Forever); the full quest list is available with
+  `/acem2l2 xpt quests`.
+- Per-level leveling history.
 - Dungeon XP (Forever), leveling goals, and level-time splits.
 - Loot value, gold/hour, and gear-upgrade notifications.
-- Death locations, respawn intervals, and grinding-spot suggestions (Forever).
+- Best grinding spot in the Overview (Forever).
+- Death and respawn history via `/acem2l2 xpt deaths [count]` and
+  `/acem2l2 xpt respawns [name]`.
 - Resizable window, search, filters, sort modes, multiple themes, and a 3D mob
   model.
 
 Heatmap
 - Per-zone 64x64 kill-density grid with static zone-map art underneath.
-- Full zone art, including a "Reveal unexplored areas" option that is on by
-  default.
+- Zone-map art where the client/generated data provides it, including a
+  "Reveal unexplored areas" option that is on by default.
 - A multi-stop heat gradient (theme accent to gold to red) so the busiest
   cells are the hottest, with adjustable contrast and an optional fire palette
   in Settings > Heatmap.
@@ -49,7 +53,7 @@ Heatmap
   visible with a disabled message, and existing data can be cleared separately.
 
 Data insights
-- Kill counts by mob, area, level, and session.
+- Kill counts by mob, area, level, and current session.
 - Dungeon kills are attributed to the instance name instead of a world map.
 - Data diagnostics: middle-click the minimap icon or use
   `/acem2l2 xpt data` to see tracked counts, limits, heatmap cells, and an
@@ -81,8 +85,8 @@ Forever 1.60.1 — full mode
 
 Midnight 12.1.5 — counts-focused mode
 - Kill, area, level, and session tracking with the full Kill Story window.
-- Heatmaps, death locations, respawns, dungeon activity, goals, splits, loot,
-  gold, and gear upgrades without XP claims.
+- Heatmaps, death/respawn history (commands), dungeon activity, goals, splits,
+  loot, gold, and gear upgrades without XP claims.
 - Optional nameplate levels.
 - XP rate, grinding spots, calibration, rested, and buff claims stay off until
   Midnight data is live-verified.
@@ -142,8 +146,12 @@ ________________________________________________________________________________
   map-overlay data.
 - Heatmaps, death locations, and respawns need the client's map-position APIs.
   Nameplate levels need the client's nameplate API.
-- History is stored per character and per client. Safety caps keep the window
-  responsive; the Data diagnostics panel shows current usage and estimated size.
-- Keeping a modest history is intentional: it keeps login, save, and the
-  window responsive. Use the diagnostics panel if you want to see how much is
-  currently tracked.
+- History is stored per character and per client. Current builds use safety
+  caps to keep the window responsive; the Data diagnostics panel shows current
+  usage and estimated size.
+- The current caps are visible in diagnostics. A tiered storage design is in
+  progress to retain more long-term history without slowing login, save, or the
+  window.
+- Some client-dependent paths—gear comparison, Midnight dungeon/death data, and
+  zone art coverage—are live-unverified and fall back gracefully when the client
+  does not expose the needed data.
