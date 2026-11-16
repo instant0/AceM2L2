@@ -29,17 +29,20 @@ journey.mobs[key]
   respawn
 
 journey.zones[map]
-  kills, xp, presenceSeconds, engagedSeconds, deaths, sessions, uniqueMobs
+  kills, killXP, questXP, otherXP, xp
+  presenceSeconds, engagedSeconds, deaths, sessions, uniqueMobs
   playerLevels
 
 journey.instances[key]
-  kills, xp, presenceSeconds, engagedSeconds, deaths, sessions, uniqueMobs
+  kills, killXP, questXP, otherXP, xp
+  presenceSeconds, engagedSeconds, deaths, sessions, uniqueMobs
   playerLevels
 
 journey.levels[playerLevel]
-  kills, xp, presenceSeconds, engagedSeconds, deaths, startedAt, endedAt
+  kills, killXP, questXP, otherXP, xp
+  presenceSeconds, engagedSeconds, deaths, startedAt, endedAt
 
-journey.sessions, heatmaps, deaths, quests, respawns
+journey.sessions, heatmaps, deaths, quests (lastTurnInAt/mapID/playerLevel), respawns
 ```
 
 ### Critical naming fix
@@ -101,7 +104,7 @@ knowledge.quests
 | `levelHistory` | `journey.levels[level].xp/presenceSeconds/startedAt/endedAt`; `engagedSeconds=0` |
 | `heatmaps.cells[cell] = count` | `cells[cell] = { kills = count, xp = 0, presenceSeconds = 0, engagedSeconds = 0 }` |
 | `deaths` | `journey.deaths` with missing attribution/health defaults |
-| `quests` | `journey.quests` |
+| `quests` | `journey.quests`; add `lastTurnInAt`, `mapID`, `playerLevel` |
 | `respawns` | `journey.respawns` |
 | `session` | one `journey.sessions` record |
 | `totals` | `totals` |
@@ -114,7 +117,7 @@ Local save migration:
 migrated_schema=2
 project=18
 migration_ms=1.2
-v2_heap_mb=0.49
+v2_heap_mb=0.55
 ```
 
 Counts:
@@ -144,6 +147,7 @@ Validation:
 The migration cannot invent fields the current save does not have:
 
 - `presenceSeconds`/`engagedSeconds` per zone/level/instance;
+- kill/quest/other XP split per zone/level/instance;
 - combat contexts (danger);
 - XP contexts;
 - death mob attribution;
@@ -181,6 +185,7 @@ These must be filled by future capture/API work, not by migration.
   - array contexts;
   - combat/XP contexts;
   - `presenceSeconds`/`engagedSeconds` (event-driven, no timer);
+  - `killXP`/`questXP`/`otherXP` split;
   - death attribution/health/buffs/group fields;
   - heatmap cell XP/time optional;
   - top-8+other cold retention;

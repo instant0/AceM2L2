@@ -58,15 +58,18 @@ Full schemas are in `docs/DATA-MODEL-AND-TEST-MATRIX.md`.
   current level, playtime.
 - Mob records: identity, name, level range, classification, kills/XP,
   byLevel/byMap/byInstance, combat outcomes, XP contexts, respawn summary.
-- Zone records: kills, XP, presence/engaged time, deaths, sessions, unique mobs, per-level
+- Zone records: kills, kill/quest/other XP, presence/engaged time, deaths,
+  sessions, unique mobs, per-level
   breakdown.
 - Instance records: same, plus instance/difficulty/type.
-- Level records: XP, kills, presence/engaged time, deaths, start/end.
+- Level records: kill/quest/other XP, kills, presence/engaged time, deaths,
+  start/end.
 - Sessions: enough to compute XP/hour.
 - Heatmaps: 64×64 cells with kills, optional XP/time.
 - Deaths: individual records with mob attribution, health, buffs, group,
   classification, instance difficulty, combat context.
-- Quests: separate records; not part of mob context.
+- Quests: separate records; `QUEST_TURNED_IN` is a sparse presence anchor and
+  quest-XP split point; not part of mob context.
 - No per-kill event log.
 
 ### Account-wide Knowledge target
@@ -194,7 +197,7 @@ Document: `docs/tasks/DS-17-04D-ACCOUNT-KNOWLEDGE-PROTOTYPE.md`
 
 **G1. DS-11 — Decision record.** Done 2026-11-16.  
 Result: `docs/DS-11-DECISION-RECORD.md`  
-Next: IMP-1 integration, then V-2. DS-14 and CAP-1 are complete.
+Next: IMP-1B5 tooltip/UI retirement, then V-2. IMP-1 slice, IMP-1A/B query, IMP-1B2/B3/B4, DS-14, and CAP-1 are complete.
 
 ## 4. Dependencies
 

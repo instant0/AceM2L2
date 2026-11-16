@@ -28,6 +28,9 @@ KillHistory/Clients/Midnight.lua
 KillHistory/Util.lua
 KillHistory/Formula.lua
 KillHistory/Data.lua
+KillHistory/Journey.lua
+KillHistory/JourneyQueries.lua
+KillHistory/JourneyStorage.lua
 KillHistory/Calibration.lua
 KillHistory/Tracking.lua
 KillHistory/World.lua

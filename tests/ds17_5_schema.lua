@@ -172,6 +172,9 @@ local function migrate(db, projectID)
       firstSeen = mob.firstSeen or 0,
       lastSeen = mob.lastSeen or 0,
       kills = kills,
+      killXP = xp,
+      questXP = 0,
+      otherXP = 0,
       xp = xp,
       sessionKills = tonumber(mob.sessionKills) or 0,
       sessionXP = tonumber(mob.sessionXP) or 0,
@@ -199,6 +202,9 @@ local function migrate(db, projectID)
     local mapKey = tostring(mapID)
     zones[mapKey] = {
       kills = tonumber(db.areas[mapID]) or 0,
+      killXP = 0,
+      questXP = 0,
+      otherXP = 0,
       xp = 0,
       presenceSeconds = 0,
       engagedSeconds = 0,
@@ -219,6 +225,9 @@ local function migrate(db, projectID)
       difficultyID = instance.difficultyID,
       instanceType = instance.instanceType,
       kills = tonumber(instance.kills) or 0,
+      killXP = tonumber(instance.xp) or 0,
+      questXP = 0,
+      otherXP = 0,
       xp = tonumber(instance.xp) or 0,
       presenceSeconds = 0,
       engagedSeconds = 0,
@@ -239,6 +248,9 @@ local function migrate(db, projectID)
     local history = levelHistory[level] or {}
     levels[tostring(level)] = {
       kills = tonumber(db.levels[level]) or 0,
+      killXP = 0,
+      questXP = 0,
+      otherXP = tonumber(history.xpGained) or 0,
       xp = tonumber(history.xpGained) or 0,
       presenceSeconds = tonumber(history.duration) or 0,
       engagedSeconds = 0,
@@ -307,8 +319,10 @@ local function migrate(db, projectID)
       count = tonumber(quest.count) or 0,
       level = 0,
       mapID = 0,
+      playerLevel = 0,
       firstSeen = quest.firstSeen or 0,
       lastSeen = quest.lastSeen or 0,
+      lastTurnInAt = quest.lastSeen or 0,
     }
   end
 

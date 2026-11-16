@@ -477,9 +477,90 @@ Result: `docs/CAP-1-JOURNEY-CAPTURE-FIELDS-RESULT.md`
 | Health bands | 0–20/21–40/41–60/61–80/81–100; missing → unknown |
 | Context split | combat = health/buffs/group/levels/class/difficulty; XP = group/rested/buffs/levels/class; quest excluded |
 | Mob level | range min/max/samples; unknown must not become player level |
-| Time | event-driven only; presenceSeconds + engagedSeconds; no timer/OnUpdate; one logout finalizer |
-| Heatmap cell | kills/XP/activeSeconds |
+| Time | event-driven only; presenceSeconds + engagedSeconds; no timer/OnUpdate; one logout finalizer; quest turn-in is a sparse anchor |
+| Heatmap cell | kills/XP/presenceSeconds/engagedSeconds |
 | Death | attribution/health/buffs/group/class/difficulty; no attribution → no mob-level danger |
+| Quest turn-in | existing `QUEST_TURNED_IN` anchors presence and separates quest XP; no engaged time; not in mob context |
+
+## 6k. IMP-1 integration slice result
+
+Result: `docs/IMP-1-JOURNEY-SCHEMA-RETRIEVAL-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Local integration | 158 mobs, 3 zone blocks, 106 zone mobs; 2.2 KB encoded |
+| Login | 0 blocks decoded |
+| Selected zone 1424 | 0.32 ms, 44–45 records |
+| Event time | presence 160 s, engaged 130 s; no timer |
+| Quest anchor | quest XP 1,150; presence anchor; not engaged time |
+| Best zone | total XP rank Zone C; kill-only rank Zone B |
+| Heatmap | map 1421, 198 cells, top-10 share 23.2% |
+| Fallback | missing/corrupt block safe |
+
+## 6l. IMP-1A instrumentation result
+
+Result: `docs/IMP-1A-JOURNEY-INSTRUMENTATION-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Production module | `KillHistory/Journey.lua`; additive `self.char.journey` |
+| Time | event-driven only; presence 200 s / engaged 140 s in test |
+| Quest anchor | questXP 500; no engaged time; lastTurnInAt set |
+| Events | existing events + `PLAYER_LOGOUT` only |
+| Tests | `tests/journey.lua` and full smoke suite pass |
+| Remaining | v2 migration, blocks, save/guard, retrieval, danger/heatmap queries |
+
+## 6m. IMP-1B query API result
+
+Result: `docs/IMP-1B-JOURNEY-QUERY-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| APIs | zone/level stats, best zones total/kill, heatmap top cells, mob/quest/time summaries |
+| Best zone | total XP/hour ranks quest-heavy zone; kill-only ranks kill-heavy zone |
+| Confidence | low <1,800s, medium ≥1,800s, high ≥7,200s |
+| Legacy | zone kills merge from `db.areas` |
+| Tests | `tests/journey_queries.lua`; run_all passes |
+| Remaining | migration, blocks, save/guard, UI integration |
+
+## 6n. IMP-1B2 block storage result
+
+Result: `docs/IMP-1B2-JOURNEY-BLOCK-STORAGE-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Blocks | per map zone and instance; varint record format |
+| Storage | base64 + checksum; dirty-zone flush |
+| Login | zero decode |
+| Retrieval | selected-block lazy decode; 8-block LRU |
+| Test | map/instance blocks, cache, dirty rebuild, corrupt/missing fallback |
+| Limitation | blocks built from legacy data; duplication remains; UI/save integration pending |
+
+## 6o. IMP-1B3 block-retrieval result
+
+Result: `docs/IMP-1B3-BLOCK-RETRIEVAL-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Mob→block index | `journey.mobZones` rebuilt on flush |
+| Block-backed lookup | works with `db.mobs` emptied |
+| Query fallback | `GetMobJourneySummary` uses block with `source="block"` |
+| Cache | lazy selected-block decode |
+| Remaining | legacy retirement, tooltip/UI/save guard integration |
+
+## 6p. IMP-1B4 save/guard result
+
+Result: `docs/IMP-1B4-SAVE-GUARD-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Block backup | previous block/index retained per dirty zone |
+| Restore | `RestoreJourneyBlocks()` restores and clears cache |
+| Oversize | `SAVED_VARIABLES_TOO_LARGE` sets `saveBlocked` |
+| Filtering | foreign add-on events ignored |
+| Blocked write | flush refuses; previous block intact |
+| Recovery | explicit reset resumes saving |
+| Tests | `tests/journey_save_guard.lua`; run_all passes |
 
 ## 7. Required tests
 

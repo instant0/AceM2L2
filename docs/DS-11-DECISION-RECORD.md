@@ -148,7 +148,13 @@ character SavedVariables. No raw Journey is copied to the account.
    - combat health/buffs/group;
    - death attribution;
    - cell XP/time.
-3. **IMP-1 — Journey schema/retrieval integration.**
+3. **IMP-1 — Journey schema/retrieval integration slice.** Done 2026-11-16.
+   **IMP-1A — Production Journey instrumentation.** Done 2026-11-16.
+   **IMP-1B — Production Journey query API.** Done 2026-11-16.
+   **IMP-1B2 — Production block storage core.** Done 2026-11-16.
+   **IMP-1B3 — Block retrieval integration.** Done 2026-11-16.
+   **IMP-1B4 — Block backup/save guard.** Done 2026-11-16.
+   **IMP-1B5 — Tooltip/UI retirement.** Next.
    - v2 schema in production code;
    - dirty-block save;
    - selected-block decode;

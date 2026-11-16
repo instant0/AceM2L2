@@ -1736,6 +1736,10 @@ function XPTooltip:RecordQuestXP(questID, questName, xp)
     end
   end
 
+  if self.OnJourneyQuestTurnIn then
+    self:OnJourneyQuestTurnIn(questID, questName, value)
+  end
+
   if self.ui and self.ui:IsShown() then
     self:RequestUIUpdate()
   end

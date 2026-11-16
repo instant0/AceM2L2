@@ -330,6 +330,9 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
     self:RequestUIUpdate()
   end
 
+  if self.OnJourneyKill then
+    self:OnJourneyKill(info, totalXP)
+  end
   if self.settings and self.settings.debug then
     AceM2L2:SafePrint(string.format(
       "Kill Story: kill %s (%s) total=%s base=%s source=%s",
@@ -361,6 +364,9 @@ function XPTooltip:AddKillXP(entry, info, totalXP, rawBase, buffedXP, skipObserv
   mob.sessionXP = (tonumber(mob.sessionXP) or 0) + totalXP
   mob.sessionXPKnown = true
   mob.lastSeen = Epoch()
+  if self.OnJourneyKillXP then
+    self:OnJourneyKillXP(totalXP, info)
+  end
   db.totals.xp = (tonumber(db.totals.xp) or 0) + totalXP
   db.session.xp = (tonumber(db.session.xp) or 0) + totalXP
   self:AddLevelHistoryXP(totalXP)

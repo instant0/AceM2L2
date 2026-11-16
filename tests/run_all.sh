@@ -38,6 +38,18 @@ for scenario in midnight midnight_missing midnight_secret_identity midnight_secr
   "$LUA_BIN" tests/smoke.lua "$scenario"
 done
 
+echo "== Journey instrumentation =="
+"$LUA_BIN" tests/journey.lua forever
+
+echo "== Journey queries =="
+"$LUA_BIN" tests/journey_queries.lua forever
+
+echo "== Journey block storage =="
+"$LUA_BIN" tests/journey_storage.lua forever
+
+echo "== Journey save guard =="
+"$LUA_BIN" tests/journey_save_guard.lua forever
+
 echo "== Embedded library smoke test =="
 "$LUA_BIN" tests/libs_smoke.lua
 

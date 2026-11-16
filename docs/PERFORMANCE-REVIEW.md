@@ -347,7 +347,25 @@ is no fixed MB target.
 - **CAP-1** is complete: health bands, combat/XP context split, mob-level range,
   active-time accumulator, heatmap cell XP/time, and death attribution/fallback
   prototyped. Result: `docs/CAP-1-JOURNEY-CAPTURE-FIELDS-RESULT.md`.
-- **IMP-1** is next: Journey schema/retrieval integration.
+- **IMP-1** integration slice is complete: local 158 mobs/3 zone blocks; login
+  0 decode; selected block 0.32 ms; event time + quest anchor + best-zone total/
+  kill + heatmap + danger + fallback. Result:
+  `docs/IMP-1-JOURNEY-SCHEMA-RETRIEVAL-RESULT.md`.
+- **IMP-1A** is complete: production `KillHistory/Journey.lua` with event-driven
+  presence/engaged time, quest anchor, XP split, and `PLAYER_LOGOUT`; no timer.
+  Result: `docs/IMP-1A-JOURNEY-INSTRUMENTATION-RESULT.md`.
+- **IMP-1B** query API is complete: best zones total/kill, heatmap top cells,
+  mob/quest/time summaries. Result: `docs/IMP-1B-JOURNEY-QUERY-RESULT.md`.
+- **IMP-1B2** is complete: per-zone/instance base64 blocks, checksum, lazy
+  decode, 8-block LRU, dirty-zone flush, corrupt/missing fallback. Result:
+  `docs/IMP-1B2-JOURNEY-BLOCK-STORAGE-RESULT.md`.
+- **IMP-1B3** is complete: block-backed mob lookup, mob→zone index, and query
+  fallback with legacy mobs removed. Result:
+  `docs/IMP-1B3-BLOCK-RETRIEVAL-RESULT.md`.
+- **IMP-1B4** save/guard is complete: block backup/restore, oversize
+  save-blocking, reset path, foreign-event filtering. Result:
+  `docs/IMP-1B4-SAVE-GUARD-RESULT.md`.
+- **IMP-1B5** is next: tooltip/UI retirement and rollback.
 - **MEM-2** remains the load/unload policy task.
 
-DS-1-F2 is the only production-code change; the storage/design tasks remain documentation-only.
+DS-1-F2, IMP-1A, IMP-1B query APIs, IMP-1B2 block storage, IMP-1B3 block retrieval, and IMP-1B4 save guard are production-code changes; the other storage/design tasks remain documentation/prototype-only.

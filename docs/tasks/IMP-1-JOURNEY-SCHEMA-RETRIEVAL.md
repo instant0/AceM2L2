@@ -1,6 +1,8 @@
 # IMP-1 — Journey schema and retrieval integration
 
-**Status:** ready; after CAP-1/DS-14  
+**Status:** integration slice executed 2026-11-16; production wiring in IMP-1A  
+**Result:** `docs/IMP-1-JOURNEY-SCHEMA-RETRIEVAL-RESULT.md`  
+**Harness:** `tests/imp1_integration.lua`  
 **Depends on:** DS-17.5, DS-15, DS-16, CAP-1, DS-14  
 **Blocks:** V-2, UI features
 
@@ -27,7 +29,16 @@ integration:
   - current Journey;
   - metadata registry/account Knowledge when available;
   - `NPC <id>` fallback.
-- Danger and best-zone XP/hour queries.
+- Event-driven time:
+  - `presenceSeconds`/`engagedSeconds`;
+  - reuse existing events + one logout finalizer;
+  - no timer/OnUpdate.
+- Quest turn-in:
+  - existing `QUEST_TURNED_IN` as sparse presence anchor;
+  - split `killXP`/`questXP`/`otherXP`;
+  - no engaged time from quest turn-in;
+  - no quest state in mob context.
+- Danger and best-zone XP/hour queries (total and kill-only).
 - Heatmap top-N queries.
 - Missing/corrupt block fallback.
 - Oversize guard integration.

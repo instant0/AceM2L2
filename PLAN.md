@@ -21,7 +21,7 @@ Current release: **2.5.2**
 | Release hygiene | Released 2.5.2 | REL-1; V-6 |
 | Memory | 3.2–3.85MB real; 23MB stable worst-case hot; guardrails/policy open | MEM-1/MEM-2; V-2 |
 | Scope/grid/limit review | Static/offline analysis first | SC-1..SC-5, G-1..G-3, A-1, HC-7; V-3 |
-| Data storage architecture | DS-1..DS-5/DS-3B/DS-3C/DS-17.1/DS-17.2/DS-17.3/DS-1-F2/DS-4P/DS-4P-F1/DS-4P-F2/DS-6/DS-7/DS-12/DS-6-F1/DS-17.4A/B/C/DS-17.5/DS-16/DS-15/DS-11/DS-14/CAP-1 done; IMP-1 next | DS-1..DS-17.6; V-2 |
+| Data storage architecture | DS-1..DS-5/DS-3B/DS-3C/DS-17.1/DS-17.2/DS-17.3/DS-1-F2/DS-4P/DS-4P-F1/DS-4P-F2/DS-6/DS-7/DS-12/DS-6-F1/DS-17.4A/B/C/DS-17.5/DS-16/DS-15/DS-11/DS-14/CAP-1/IMP-1 slice/IMP-1A/IMP-1B query/IMP-1B2/B3/B4 done; IMP-1B5 next | DS-1..DS-17.6; V-2 |
 | Character lifecycle and cross-character data | Sub-task files ready | DS-17.0..DS-17.6; V-2 |
 | Journey overlay | Proposed, after DS | J-1..J-6; V-4 |
 | Cell inspector | Proposed, after DS | M-1..M-6; V-4 |
@@ -125,7 +125,7 @@ complete.** DS-1 is in
 DS-5 is in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`; DS-17.1 is in
 `docs/DS-17-1-AGGREGATION-DECISION.md`; DS-17.2, DS-17.3, DS-1-F2, DS-4P,
 DS-4P-F1, DS-4P-F2, DS-6, DS-7/DS-12, and DS-6-F1 are complete.
-Next: IMP-1 (Journey schema/retrieval integration).
+Next: IMP-1B5 (tooltip/UI retirement and rollback).
 
 ### Phase 3 — storage design and prototypes
 
@@ -154,8 +154,20 @@ Next: IMP-1 (Journey schema/retrieval integration).
     `docs/DS-14-OVERSIZE-GUARD-RESULT.md`.
 14. **CAP-1 — Journey capture fields.** Done 2026-11-16. Result:
     `docs/CAP-1-JOURNEY-CAPTURE-FIELDS-RESULT.md`.
-15. **IMP-1 — Journey schema/retrieval integration.** Next.
-    `docs/tasks/IMP-1-JOURNEY-SCHEMA-RETRIEVAL.md`.
+15. **IMP-1 — Journey schema/retrieval integration.** Integration slice done
+    2026-11-16. Result: `docs/IMP-1-JOURNEY-SCHEMA-RETRIEVAL-RESULT.md`.
+16. **IMP-1A — Production Journey instrumentation.** Done 2026-11-16. Result:
+    `docs/IMP-1A-JOURNEY-INSTRUMENTATION-RESULT.md`.
+17. **IMP-1B — Production Journey query API.** Done 2026-11-16. Result:
+    `docs/IMP-1B-JOURNEY-QUERY-RESULT.md`.
+18. **IMP-1B2 — Production migration and block storage.** Done 2026-11-16.
+    Result: `docs/IMP-1B2-JOURNEY-BLOCK-STORAGE-RESULT.md`.
+19. **IMP-1B3 — Journey migration and retrieval integration.** Done
+    2026-11-16. Result: `docs/IMP-1B3-BLOCK-RETRIEVAL-RESULT.md`.
+20. **IMP-1B4 — Legacy retirement and save/guard integration.** Save/guard
+    slice done 2026-11-16. Result: `docs/IMP-1B4-SAVE-GUARD-RESULT.md`.
+21. **IMP-1B5 — Tooltip/UI retirement and rollback.** Next.
+    `docs/tasks/IMP-1B5-TOOLTIP-UI-RETIREMENT.md`.
 14. **DS-17.4A — Journey/Knowledge model validation.** Done 2026-11-16.
     Result: `docs/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL-RESULT.md`.
     **DS-17.4B — Danger and XP/hour prototypes.** Done 2026-11-16.
@@ -295,13 +307,23 @@ Use these groups to avoid duplicate harnesses and release churn:
 24. **WP-3 / DS-11** — decision record. **Done 2026-11-16.**
 25. **WP-3 / DS-14** — oversize guard. **Done 2026-11-16.**
 26. **WP-3 / CAP-1** — Journey capture fields. **Done 2026-11-16.**
-27. **WP-3 / IMP-1** — Journey schema/retrieval integration. **Next.**
-28. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
+27. **WP-3 / IMP-1** — Journey schema/retrieval integration. **Slice done
+    2026-11-16.**
+28. **WP-3 / IMP-1A** — production Journey instrumentation. **Done
+    2026-11-16.**
+29. **WP-3 / IMP-1B** — production Journey query API. **Done 2026-11-16.**
+30. **WP-3 / IMP-1B2** — production migration/block storage. **Done
+    2026-11-16.**
+31. **WP-3 / IMP-1B3** — Journey migration/retrieval integration. **Done
+    2026-11-16.**
+32. **WP-3 / IMP-1B4** — legacy retirement/save guard. **Done 2026-11-16.**
+33. **WP-3 / IMP-1B5** — tooltip/UI retirement and rollback. **Next.**
+34. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
     evidence is scoped.
-29. **WP-4 / R-4** — static overlay/art audit.
-30. **WP-5** — limits/grid decisions after measurements.
-31. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
-32. **WP-7 / J/M** — only after DS-11.
+35. **WP-4 / R-4** — static overlay/art audit.
+36. **WP-5** — limits/grid decisions after measurements.
+37. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
+38. **WP-7 / J/M** — only after DS-11.
 
 ### Safe execution order for massive storage
 
@@ -330,9 +352,15 @@ cap changes.
 19. **DS-11 — decision record.** **Done 2026-11-16.**
 20. **DS-14 — oversize guard implementation.** **Done 2026-11-16.**
 21. **CAP-1 — Journey capture fields.** **Done 2026-11-16.**
-22. **IMP-1 — Journey schema/retrieval integration.** Next.
-23. **MEM-2 — load/unload/eviction policy.** Design using DS-17.3/DS-15/DS-16.
-24. **V-2 — live API/data and SavedVariables verification.**
+22. **IMP-1 — Journey schema/retrieval integration.** **Slice done 2026-11-16.**
+23. **IMP-1A — production Journey instrumentation.** **Done 2026-11-16.**
+24. **IMP-1B — production Journey query API.** **Done 2026-11-16.**
+25. **IMP-1B2 — production migration/block storage.** **Done 2026-11-16.**
+26. **IMP-1B3 — Journey migration/retrieval integration.** **Done 2026-11-16.**
+27. **IMP-1B4 — legacy retirement/save guard.** **Done 2026-11-16.**
+28. **IMP-1B5 — tooltip/UI retirement and rollback.** Next.
+29. **MEM-2 — load/unload/eviction policy.** Design using DS-17.3/DS-15/DS-16.
+30. **V-2 — live API/data and SavedVariables verification.**
 
 Do not start global-cap removal, schema migration, the LoadOnDemand companion,
 or a production cold tier before step 5 is proven.
@@ -1078,8 +1106,31 @@ budget.
   context split, mob level range, active time, heatmap cell XP/time, and death
   attribution/fallback prototyped. Result:
   `docs/CAP-1-JOURNEY-CAPTURE-FIELDS-RESULT.md`.
-- [ ] **IMP-1 — Journey schema/retrieval integration.** Next. Task:
-  `docs/tasks/IMP-1-JOURNEY-SCHEMA-RETRIEVAL.md`.
+- [x] **IMP-1 — Journey schema/retrieval integration.** Integration slice
+  executed 2026-11-16: local 158 mobs/3 zone blocks; login 0 decode; selected
+  block 0.32 ms; event time + quest anchor + best-zone total/kill + heatmap +
+  danger + fallback. Result:
+  `docs/IMP-1-JOURNEY-SCHEMA-RETRIEVAL-RESULT.md`.
+- [x] **IMP-1A — Production Journey instrumentation.** Executed 2026-11-16.
+  New `KillHistory/Journey.lua`; event-driven presence/engaged time; quest
+  anchor; kill/quest XP split; `PLAYER_LOGOUT` finalizer; tests/journey.lua.
+  Result: `docs/IMP-1A-JOURNEY-INSTRUMENTATION-RESULT.md`.
+- [x] **IMP-1B — Production Journey query API.** Executed 2026-11-16.
+  Read-only best-zone total/kill XP/hour, heatmap top cells, mob/quest/time
+  summaries; tests/journey_queries.lua. Result:
+  `docs/IMP-1B-JOURNEY-QUERY-RESULT.md`.
+- [x] **IMP-1B2 — Production migration/block storage.** Executed 2026-11-16.
+  Per-zone/instance base64 blocks, checksum, lazy decode, LRU, dirty-zone flush.
+  Result: `docs/IMP-1B2-JOURNEY-BLOCK-STORAGE-RESULT.md`.
+- [x] **IMP-1B3 — Journey migration/retrieval integration.** Executed
+  2026-11-16. Block-backed mob lookup, mob→zone index, query fallback with
+  legacy removed; tests pass. Result:
+  `docs/IMP-1B3-BLOCK-RETRIEVAL-RESULT.md`.
+- [x] **IMP-1B4 — Legacy retirement and save/guard integration.** Save/guard
+  slice executed 2026-11-16: block backup/restore, oversize save-blocking,
+  reset path. Result: `docs/IMP-1B4-SAVE-GUARD-RESULT.md`.
+- [ ] **IMP-1B5 — Tooltip/UI retirement and rollback.** Next. Task:
+  `docs/tasks/IMP-1B5-TOOLTIP-UI-RETIREMENT.md`.
 - [x] **DS-12 — Packed block codec.** Executed 2026-11-16 with DS-7. Block
   metadata, adaptive cells, base64 storage, checksum, corruption/truncation, and
   block-size guidance are defined. Result:

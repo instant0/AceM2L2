@@ -119,6 +119,7 @@ function XPTooltip:OnNamePlateRemoved(event, unit)
 end
 
 function XPTooltip:OnZoneChanged(event)
+  self:OnJourneyZoneChanged()
   self.lastPool = self:GetRestedPool()
   self:ScheduleInstanceStateRefresh(0.75)
   if self.ui and self.ui:IsShown() then
@@ -127,12 +128,26 @@ function XPTooltip:OnZoneChanged(event)
 end
 
 function XPTooltip:OnLevelUp(event, level)
+  self:OnJourneyLevelUp(level)
   self:FinalizeLevelHistory(level)
   self:ResetRates()
   self.lastPool = self:GetRestedPool()
   self:SchedulePrune()
   if self.ui and self.ui:IsShown() then
     self:RequestUIUpdate()
+  end
+end
+
+function XPTooltip:OnPlayerLogout()
+  self:OnJourneyLogout()
+end
+
+function XPTooltip:OnSavedVariablesTooLarge(event, addonName)
+  if addonName and addonName ~= "AceM2L2" then
+    return
+  end
+  if self.OnJourneySaveBlocked then
+    self:OnJourneySaveBlocked()
   end
 end
 
@@ -145,6 +160,7 @@ function XPTooltip:OnLogin(event)
 end
 
 function XPTooltip:OnEnteringWorld(event)
+  self:OnJourneyEnterWorld()
   self.lastPool = self:GetRestedPool()
   if not self.active then
     self:Refresh()

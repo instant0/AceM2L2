@@ -312,6 +312,8 @@ function XPTooltip:Install()
     { "PLAYER_LEVEL_UP", "OnLevelUp" },
     { "PLAYER_ENTERING_WORLD", "OnEnteringWorld" },
     { "PLAYER_LOGIN", "OnLogin" },
+    { "PLAYER_LOGOUT", "OnPlayerLogout" },
+    { "SAVED_VARIABLES_TOO_LARGE", "OnSavedVariablesTooLarge" },
     { "ENABLE_XP_GAIN", "OnXPGainEnabled" },
     { "DISABLE_XP_GAIN", "OnXPGainDisabled" },
     { "PLAYER_MAX_LEVEL_UPDATE", "OnMaxLevelUpdate" },
