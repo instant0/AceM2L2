@@ -365,6 +365,122 @@ counts are deterministic for the same input.
 - Retention rules that could drop aggregation dimensions.
 - DS-17.1/17.4/17.5 need the new fields and split.
 
+## 6b. DS-17.4A result
+
+Result: `docs/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL-RESULT.md`
+
+| Finding | Number |
+|---|---|
+| Local mobs / contexts | 158 mobs / 1 context entry |
+| Full contexts at 10k mobs × 12 | 70.70 MB; top-8 45.34 MB, 93.8% kills / 92.3% XP; top-4 23.06 MB, 66.7% / 64.3% |
+| Metadata schema at 100k | nested 33.75 MB; parallel 26.00 MB; packed 4.45 MB |
+| Heatmap 64→32/16 | totals preserved; 428/256 cells; **local occupancy 4.5–4.8%, not saturated** |
+| Local gaps | no active time, combat/XP contexts, death attribution/health/buffs/group, heatmap XP/time |
+
+## 6c. DS-17.4B result
+
+Result: `docs/DS-17-04B-DANGER-AND-XP-HOUR-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Danger | Wilson bounds + sample confidence; sparse 2 samples = not enough data |
+| Best zone | XP/hour, not kills/hour; low-sample high XP/hour flagged low confidence |
+| Heatmap local occupancy | 4.83% / 4.54% / 0.02%; top 10 cells ≈23% of kills |
+| Heatmap downsample | top-10 overlap 6/10–10/10 in the tiny sample; not general proof |
+| Missing data | killer attribution, death health/buffs/group, per-zone active time, cell XP/time |
+
+## 6d. DS-17.4C result
+
+Result: `docs/DS-17-04C-RETENTION-MERGE-COMPATIBILITY-RESULT.md`
+
+| Finding | Number |
+|---|---|
+| Array contexts at 10k×12 | 4.37 MB full; top-8 3.15 MB, 93.8%/92.2% detail; top-8+other 9.79 MB, 100% totals |
+| Keyed-map contexts at 10k×12 | 70.70 MB (DS-17.4A) — array/list is required cold |
+| Packed contexts | 1.81 MB full; 1.43 MB top-8+other |
+| Active totals | zone kills/XP/activeSeconds/deaths preserved |
+| Heatmap normal density | 0.5–5%; top hotspot overlap degrades as density rises |
+| Aggregation | cold totals rebuild exactly; no merge implemented |
+
+## 6e. DS-17.5 result
+
+Result: `docs/DS-17-05-SCHEMA-AND-MIGRATION-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| v2 Journey migration | 158 mobs, 1,993 kills, 152,816 XP, 385 cells, 16 deaths, 38 quests, 69 respawns preserved |
+| Idempotent | yes |
+| Migration cost | 1.2 ms; 0.49 MB v2 heap on local sample |
+| Player vs mob level | v1 `killsAtLevel` is player level; v2 renames to `byPlayerLevel`; mob level range separate |
+| Missing after migration | active time, combat/XP contexts, death attribution/health/buffs/group, heatmap XP/time, character class/race/faction |
+| Account Knowledge | target defined; no merge implemented |
+| Downgrade | newer schema rejected |
+
+## 6f. DS-16 result
+
+Result: `docs/DS-16-SAVE-CHECKPOINT-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Full encode, 400×10 KB blocks | 795 ms; 5.11 MB base64 |
+| Dirty 1 / 10 / 100 blocks | 2.1 / 21.2 / 206.5 ms |
+| Save encoded file | 4.2 ms |
+| Full reload + base64 decode all | 1,153.6 ms — lazy selected-block decode required |
+| Backup/restore | previous block retained and restored |
+| Oversize state | normal → oversized → compacting → normal |
+| Policy | no per-kill save; account Knowledge writes deferred |
+
+## 6g. DS-15 result
+
+Result: `docs/DS-15-LAZY-RETRIEVAL-CACHE-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Login | 8.0 ms load; **0 blocks decoded** |
+| Selected block | 1.7 ms decode; 10k selected-zone tooltips 1.2 ms |
+| Full decode | 586 ms — must not happen at login |
+| Random global cold tooltip | 16.2 s without cache; 5.8 s with 256-block cache (62.3% hit) |
+| Best zone / heatmap | summary queries; no block decode; 77.6 ms / 0.34 ms per 10k |
+| Missing/corrupt | safe fallback; cache not poisoned |
+| Implication | global tooltip must use hot/registry/summary, not arbitrary cold blocks |
+
+## 6h. DS-11 decision record
+
+Result: `docs/DS-11-DECISION-RECORD.md`
+
+Settled: Journey/Knowledge split; no arbitrary caps; per-zone blocks; 64/32/16;
+packed codec; no shipped names; player/mob level separation; array contexts;
+top-8+other; selected-block lazy decode; dirty-block save; oversize recovery.
+
+Deferred: account Knowledge merge; LoadOnDemand companion; route/UI; V-2 live
+checks. Implementation order: DS-14 → CAP-1 → IMP-1 → V-2 → UI.
+
+## 6i. DS-14 result
+
+Result: `docs/DS-14-OVERSIZE-GUARD-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Constant budget | 340k constants split into 4 chunks under 100k; max 99,450 |
+| Oversized block | rejected, not truncated |
+| Save-blocked state | blocked saves do not write; compaction restores normal save |
+| Backup/restore | previous generation restored |
+| Downgrade | schema 2 accepted; schema 3 read-only/rejected |
+| Exact client limit | V-2 check |
+
+## 6j. CAP-1 result
+
+Result: `docs/CAP-1-JOURNEY-CAPTURE-FIELDS-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Health bands | 0–20/21–40/41–60/61–80/81–100; missing → unknown |
+| Context split | combat = health/buffs/group/levels/class/difficulty; XP = group/rested/buffs/levels/class; quest excluded |
+| Mob level | range min/max/samples; unknown must not become player level |
+| Time | event-driven only; presenceSeconds + engagedSeconds; no timer/OnUpdate; one logout finalizer |
+| Heatmap cell | kills/XP/activeSeconds |
+| Death | attribution/health/buffs/group/class/difficulty; no attribution → no mob-level danger |
+
 ## 7. Required tests
 
 ### Tier 1 — model and schema (offline, now)

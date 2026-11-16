@@ -1,6 +1,8 @@
 # DS-17.5 — Schema, field ownership, and migration
 
-**Status:** ready; after DS-17.4A/B/C  
+**Status:** executed 2026-11-16  
+**Result:** `docs/DS-17-05-SCHEMA-AND-MIGRATION-RESULT.md`  
+**Harness:** `tests/ds17_5_schema.lua`  
 **Depends on:** DS-17.1..DS-17.4C, DS-4, DS-5, DS-7/DS-12, DS-9  
 **Blocks:** DS-15, DS-16, DS-11
 
@@ -18,6 +20,15 @@ The model is documented in:
 
 - `docs/DATA-MODEL-AND-TEST-MATRIX.md`
 - `docs/DATA-MODEL-PLAN.md`
+
+Latest validated inputs:
+
+- contexts as array/list records, not string-keyed maps;
+- cold: top-8 contexts + `other` aggregate, packed;
+- preserve XP/kills/active time/deaths/samples totals;
+- heatmap: 64×64 hot, 32/16 cold, plus top-N hotspot summary;
+- 0.5–5% heatmap occupancy is normal; 15–30% is stress;
+- no merge implementation now.
 
 ## Roots
 

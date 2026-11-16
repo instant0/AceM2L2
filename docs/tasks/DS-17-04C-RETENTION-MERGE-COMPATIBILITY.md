@@ -1,6 +1,8 @@
 # DS-17.4C — Retention and aggregation compatibility
 
-**Status:** ready; after DS-17.4A/B  
+**Status:** executed 2026-11-16  
+**Result:** `docs/DS-17-04C-RETENTION-MERGE-COMPATIBILITY-RESULT.md`  
+**Harness:** `tests/ds17_4c_retention.lua`  
 **Depends on:** DS-17.4A, DS-17.4B, DS-17.3, DS-7/DS-12  
 **Blocks:** DS-17.5, DS-9, DS-11
 

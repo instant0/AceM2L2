@@ -21,7 +21,7 @@ Current release: **2.5.2**
 | Release hygiene | Released 2.5.2 | REL-1; V-6 |
 | Memory | 3.2–3.85MB real; 23MB stable worst-case hot; guardrails/policy open | MEM-1/MEM-2; V-2 |
 | Scope/grid/limit review | Static/offline analysis first | SC-1..SC-5, G-1..G-3, A-1, HC-7; V-3 |
-| Data storage architecture | DS-1..DS-5/DS-3B/DS-3C/DS-17.1/DS-17.2/DS-17.3/DS-1-F2/DS-4P/DS-4P-F1/DS-4P-F2/DS-6/DS-7/DS-12/DS-6-F1 done; DS-17.4A next | DS-1..DS-17.6; V-2 |
+| Data storage architecture | DS-1..DS-5/DS-3B/DS-3C/DS-17.1/DS-17.2/DS-17.3/DS-1-F2/DS-4P/DS-4P-F1/DS-4P-F2/DS-6/DS-7/DS-12/DS-6-F1/DS-17.4A/B/C/DS-17.5/DS-16/DS-15/DS-11/DS-14/CAP-1 done; IMP-1 next | DS-1..DS-17.6; V-2 |
 | Character lifecycle and cross-character data | Sub-task files ready | DS-17.0..DS-17.6; V-2 |
 | Journey overlay | Proposed, after DS | J-1..J-6; V-4 |
 | Cell inspector | Proposed, after DS | M-1..M-6; V-4 |
@@ -125,7 +125,7 @@ complete.** DS-1 is in
 DS-5 is in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`; DS-17.1 is in
 `docs/DS-17-1-AGGREGATION-DECISION.md`; DS-17.2, DS-17.3, DS-1-F2, DS-4P,
 DS-4P-F1, DS-4P-F2, DS-6, DS-7/DS-12, and DS-6-F1 are complete.
-Next: DS-17.4A (Journey/Knowledge model validation).
+Next: IMP-1 (Journey schema/retrieval integration).
 
 ### Phase 3 — storage design and prototypes
 
@@ -145,27 +145,33 @@ Next: DS-17.4A (Journey/Knowledge model validation).
 8. **DS-9 — Retention and migration.**
 9. **DS-17.4 — Cross-character knowledge and route recommendations.** Split
    into DS-17.4A–D below.
-10. **DS-17.5 — Schema and migration.** After DS-17.4A–C.
-    `docs/tasks/DS-17-05-SCHEMA-AND-MIGRATION.md`.
+10. **DS-17.5 — Schema and migration.** Done 2026-11-16. Result:
+    `docs/DS-17-05-SCHEMA-AND-MIGRATION-RESULT.md`.
 11. **DS-7 + DS-12 — Packed block codec.** Done 2026-11-16. Result:
    `docs/DS-7-12-PACKED-BLOCK-CODEC-RESULT.md`.
 12. **DS-13 — On-demand companion packaging.**
-13. **DS-14 — Constant-table/oversize guard.**
-14. **DS-17.4A — Journey/Knowledge model validation.** Next.
-    `docs/tasks/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL.md`.
-    **DS-17.4B — Danger and XP/hour prototypes.**
-    `docs/tasks/DS-17-04B-DANGER-AND-XP-HOUR.md`.
-    **DS-17.4C — Retention/aggregation compatibility.**
-    `docs/tasks/DS-17-04C-RETENTION-MERGE-COMPATIBILITY.md`.
+13. **DS-14 — Constant-table/oversize guard.** Done 2026-11-16. Result:
+    `docs/DS-14-OVERSIZE-GUARD-RESULT.md`.
+14. **CAP-1 — Journey capture fields.** Done 2026-11-16. Result:
+    `docs/CAP-1-JOURNEY-CAPTURE-FIELDS-RESULT.md`.
+15. **IMP-1 — Journey schema/retrieval integration.** Next.
+    `docs/tasks/IMP-1-JOURNEY-SCHEMA-RETRIEVAL.md`.
+14. **DS-17.4A — Journey/Knowledge model validation.** Done 2026-11-16.
+    Result: `docs/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL-RESULT.md`.
+    **DS-17.4B — Danger and XP/hour prototypes.** Done 2026-11-16.
+    Result: `docs/DS-17-04B-DANGER-AND-XP-HOUR-RESULT.md`.
+    **DS-17.4C — Retention/aggregation compatibility.** Done 2026-11-16.
+    Result: `docs/DS-17-04C-RETENTION-MERGE-COMPATIBILITY-RESULT.md`.
     **DS-17.4D — Account Knowledge derivation prototype.** Future.
     `docs/tasks/DS-17-04D-ACCOUNT-KNOWLEDGE-PROTOTYPE.md`.
-15. **DS-15 — Lazy retrieval/cache.** Blocked by DS-17.4A–C/DS-17.5.
-    `docs/tasks/DS-15-LAZY-RETRIEVAL-CACHE.md`.
-16. **DS-16 — Save/checkpoint policy.**
-    `docs/tasks/DS-16-SAVE-CHECKPOINT.md`.
+15. **DS-15 — Lazy retrieval/cache.** Done 2026-11-16. Result:
+    `docs/DS-15-LAZY-RETRIEVAL-CACHE-RESULT.md`.
+16. **DS-16 — Save/checkpoint policy.** Done 2026-11-16. Result:
+    `docs/DS-16-SAVE-CHECKPOINT-RESULT.md`.
 17. **DS-10 — Offline prototype.**
 18. **DS-17.6 — Validation and decision.**
-19. **DS-11 — Decision record.**
+19. **DS-11 — Decision record.** Done 2026-11-16. Result:
+    `docs/DS-11-DECISION-RECORD.md`.
 20. **H64-10 — Schema/downgrade decision.** Decide schema `1` vs a bump after
     DS-9/DS-11; this is not a Phase 1 decision.
 
@@ -277,14 +283,25 @@ Use these groups to avoid duplicate harnesses and release churn:
 15. **WP-2 / DS-6 — static metadata feasibility.** **Done 2026-11-16.**
 16. **WP-3 / DS-7 + DS-12** — final packed-block codec. **Done 2026-11-16.**
 17. **WP-3 / DS-6-F1** — mob metadata registry. **Done 2026-11-16.**
-18. **WP-3 / DS-17.4A** — Journey/Knowledge model validation. **Next.**
-19. **WP-3 / DS-15** — lazy retrieval/cache.
-20. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
+18. **WP-3 / DS-17.4A** — Journey/Knowledge model validation. **Done
+    2026-11-16.**
+19. **WP-3 / DS-17.4B** — danger and XP/hour prototypes. **Done 2026-11-16.**
+20. **WP-3 / DS-17.4C** — retention/aggregation compatibility. **Done
+    2026-11-16.**
+21. **WP-3 / DS-17.5** — schema, field ownership, migration. **Done
+    2026-11-16.**
+22. **WP-3 / DS-16** — save/checkpoint policy. **Done 2026-11-16.**
+23. **WP-3 / DS-15** — lazy retrieval/cache. **Done 2026-11-16.**
+24. **WP-3 / DS-11** — decision record. **Done 2026-11-16.**
+25. **WP-3 / DS-14** — oversize guard. **Done 2026-11-16.**
+26. **WP-3 / CAP-1** — Journey capture fields. **Done 2026-11-16.**
+27. **WP-3 / IMP-1** — Journey schema/retrieval integration. **Next.**
+28. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
     evidence is scoped.
-21. **WP-4 / R-4** — static overlay/art audit.
-22. **WP-5** — limits/grid decisions after measurements.
-23. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
-24. **WP-7 / J/M** — only after DS-11.
+29. **WP-4 / R-4** — static overlay/art audit.
+30. **WP-5** — limits/grid decisions after measurements.
+31. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
+32. **WP-7 / J/M** — only after DS-11.
 
 ### Safe execution order for massive storage
 
@@ -304,11 +321,18 @@ cap changes.
 10. **DS-6 — static metadata feasibility.** **Done 2026-11-16.**
 11. **DS-7 / DS-12 — final packed-block codec.** **Done 2026-11-16.**
 12. **DS-6-F1 — mob metadata registry.** **Done 2026-11-16.**
-13. **DS-17.4A — Journey/Knowledge model validation.** Next.
-14. **DS-15 — lazy retrieval/cache.** After DS-17.4A.
-15. **MEM-2 — load/unload/eviction policy.** Design using DS-17.3/DS-15/DS-16.
-16. **DS-16 / DS-14 — save and oversize implementation.**
-17. **DS-17.5 / DS-11 — schema, migration, and final decision.**
+13. **DS-17.4A — Journey/Knowledge model validation.** **Done 2026-11-16.**
+14. **DS-17.4B — danger and XP/hour prototypes.** **Done 2026-11-16.**
+15. **DS-17.4C — retention/aggregation compatibility.** **Done 2026-11-16.**
+16. **DS-17.5 — schema, field ownership, migration.** **Done 2026-11-16.**
+17. **DS-16 — save/checkpoint policy.** **Done 2026-11-16.**
+18. **DS-15 — lazy retrieval/cache.** **Done 2026-11-16.**
+19. **DS-11 — decision record.** **Done 2026-11-16.**
+20. **DS-14 — oversize guard implementation.** **Done 2026-11-16.**
+21. **CAP-1 — Journey capture fields.** **Done 2026-11-16.**
+22. **IMP-1 — Journey schema/retrieval integration.** Next.
+23. **MEM-2 — load/unload/eviction policy.** Design using DS-17.3/DS-15/DS-16.
+24. **V-2 — live API/data and SavedVariables verification.**
 
 Do not start global-cap removal, schema migration, the LoadOnDemand companion,
 or a production cold tier before step 5 is proven.
@@ -1042,9 +1066,20 @@ budget.
 - [ ] **DS-10 — Offline prototype.** Use saved-variable fixtures and synthetic
   zone-heavy/projected profiles to exercise packing, decode, and query paths.
   Live client verification is deferred to V-2.
-- [ ] **DS-11 — Decision record.** Choose current, identity/count split,
-  zone-first, static DB, packing, lifecycle/archive, cross-character knowledge,
-  or a phased combination; include estimates and a migration plan.
+- [x] **DS-11 — Decision record.** Executed 2026-11-16. Settled Journey/
+  Knowledge, hot/cold, codec, schema, retrieval, save, rejected alternatives,
+  implementation order, and V-2 checklist. Result:
+  `docs/DS-11-DECISION-RECORD.md`.
+- [x] **DS-14 — Constant-table/oversize guard.** Executed 2026-11-16.
+  340k constants split into 4 chunks under a 100k budget; oversized block
+  rejected; save-blocked state, backup/restore, and downgrade guard pass.
+  Result: `docs/DS-14-OVERSIZE-GUARD-RESULT.md`.
+- [x] **CAP-1 — Journey capture fields.** Executed 2026-11-16. Health bands,
+  context split, mob level range, active time, heatmap cell XP/time, and death
+  attribution/fallback prototyped. Result:
+  `docs/CAP-1-JOURNEY-CAPTURE-FIELDS-RESULT.md`.
+- [ ] **IMP-1 — Journey schema/retrieval integration.** Next. Task:
+  `docs/tasks/IMP-1-JOURNEY-SCHEMA-RETRIEVAL.md`.
 - [x] **DS-12 — Packed block codec.** Executed 2026-11-16 with DS-7. Block
   metadata, adaptive cells, base64 storage, checksum, corruption/truncation, and
   block-size guidance are defined. Result:
@@ -1065,31 +1100,38 @@ budget.
   `IsAddOnLoaded`; handle `LoadAddOn`'s `loaded, reason`. Load from
   `PLAYER_LOGIN` or a user action, not the main addon's `ADDON_LOADED` handler.
   Runtime companion variable timing is deferred to V-2.
-- [ ] **DS-14 — Constant-table/oversize guard.** Stay below the Lua constant
-  limit. Handle `SAVED_VARIABLES_TOO_LARGE` as an out-of-memory load failure:
-  keep a previous backup, stop normal saving, and define a compaction/reset
-  recovery path. There is no documented hard byte limit; do not present the
-  event as a normal size warning. `SAVED_VARIABLES_TOO_LARGE` fires after
-  `ADDON_LOADED`, can affect account and/or per-character variables, and the
-  variables will not save on the next logout.
-- [ ] **DS-17.4A — Journey/Knowledge model validation.** Next. Validate the
-  per-character Journey schema, danger/XP contexts, best-zone XP/hour, heatmap
-  ranking, retention compatibility, and account Knowledge target. Task:
-  `docs/tasks/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL.md`.
-- [ ] **DS-15 — Lazy retrieval, zone-scoped queries, and cache.** Blocked by
-  DS-17.4A–C and DS-17.5. Decode only the selected block; base64-decode only
-  that block; resolve mob keys through the Journey and account Knowledge;
-  provide tooltip/danger/best-zone/heatmap queries with `NPC <id>` fallback;
-  keep a bounded LRU; measure decode/UI latency and fallback correctness. No
-  per-zone SavedVariables files; laziness is decode/normalize/UI, or a
-  LoadOnDemand companion. Task: `docs/tasks/DS-15-LAZY-RETRIEVAL-CACHE.md`.
-  Coordinate with MEM-2's load/unload/eviction policy.
-- [ ] **DS-16 — Explicit save/checkpoint policy.** Define checkpoint triggers
-  around `C_AddOns.SaveAddOns`, logout/reload, and
-  `ADDONS_UNLOADING: closingClient`. Do not save per kill. Do not promise
-  synchronous durability; verify actual behavior in V-2. Include the
-  `SAVED_VARIABLES_TOO_LARGE` stop-saving path. Task:
-  `docs/tasks/DS-16-SAVE-CHECKPOINT.md`.
+- [x] **DS-17.4A — Journey/Knowledge model validation.** Executed 2026-11-16.
+  Local inventory: 158 mobs, 1 context entry, no active time/combat/XP contexts/
+  death attribution/heatmap XP-time. Context stress: 10k×12 contexts 70.7 MB,
+  top-8 45.3 MB (93.8% kills/92.3% XP), top-4 23.1 MB (66.7%/64.3%). Schema:
+  100k metadata nested 33.75 MB, parallel 26.00 MB, packed 4.45 MB. Heatmap
+  downsampling preserves totals. Result:
+  `docs/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL-RESULT.md`.
+- [x] **DS-17.4B — Danger and XP/hour prototypes.** Executed 2026-11-16.
+  Wilson-bound danger, best-zone XP/hour ranking with confidence, and sparse
+  local heatmap occupancy (4.83%/4.54%/0.02%) measured. Result:
+  `docs/DS-17-04B-DANGER-AND-XP-HOUR-RESULT.md`.
+- [x] **DS-17.4C — Retention/aggregation compatibility.** Executed 2026-11-16.
+  Array/list contexts are far smaller than keyed maps; top-8 + `other`
+  preserves totals with top-8 detail; packed top-8+other 1.43 MB at 10k×12;
+  active time/totals preserved; sparse heatmaps 0.5–5%, top-N hotspot needed
+  with downsampling. Result:
+  `docs/DS-17-04C-RETENTION-MERGE-COMPATIBILITY-RESULT.md`.
+- [x] **DS-17.5 — Schema, field ownership, migration.** Executed 2026-11-16.
+  v2 Journey renames player-level fields, adds mob level range/activeSeconds/
+  combat/XP contexts/death fields, arrays for cold contexts, top-8+other, and
+  account Knowledge target. Local migration preserved 158 mobs, 1,993 kills,
+  152,816 XP, 385 cells, 16 deaths, 38 quests, 69 respawns; idempotent; 0.49 MB
+  v2 heap. Result: `docs/DS-17-05-SCHEMA-AND-MIGRATION-RESULT.md`.
+- [x] **DS-16 — Save/checkpoint policy.** Executed 2026-11-16. Dirty-block
+  encode 2.1 ms/1 block vs 795 ms/full 400; full base64 decode 1.15 s, so lazy
+  selected-block decode required; backup/oversize state machine defined.
+  Result: `docs/DS-16-SAVE-CHECKPOINT-RESULT.md`.
+- [x] **DS-15 — Lazy retrieval, zone-scoped queries, and cache.** Executed
+  2026-11-16. Login decoded zero blocks; selected block 1.7 ms, selected-zone
+  10k tooltip 1.2 ms; full decode 586 ms; random global cold tooltip too
+  expensive; best-zone/heatmap summaries no decode. Result:
+  `docs/DS-15-LAZY-RETRIEVAL-CACHE-RESULT.md`.
 - [ ] **DS-17 — Character lifecycle, compression, and cross-character data.**
   Model a full 1–60/1–max leveling life, leveling vs endgame modes, hot/warm/cold
   archive tiers, and account-wide aggregate leveling knowledge for alts. Includes

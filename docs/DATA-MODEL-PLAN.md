@@ -22,7 +22,7 @@ layer. “Account-wide” means the same player’s characters on the same compu
 | Mobs are localised; one fixed level range, at most 4 zone refs (assumed) | local `/mnt/r/AceM2L2.lua` + task assumption |
 | Character Journey must remain per character | requirements + DS-17.2 |
 | Account-wide data should be derived aggregates, not raw history | requirements + DS-17.4 |
-| Danger needs combat context; best zone needs XP/hour and active time | latest review |
+| Danger needs combat context; best zone needs XP/hour and event-driven presence/engaged time | latest review |
 
 The remaining work is **not another storage-medium bake-off**. It is targeted
 validation of:
@@ -58,10 +58,10 @@ Full schemas are in `docs/DATA-MODEL-AND-TEST-MATRIX.md`.
   current level, playtime.
 - Mob records: identity, name, level range, classification, kills/XP,
   byLevel/byMap/byInstance, combat outcomes, XP contexts, respawn summary.
-- Zone records: kills, XP, active time, deaths, sessions, unique mobs, per-level
+- Zone records: kills, XP, presence/engaged time, deaths, sessions, unique mobs, per-level
   breakdown.
 - Instance records: same, plus instance/difficulty/type.
-- Level records: XP, kills, active time, deaths, start/end.
+- Level records: XP, kills, presence/engaged time, deaths, start/end.
 - Sessions: enough to compute XP/hour.
 - Heatmaps: 64×64 cells with kills, optional XP/time.
 - Deaths: individual records with mob attribution, health, buffs, group,
@@ -86,7 +86,8 @@ Derived from Journey data later:
 
 ### Phase A — model validation (offline, now)
 
-**A1. DS-17.4A — Journey/Knowledge model validation.**  
+**A1. DS-17.4A — Journey/Knowledge model validation.** Done 2026-11-16.  
+Result: `docs/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL-RESULT.md`  
 Document: `docs/tasks/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL.md`
 
 - field inventory from local save;
@@ -96,7 +97,8 @@ Document: `docs/tasks/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL.md`
 - account Knowledge field mapping;
 - missing API/data list.
 
-**A2. DS-17.4B — Danger and XP/hour prototypes.**  
+**A2. DS-17.4B — Danger and XP/hour prototypes.** Done 2026-11-16.  
+Result: `docs/DS-17-04B-DANGER-AND-XP-HOUR-RESULT.md`  
 Document: `docs/tasks/DS-17-04B-DANGER-AND-XP-HOUR.md`
 
 - danger outcomes: kills/deaths/health/time by context;
@@ -106,10 +108,11 @@ Document: `docs/tasks/DS-17-04B-DANGER-AND-XP-HOUR.md`
 - group/rested/buff effects;
 - no UI.
 
-**A3. DS-17.4C — Retention and aggregation compatibility.**  
+**A3. DS-17.4C — Retention and aggregation compatibility.** Done 2026-11-16.  
+Result: `docs/DS-17-04C-RETENTION-MERGE-COMPATIBILITY-RESULT.md`  
 Document: `docs/tasks/DS-17-04C-RETENTION-MERGE-COMPATIBILITY.md`
 
-- cold archive preserves byLevel/byMap/byInstance, contexts, active time,
+- cold archive preserves byLevel/byMap/byInstance, contexts, presence/engaged time,
   deaths, heatmap cells;
 - verify Knowledge can be derived from cold data;
 - schema shape final choice;
@@ -117,7 +120,8 @@ Document: `docs/tasks/DS-17-04C-RETENTION-MERGE-COMPATIBILITY.md`
 
 ### Phase B — schema and migration
 
-**B1. DS-17.5 — Schema, field ownership, and migration.**  
+**B1. DS-17.5 — Schema, field ownership, and migration.** Done 2026-11-16.  
+Result: `docs/DS-17-05-SCHEMA-AND-MIGRATION-RESULT.md`  
 Document: `docs/tasks/DS-17-05-SCHEMA-AND-MIGRATION.md`
 
 - final Journey schema;
@@ -126,7 +130,8 @@ Document: `docs/tasks/DS-17-05-SCHEMA-AND-MIGRATION.md`
 - migration/backup/downgrade;
 - no merge implementation.
 
-**B2. DS-16 — Save/checkpoint policy.**  
+**B2. DS-16 — Save/checkpoint policy.** Done 2026-11-16.  
+Result: `docs/DS-16-SAVE-CHECKPOINT-RESULT.md`  
 Document: `docs/tasks/DS-16-SAVE-CHECKPOINT.md`
 
 - no per-kill save;
@@ -138,7 +143,8 @@ Document: `docs/tasks/DS-16-SAVE-CHECKPOINT.md`
 
 ### Phase C — retrieval
 
-**C1. DS-15 — Lazy retrieval/cache.**  
+**C1. DS-15 — Lazy retrieval/cache.** Done 2026-11-16.  
+Result: `docs/DS-15-LAZY-RETRIEVAL-CACHE-RESULT.md`  
 Document: `docs/tasks/DS-15-LAZY-RETRIEVAL-CACHE.md`
 
 - selected-block decode;
@@ -170,7 +176,7 @@ Document: `docs/tasks/DS-17-04D-ACCOUNT-KNOWLEDGE-PROTOTYPE.md`
 - killer attribution;
 - health before/after and time-to-kill;
 - buff/group/rested capture;
-- per-zone/level active time;
+- per-zone/level event-driven presence/engaged time;
 - XP events/group unattributed XP;
 - SavedVariables size/parse/save/migration;
 - Forever vs Midnight differences.
@@ -186,9 +192,9 @@ Document: `docs/tasks/DS-17-04D-ACCOUNT-KNOWLEDGE-PROTOTYPE.md`
 
 ### Phase G — decision
 
-**G1. DS-11 — Decision record.**  
-Choose the final schema/storage/retrieval model after A–E. Do not implement the
-account-wide ALT UI or merge before the model is validated.
+**G1. DS-11 — Decision record.** Done 2026-11-16.  
+Result: `docs/DS-11-DECISION-RECORD.md`  
+Next: IMP-1 integration, then V-2. DS-14 and CAP-1 are complete.
 
 ## 4. Dependencies
 
@@ -226,7 +232,7 @@ Verdicts: **P** proceed, **R** revise/proceed with constraints, **D** defer.
 | A1 Journey/Knowledge validation | P | P | P | P | P | P | **Proceed now** |
 | A2 context cardinality | P | R | P | R | P | P | Proceed; keep top-N/collapse measurement |
 | A2 danger outcomes | P | P | P | R | P | P | Proceed; verify killer attribution |
-| A2 best-zone XP/hour | P | R | P | R | P | P | Proceed; active time and confidence required |
+| A2 best-zone XP/hour | P | R | P | R | P | P | Proceed; event-driven time and confidence required |
 | A2 heatmap best-cell | P | R | P | P | P | P | Proceed; per-cell time/XP must earn its cost |
 | A3 retention/aggregation compatibility | P | P | P | P | P | P | **Proceed now** |
 | A3 schema-shape comparison | P | P | P | P | R | P | Proceed; choose simplest correct shape |

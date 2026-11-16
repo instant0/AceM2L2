@@ -1,6 +1,8 @@
 # DS-17.4B — Danger and XP/hour prototypes
 
-**Status:** ready; after DS-17.4A  
+**Status:** executed 2026-11-16  
+**Result:** `docs/DS-17-04B-DANGER-AND-XP-HOUR-RESULT.md`  
+**Harness:** `tests/ds17_4b_queries.lua`  
 **Depends on:** DS-17.4A, DS-17.1, DS-17.3  
 **Blocks:** DS-17.4C, DS-17.5, DS-15
 

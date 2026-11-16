@@ -1,6 +1,8 @@
 # DS-16 — Save/checkpoint policy
 
-**Status:** ready; after DS-17.5  
+**Status:** executed 2026-11-16  
+**Result:** `docs/DS-16-SAVE-CHECKPOINT-RESULT.md`  
+**Harness:** `tests/ds16_save_policy.lua`  
 **Depends on:** DS-5, DS-7/DS-12, DS-17.5, DS-14, DS-16 inputs  
 **Blocks:** DS-11, V-2
 

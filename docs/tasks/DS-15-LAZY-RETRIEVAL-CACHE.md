@@ -1,6 +1,8 @@
 # DS-15 — Lazy retrieval, zone-scoped queries, and cache
 
-**Status:** pending; blocked by DS-17.4A/B/C and DS-17.5  
+**Status:** executed 2026-11-16  
+**Result:** `docs/DS-15-LAZY-RETRIEVAL-CACHE-RESULT.md`  
+**Harness:** `tests/ds15_retrieval.lua`  
 **Depends on:** DS-17.5, DS-7/DS-12, DS-17.3, DS-17.4A/B  
 **Blocks:** DS-16, DS-11
 

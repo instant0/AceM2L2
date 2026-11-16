@@ -1,6 +1,8 @@
 # DS-17.4A — Journey/Knowledge model validation
 
-**Status:** next; ready  
+**Status:** executed 2026-11-16  
+**Result:** `docs/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL-RESULT.md`  
+**Harness:** `tests/ds17_4a_model.lua`  
 **Depends on:** DS-17.1, DS-17.3, DS-6-F1, DS-7/DS-12  
 **Blocks:** DS-17.4, DS-17.5, DS-15, DS-16, DS-9, DS-11
 

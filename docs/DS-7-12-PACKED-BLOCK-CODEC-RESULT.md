@@ -27,7 +27,8 @@ refs, so no separate spawn index is required.
 - one block per zone/instance (plus a 350k sub-block profile); each mob belongs
   to exactly one block, so there is no mobs × zones × grids cross-product;
 - sparse NPC IDs (`100000 + index * 7 + index % 3`);
-- 64/32/16 grids, 5%/15%/30% cell density;
+- 64/32/16 grids; 5% is near the local sparse baseline, 15%/30% are stress
+  profiles;
 - 4/8/12 contexts per mob;
 - level counts and top-N entries per block;
 - metadata registry separate: account-wide stable `npc:<id>` + per-character
@@ -178,7 +179,8 @@ pass.
 
 1. **Plain Lua tables are rejected.** 175 MB at 100k/4 and 432 MB at 100k/12.
 2. **Hybrid cell encoding wins.** Sparse at 5%, bitset at 15%/30%; hybrid matches
-   the better form per block.
+   the better form per block. Local heatmap occupancy is only 4.5–4.8%, so 5%
+   is closer to normal and 15%/30% are stress profiles.
 3. **No inline names.** Cold blocks contain IDs only; account metadata is
    0.02 MB for the local 100 stable NPCs and 2.38 MB at 10k stable entries
    (0.42 MB packed); name-only is per character.

@@ -313,9 +313,41 @@ is no fixed MB target.
   width 4. Local account part 100 entries 0.02 MB / 3.8 KB packed; name-only 58
   entries 0.01 MB / 3.7 KB packed. Account-only 10k 2.38 MB map / 0.42 MB
   packed; 100k 35.97 / 4.16 MB. No shipped all-name list.
-- **DS-15** is next: lazy selected-block retrieval, base64 decode, registry
-  name resolution, and bounded block cache.
+- **DS-17.4A** is complete: local Journey inventory, context cardinality, schema
+  shape, and heatmap downsampling measured. Full contexts at 10k×12 are 70.70 MB;
+  top-8 covers 93.8% kills/92.3% XP; 100k metadata is 33.75 MB nested, 26.00 MB
+  parallel, 4.45 MB packed. Result:
+  `docs/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL-RESULT.md`.
+- **DS-17.4B** is complete: Wilson-bound danger, best-zone XP/hour with
+  confidence, and sparse local heatmap occupancy (4.83%/4.54%/0.02%) measured.
+  Result: `docs/DS-17-04B-DANGER-AND-XP-HOUR-RESULT.md`.
+- **DS-17.4C** is complete: array/list contexts 4.37 MB at 10k×12 vs 70.70 MB
+  keyed map; top-8+other preserves totals; packed top-8+other 1.43 MB; active
+  totals preserved; sparse heatmap hotspot loss measured. Result:
+  `docs/DS-17-04C-RETENTION-MERGE-COMPATIBILITY-RESULT.md`.
+- **DS-17.5** is complete: v2 Journey schema, player/mob level naming fix,
+  migration/backup/downgrade, and account Knowledge target. Local migration
+  preserved 158 mobs, 1,993 kills, 152,816 XP, 385 cells, 16 deaths, 38 quests,
+  and 69 respawns; idempotent; 0.49 MB v2 heap. Result:
+  `docs/DS-17-05-SCHEMA-AND-MIGRATION-RESULT.md`.
+- **DS-16** is complete: dirty-block incremental saves, backup/restore, oversize
+  state, and lazy decode policy. Full 400-block encode 795 ms; dirty 1 block
+  2.1 ms; full base64 decode 1.15 s, so selected-block decode is required.
+  Result: `docs/DS-16-SAVE-CHECKPOINT-RESULT.md`.
+- **DS-15** is complete: login decoded 0 blocks; selected block 1.7 ms;
+  selected-zone 10k tooltips 1.2 ms; full decode 586 ms; random global cold
+  tooltip 16.2 s without cache / 5.8 s with 256-block cache. Result:
+  `docs/DS-15-LAZY-RETRIEVAL-CACHE-RESULT.md`.
+- **DS-11** is complete: settled Journey/Knowledge, hot/cold, codec, schema,
+  retrieval, save, rejected alternatives, implementation order, and V-2
+  checklist. Result: `docs/DS-11-DECISION-RECORD.md`.
+- **DS-14** is complete: 340k constants split into 4 chunks under a 100k
+  prototype budget; oversized block rejected; save-blocked/backup/compaction
+  and downgrade guards pass. Result: `docs/DS-14-OVERSIZE-GUARD-RESULT.md`.
+- **CAP-1** is complete: health bands, combat/XP context split, mob-level range,
+  active-time accumulator, heatmap cell XP/time, and death attribution/fallback
+  prototyped. Result: `docs/CAP-1-JOURNEY-CAPTURE-FIELDS-RESULT.md`.
+- **IMP-1** is next: Journey schema/retrieval integration.
 - **MEM-2** remains the load/unload policy task.
-- **DS-17.5/DS-11** remain the schema/migration/decision gate.
 
 DS-1-F2 is the only production-code change; the storage/design tasks remain documentation-only.
