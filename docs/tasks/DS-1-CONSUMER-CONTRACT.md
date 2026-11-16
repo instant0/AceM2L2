@@ -205,6 +205,7 @@ before DS-11.
 | `mob.contexts` | canonical observations | calibration input |
 | `calibration.*` | derived ratios | rebuildable/summary |
 | `totals`, `session` | canonical counters | invariant-checked |
+| `unattributed` | canonical aggregate | XP from kills with no mob identity; never a fake mob |
 | `deaths`/`respawns`/`rates`/`levelHistory` | canonical | separate stores |
 | `quests`, `economy`, `goal` | canonical | independent roots |
 
@@ -225,6 +226,9 @@ Global:
 
 - `totals.kills` = sum of `mob.kills`.
 - `totals.uniqueMobs` = count of non-empty mob entries.
+- `totals.xp` = sum of `mob.totalXP` + `unattributed.xp`.
+- `session.xp` = sum of `mob.sessionXP` + `unattributed.xp`.
+- `unattributed` contributes no kills, levels, areas, instances, or heatmaps.
 - instance kills are not in `areas`.
 - per-client roots are separate; no Forever/Midnight mixing.
 - cap pruning is deterministic.

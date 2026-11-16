@@ -1,7 +1,7 @@
 # DS-17.1 — Data organization and query sufficiency
 
-**Status:** next; capacity model and DS-3B validation complete; remaining
-feature-to-data, hot/warm/cold boundary, required keys, and 64×64 decision  
+**Status:** executed 2026-11-16; decision complete  
+**Result:** `docs/DS-17-1-AGGREGATION-DECISION.md`  
 **Parent:** DS-17  
 **Depends on:** DS-1 (consumer contract), DS-2 (reference baseline only), DS-3
 (small/medium sanity check), DS-3B (massive synthetic validation), DS-5

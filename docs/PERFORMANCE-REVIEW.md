@@ -3,7 +3,9 @@
 **Status:** reviewed 2026-11-15  
 **Scope:** completed tasks that affect storage, retrieval, loading, and memory:
 H64-9, HC-5, DS-1, DS-2, DS-3, DS-4, DS-5, MEM-1, and the capacity model.  
-**Question:** are the choices correct, or only provisional?
+**Question:** are the choices correct, or only provisional?  
+**Full data-model plan:** `docs/DATA-MODEL-PLAN.md`  
+**Model/test record:** `docs/DATA-MODEL-AND-TEST-MATRIX.md`
 
 ## Verdict
 
@@ -20,7 +22,7 @@ them are analysis or offline measurement, not implementation.
 | No per-kill log | Correct for current features; Journey still needs an explicit decision |
 | Account vs per-character roots | Correct |
 | No per-zone SavedVariables files | Correct |
-| Static metadata outside the character save | Correct direction; DS-6 not done |
+| Static metadata outside the character save | DS-6/F1: no shipped all-name list; account-wide stable `npc:<id>` metadata (name, fixed level range, ≤4 zone refs) + per-character name-only; local account part 0.02 MB; account-only 10k 2.38 MB map / 0.42 MB packed |
 | Derived `areas`/`levels` caches | Correct; covered by smoke invariants |
 | Current nested hot tables as the whole solution | **Incorrect/incomplete**; they are a hot tier only |
 | 2,000/40/100/12 global caps as the design | **Incorrect**; too small for the massive tier |
@@ -274,18 +276,46 @@ is no fixed MB target.
 - long-term 3/6/12-month profiles and cap pressure (DS-3C done; DS-3C result:
   2h/day hits 2,000 mobs in ~3 months, rate buffer turns over in 2.4h);
 - 4/8-context variants, if DS-17.1 finds a measured retrieval or memory benefit;
-- 200-zone/200-instance and 10k/100k-mob cold-tier prototype (DS-4P/DS-17.3);
+- 200-zone/200-instance and 10k/100k-mob cold-tier prototype (DS-4P done);
 - live client memory and save/load timing (V-2).
 
 ## Task adjustment
 
 - **DS-3B — Massive synthetic store validation** is complete.
 - **DS-3C — Long-term growth and cap pressure** is complete.
-- **DS-17.1** is next; it consumes the actual DS-3B and DS-3C numbers.
-- **DS-4P** remains required.
-- **DS-1-F2** remains the first safe code task after validation/design.
-- **DS-7/DS-12** remain required for cold packing.
+- **DS-17.1 — Aggregation and 64×64 decision** is complete:
+  `docs/DS-17-1-AGGREGATION-DECISION.md`.
+- **DS-17.2** is complete; `docs/DS-17-2-MODES-LIFECYCLE-DECISION.md`.
+- **DS-17.3** is complete; `docs/DS-17-3-RETENTION-DECISION.md`.
+- **DS-4P** is complete: tier C 100k/200/200, 38.5 MB hot / 8.07 MB cold,
+  selected-zone 3.7 ms, tooltip 0.55 ms/10k, no full scan.
+- **DS-4P-F1** is complete: static names + numeric hot arrays reduce 100k
+  per-character hot heap from 20.67 MB to 7.67 MB; the scoped name index
+  (DS-4P-F2) is complete and now indexes live-captured names.
+- **DS-4P-F2** is complete: 100k mobs 7.73 MB hot + 5.97 MB shared, 11,001
+  scoped entries; no global name index.
+- **DS-6** is complete and revised: **no shipped all-name list**. Metadata is
+  learned live into a per-character registry. Local sample: 158 mobs, 0.05 MB;
+  10k entries 4.11 MB map / 0.43 MB packed; 100k 38.25 / 4.32 MB. Cold blocks
+  store IDs only; missing names fall back to `NPC <id>`. Mobs are
+  zone/instance/grid-localized; a pre-kill spawn index is deferred. Shipped-name
+  measurements remain as the rejected alternative.
+- **DS-1-F2** is complete; `docs/DS-1-F2-INDEX-RESULT.md`.
+- **DS-7/DS-12** are complete: hybrid sparse/bitset cells, varint/delta fields,
+  per-zone/instance/level-band blocks, no inline names, per-block checksum, and
+  per-block base64. 100k/4 contexts is 3.90 MB cold / 4.03 MB heap; 100k/12 is
+  9.19 MB; 350k one-zone block 12.56 MB but ~10 ms decode, so split into
+  ~256-512-mob sub-blocks (350k sub-block profile: 13.22 MB, 2.55 ms decode).
+- **DS-6-F1** is complete: **account-wide stable `npc:<id>` metadata** (name,
+  fixed level range, ≤4 zone refs) plus **per-character name-only** metadata.
+  Raw history/observed XP stays per character. Local `/mnt/r/AceM2L2.lua`: 158
+  mobs, 100 npcID / 58 name-only; 135 in one zone/instance, 23 in two; max level
+  width 4. Local account part 100 entries 0.02 MB / 3.8 KB packed; name-only 58
+  entries 0.01 MB / 3.7 KB packed. Account-only 10k 2.38 MB map / 0.42 MB
+  packed; 100k 35.97 / 4.16 MB. No shipped all-name list.
+- **DS-15** is next: lazy selected-block retrieval, base64 decode, registry
+  name resolution, and bounded block cache.
 - **MEM-2** remains the load/unload policy task.
 - **DS-17.5/DS-11** remain the schema/migration/decision gate.
 
-No production code changed.
+DS-1-F2 is the only production-code change; the storage/design tasks remain documentation-only.

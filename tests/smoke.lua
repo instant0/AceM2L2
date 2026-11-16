@@ -64,10 +64,13 @@ local function AssertAggregateInvariant(label)
       end
     end
   end
+  local unattributedXP = type(db.unattributed) == "table"
+    and (tonumber(db.unattributed.xp) or 0) or 0
   assert((tonumber(db.totals.kills) or 0) == kills, label .. ": kills")
-  assert((tonumber(db.totals.xp) or 0) == xp, label .. ": xp")
+  assert((tonumber(db.totals.xp) or 0) == xp + unattributedXP, label .. ": xp")
   assert((tonumber(db.session.kills) or 0) == sessionKills, label .. ": session kills")
-  assert((tonumber(db.session.xp) or 0) == sessionXP, label .. ": session xp")
+  assert((tonumber(db.session.xp) or 0) == sessionXP + unattributedXP,
+    label .. ": session xp")
   assert((tonumber(db.totals.uniqueMobs) or 0) == unique, label .. ": unique")
   for key, value in pairs(levels) do
     assert((tonumber(db.levels[key]) or 0) == value, label .. ": level " .. key)
@@ -517,6 +520,116 @@ module:RemoveMobEntry("npc:90001")
 assert(deleteDB.totals.kills == 0 and deleteDB.totals.xp == 0, "delete totals mismatch")
 assert(deleteDB.levels["10"] == 0 and deleteDB.areas["12"] == 0, "delete breakdown mismatch")
 AssertAggregateInvariant("after delete")
+
+-- Identity/zone/instance indexes (derived, in-memory only).
+module:ResetKills()
+module:RecordKill({
+  name = "Known", npcID = 1001, mapID = 12, playerLevel = 10,
+  classification = "normal",
+}, 95, 95, 95, "test")
+module:RecordKill({
+  name = "Known", npcID = 1001, mapID = 13, playerLevel = 10,
+  classification = "normal",
+}, 95, 95, 95, "test")
+module:RecordKill({
+  name = "Name Only", mapID = 12, playerLevel = 10, classification = "normal",
+}, 95, 95, 95, "test")
+module:RecordKill({
+  name = "Ambiguous", npcID = 1002, mapID = 12, playerLevel = 10,
+  classification = "normal",
+}, 95, 95, 95, "test")
+module:RecordKill({
+  name = "Ambiguous", npcID = 1003, mapID = 13, playerLevel = 10,
+  classification = "normal",
+}, 95, 95, 95, "test")
+
+module:InvalidateMobIndex()
+assert(module:GetMobKeyByNpcID(1001) == "npc:1001", "npc index missing")
+assert(module:GetMobKey("Known", nil) == "npc:1001", "name index missed unique NPC")
+assert(module:GetMobKey("Name Only", nil) == "name:name only",
+  "name-only fallback changed")
+assert(module:FindNPCKeyByName("Ambiguous") == nil,
+  "ambiguous name should not resolve to one NPC")
+assert(module:GetMobKey("Ambiguous", nil) == "name:ambiguous",
+  "ambiguous name fallback changed")
+
+local function HasKey(list, key)
+  for _, value in ipairs(list) do
+    if value == key then
+      return true
+    end
+  end
+  return false
+end
+
+local map12 = module:GetMobKeysForMap(12)
+local map13 = module:GetMobKeysForMap(13)
+assert(HasKey(map12, "npc:1001") and HasKey(map12, "name:name only")
+  and HasKey(map12, "npc:1002"), "map 12 index mismatch")
+assert(HasKey(map13, "npc:1001") and HasKey(map13, "npc:1003"),
+  "map 13 index mismatch")
+
+local indexedMob = module.char.mobs["npc:1002"]
+indexedMob.killsByInstance["legacy:1"] = 2
+module:InvalidateMobIndex()
+local instanceKeys = module:GetMobKeysForInstance("legacy:1")
+assert(HasKey(instanceKeys, "npc:1002"), "instance index mismatch")
+
+module:RemoveMobEntry("npc:1001")
+map12 = module:GetMobKeysForMap(12)
+map13 = module:GetMobKeysForMap(13)
+assert(not HasKey(map12, "npc:1001") and not HasKey(map13, "npc:1001"),
+  "delete did not refresh zone index")
+
+-- An already-built index picks up new zone links from the kill path.
+module:ResetKills()
+module:RecordKill({
+  name = "Incremental", npcID = 2001, mapID = 12, playerLevel = 10,
+  classification = "normal",
+}, 95, 95, 95, "test")
+assert(HasKey(module:GetMobKeysForMap(12), "npc:2001"),
+  "initial zone index missing")
+module:RecordKill({
+  name = "Incremental", npcID = 2001, mapID = 13, playerLevel = 10,
+  classification = "normal",
+}, 95, 95, 95, "test")
+assert(HasKey(module:GetMobKeysForMap(13), "npc:2001"),
+  "incremental zone link missing")
+
+module:ResetKills()
+
+-- Identity-less group XP is XP, not an Unknown mob.
+local savedUnnamedGroup = _G.COMBATLOG_XPGAIN_FIRSTPERSON_UNNAMED_GROUP
+local savedQuestFormat = _G.COMBATLOG_XPGAIN_QUEST
+_G.COMBATLOG_XPGAIN_FIRSTPERSON_UNNAMED_GROUP = "You gain %d experience."
+_G.COMBATLOG_XPGAIN_QUEST = nil
+AceM2L2.xpFmts = nil
+state.groupSize = 2
+module:ResetKills()
+module.lastTarget = nil
+module.lastMouseover = nil
+module.pendingChatXP = {}
+module.pendingDeaths = {}
+module:OnXPChat("CHAT_MSG_COMBAT_XP_GAIN", "You gain 95 experience.")
+assert(#(module.pendingChatXP or {}) == 1,
+  "unnamed group XP was not queued for identity")
+RunTimers()
+assert(next(module.char.mobs or {}) == nil,
+  "unattributed group XP created a mob entry")
+assert((module.char.totals.kills or 0) == 0,
+  "unattributed group XP became a kill")
+assert((module.char.totals.xp or 0) == 95, "unattributed group XP not kept")
+assert(module.char.unattributed and module.char.unattributed.events == 1
+  and module.char.unattributed.xp == 95,
+  "unattributed group bucket mismatch")
+assert((module.char.rates and #module.char.rates or 0) > 0,
+  "unattributed group XP missed the rate sample")
+AssertAggregateInvariant("unattributed group XP")
+state.groupSize = 1
+_G.COMBATLOG_XPGAIN_FIRSTPERSON_UNNAMED_GROUP = savedUnnamedGroup
+_G.COMBATLOG_XPGAIN_QUEST = savedQuestFormat
+AceM2L2.xpFmts = nil
+module:ResetKills()
 
 -- Tooltip and UI.
 module:ResetKills()

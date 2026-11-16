@@ -205,6 +205,13 @@ function XPTooltip:RefreshOverview()
     levelLines[#levelLines + 1] = "Quest XP: " .. FormatNumber(questXP)
       .. " from " .. FormatNumber(questGains) .. " gains"
   end
+  local unattributed = db.unattributed
+  if type(unattributed) == "table"
+    and (tonumber(unattributed.xp) or 0) > 0 then
+    levelLines[#levelLines + 1] = "Unattributed group XP: "
+      .. FormatNumber(unattributed.xp) .. " from "
+      .. FormatNumber(unattributed.events or 0) .. " gains"
+  end
   local settings = self:GetSettings()
   if settings and settings.showXPBonuses then
     local bonuses, _, totalPercent = self:GetActiveXPBonuses()

@@ -1,6 +1,7 @@
 # DS-17.2 — Leveling/endgame modes and archive lifecycle
 
-**Status:** research/design task, not implemented  
+**Status:** executed 2026-11-16  
+**Result:** `docs/DS-17-2-MODES-LIFECYCLE-DECISION.md`  
 **Parent:** DS-17  
 **Depends on:** DS-17.1  
 **Blocks:** DS-17.3, DS-9, DS-11

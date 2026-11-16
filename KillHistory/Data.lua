@@ -46,6 +46,7 @@ local function NewEmptyClientData()
     dataSchema = CLIENT_DATA_SCHEMA,
     mobs = {},
     quests = {},
+    unattributed = { events = 0, xp = 0, byLevel = {}, byMap = {}, lastSeen = 0 },
     levelHistory = {},
     rates = {},
     deaths = {},
@@ -89,6 +90,27 @@ local function NonNegativeFinite(value)
     return 0
   end
   return max(0, number)
+end
+
+-- Identity-less group/remote XP is real XP but has no mob identity. Keep it in
+-- a separate aggregate so it never becomes a fake "Unknown" mob.
+local function NormalizeUnattributed(value)
+  local source = type(value) == "table" and value or {}
+  local byLevel = EnsureNumberMap(source.byLevel)
+  local byMap = EnsureNumberMap(source.byMap)
+  for key, number in pairs(byLevel) do
+    byLevel[key] = NonNegativeFinite(number)
+  end
+  for key, number in pairs(byMap) do
+    byMap[key] = NonNegativeFinite(number)
+  end
+  return {
+    events = NonNegativeFinite(source.events),
+    xp = NonNegativeFinite(source.xp),
+    byLevel = byLevel,
+    byMap = byMap,
+    lastSeen = NonNegativeFinite(source.lastSeen),
+  }
 end
 
 -- Dungeon totals are a self-contained bucket. Rebuild only the five supported
@@ -586,6 +608,7 @@ function XPTooltip:MigrateDB()
 end
 
 function XPTooltip:EnsureDB()
+  self:InvalidateMobIndex()
   local root, storageBlocked = self:MigrateDB()
   local projectID = self:GetProjectID()
   if self.dataProjectID and self.dataProjectID ~= projectID then
@@ -675,6 +698,7 @@ function XPTooltip:EnsureDB()
   -- character is in place.
   self:NormalizeAccounting()
   self:NormalizeDungeon()
+  db.unattributed = NormalizeUnattributed(db.unattributed)
   db.goal = self:NormalizeGoal(db.goal)
   self:NormalizeEconomy()
   -- Level history uses self.char, so normalize it exactly once here.
@@ -743,6 +767,49 @@ function XPTooltip:RecordRateSample(xp, source)
     level = self:GetPlayerLevel() or 0,
   }
   db.rates = NormalizeRateList(db.rates)
+  return true
+end
+
+-- Record XP for a kill whose mob identity is unavailable (typically a group
+-- member's remote kill). It contributes XP/rate/level history but no mob,
+-- area, level-kill, heatmap, or unique-mob entry.
+function XPTooltip:RecordUnattributedXP(info, totalXP, source)
+  if not self:Supports("hasPerMobXP") then
+    return false
+  end
+  local value = tonumber(totalXP)
+  if not value or value <= 0 then
+    return false
+  end
+  local db = self.char
+  if not db then
+    return false
+  end
+  local bucket = NormalizeUnattributed(db.unattributed)
+  bucket.events = bucket.events + 1
+  bucket.xp = bucket.xp + value
+  bucket.lastSeen = Epoch()
+
+  local playerLevel = tonumber(info and info.playerLevel)
+    or self:GetPlayerLevel() or 0
+  if playerLevel > 0 then
+    local key = tostring(playerLevel)
+    bucket.byLevel[key] = (bucket.byLevel[key] or 0) + value
+  end
+  local mapID = tonumber(info and info.mapID) or self:GetMapID() or 0
+  if mapID > 0 then
+    local key = tostring(mapID)
+    bucket.byMap[key] = (bucket.byMap[key] or 0) + value
+  end
+  db.unattributed = bucket
+  db.totals.xp = (tonumber(db.totals.xp) or 0) + value
+  db.session.xp = (tonumber(db.session.xp) or 0) + value
+
+  self:AddLevelHistoryXP(value)
+  self:RecordRateSample(value, source or "unattributed_group")
+  if self.ui and self.ui:IsShown() then
+    self:RequestUIUpdate()
+  end
   return true
 end
 
@@ -958,27 +1025,151 @@ function XPTooltip:GetTimeToLevel(windowSeconds)
   return remaining / xpPerHour * 3600
 end
 
-function XPTooltip:FindNPCKeyByName(name)
+--[[--------------------------------------------------------------------------------
+  In-memory identity and scope indexes
+
+  These indexes are derived from the canonical mob records and are never saved.
+  They make tooltip/name lookup and zone/instance listing independent of a full
+  mob scan. Mutating paths invalidate them; the next query rebuilds once.
+------------------------------------------------------------------------------------]]
+
+function XPTooltip:InvalidateMobIndex()
+  self.mobIndex = nil
+  self.mobIndexDb = nil
+end
+
+local function AddMobIndexSet(index, kind, scopeKey, mobKey)
+  if scopeKey == nil then
+    return
+  end
+  local text = tostring(scopeKey)
+  local bucket = index[kind][text]
+  if not bucket then
+    bucket = {}
+    index[kind][text] = bucket
+  end
+  bucket[mobKey] = true
+end
+
+function XPTooltip:EnsureMobIndex()
   local db = self.char
-  if not db or type(db.mobs) ~= "table" then
+  if type(db) ~= "table" or type(db.mobs) ~= "table" then
     return nil
   end
-  local lower = Lower(name)
-  if not lower then
-    return nil
+  if self.mobIndex and self.mobIndexDb == db then
+    return self.mobIndex
   end
-  local match, count
+  local index = {
+    byNpc = {},
+    byName = {},
+    byZone = {},
+    byInstance = {},
+  }
   for key, mob in pairs(db.mobs) do
-    if type(key) == "string" and key:sub(1, 4) == "npc:"
-      and type(mob) == "table" and Lower(mob.name) == lower then
-      match = key
-      count = (count or 0) + 1
-      if count > 1 then
-        return nil
+    if type(mob) == "table" then
+      local npcID = tonumber(mob.npcID)
+      if npcID and npcID > 0 then
+        index.byNpc[npcID] = key
+      end
+      local lower = Lower(mob.name)
+      if lower and lower ~= "" then
+        local nameEntry = index.byName[lower]
+        if not nameEntry then
+          nameEntry = { npcKeys = {}, allKeys = {} }
+          index.byName[lower] = nameEntry
+        end
+        nameEntry.allKeys[#nameEntry.allKeys + 1] = key
+        if type(key) == "string" and key:sub(1, 4) == "npc:" then
+          nameEntry.npcKeys[#nameEntry.npcKeys + 1] = key
+        end
+      end
+      for mapKey, count in pairs(mob.killsByMap or {}) do
+        if (tonumber(count) or 0) > 0 then
+          AddMobIndexSet(index, "byZone", mapKey, key)
+        end
+      end
+      for instanceKey, count in pairs(mob.killsByInstance or {}) do
+        if (tonumber(count) or 0) > 0 then
+          AddMobIndexSet(index, "byInstance", instanceKey, key)
+        end
       end
     end
   end
-  return match
+  self.mobIndex = index
+  self.mobIndexDb = db
+  return index
+end
+
+-- Incremental link updates for the common kill path. If the index is not built,
+-- there is nothing to update; the next build will see the new counts.
+function XPTooltip:IndexMobZone(mobKey, mapKey)
+  local index = self.mobIndex
+  if index and self.mobIndexDb == self.char then
+    AddMobIndexSet(index, "byZone", mapKey, mobKey)
+  end
+end
+
+function XPTooltip:IndexMobInstance(mobKey, instanceKey)
+  local index = self.mobIndex
+  if index and self.mobIndexDb == self.char then
+    AddMobIndexSet(index, "byInstance", instanceKey, mobKey)
+  end
+end
+
+function XPTooltip:FindNPCKeyByName(name)
+  local lower = Lower(name)
+  if not lower or lower == "" then
+    return nil
+  end
+  local index = self:EnsureMobIndex()
+  local entry = index and index.byName[lower] or nil
+  if entry and #entry.npcKeys == 1 then
+    return entry.npcKeys[1]
+  end
+  return nil
+end
+
+function XPTooltip:GetMobKeyByNpcID(npcID)
+  local id = tonumber(npcID)
+  if not id or id <= 0 then
+    return nil
+  end
+  local index = self:EnsureMobIndex()
+  return index and index.byNpc[id] or nil
+end
+
+local function MobKeysForScope(index, kind, scopeKey, field, db)
+  local keys = {}
+  local bucket = index and index[kind][tostring(scopeKey)] or nil
+  if not bucket then
+    return keys
+  end
+  for mobKey in pairs(bucket) do
+    local mob = db.mobs and db.mobs[mobKey]
+    local source = type(mob) == "table" and mob[field] or nil
+    local count = type(source) == "table" and tonumber(source[tostring(scopeKey)]) or 0
+    if count and count > 0 then
+      keys[#keys + 1] = mobKey
+    end
+  end
+  table.sort(keys)
+  return keys
+end
+
+function XPTooltip:GetMobKeysForMap(mapID)
+  local db = self.char
+  if not db or type(db.mobs) ~= "table" then
+    return {}
+  end
+  return MobKeysForScope(self:EnsureMobIndex(), "byZone", mapID, "killsByMap", db)
+end
+
+function XPTooltip:GetMobKeysForInstance(instanceKey)
+  local db = self.char
+  if not db or type(db.mobs) ~= "table" then
+    return {}
+  end
+  return MobKeysForScope(self:EnsureMobIndex(), "byInstance", instanceKey, "killsByInstance", db)
 end
 
 function XPTooltip:GetMobKey(name, npcID)
@@ -1130,6 +1321,7 @@ function XPTooltip:MergeMobEntries(fromKey, toKey, historical)
   if type(from) ~= "table" then
     return false
   end
+  self:InvalidateMobIndex()
 
   local to = db.mobs[toKey]
   if type(to) ~= "table" then
@@ -1708,7 +1900,13 @@ end
 function XPTooltip:EnsureMob(mobKey, name, npcID, classification)
   local db = self.char
   local mob = db.mobs[mobKey]
-  if type(mob) ~= "table" then
+  local isNew = type(mob) ~= "table"
+  local oldName, oldNpcID
+  if not isNew then
+    oldName = mob.name
+    oldNpcID = tonumber(mob.npcID)
+  end
+  if isNew then
     mob = {
       npcID = npcID,
       name = name or "Unknown",
@@ -1750,6 +1948,10 @@ function XPTooltip:EnsureMob(mobKey, name, npcID, classification)
     self:NormalizeMobFields(mob)
     mob.firstSeen = mob.firstSeen or Epoch()
   end
+  if isNew or (npcID and oldNpcID ~= tonumber(npcID))
+    or (name and name ~= "" and name ~= "Unknown" and oldName ~= mob.name) then
+    self:InvalidateMobIndex()
+  end
   return mob
 end
 
@@ -1790,6 +1992,7 @@ function XPTooltip:RemoveMobEntry(mobKey, deferRefresh)
   self:SubtractMobAccounting(db, mob)
 
   db.mobs[mobKey] = nil
+  self:InvalidateMobIndex()
   if type(db.calibration) == "table" and type(db.calibration.mobs) == "table" then
     -- Only the mob-specific calibration entry is retracted. Aggregate
     -- zone/level/class ratios learned from other observations are retained;

@@ -822,6 +822,8 @@ function XPTooltip:ResetKills()
     self:ResetScroll()
   end
   db.mobs = {}
+  self:InvalidateMobIndex()
+  db.unattributed = { events = 0, xp = 0, byLevel = {}, byMap = {}, lastSeen = 0 }
   db.quests = {}
   db.areas = {}
   db.instances = {}

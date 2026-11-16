@@ -12,6 +12,7 @@ Current release: **2.5.2**
 | Heat alpha | Superseded by the 2.4.4 gradient | A-3; V-1 |
 | Heat intensity/warm colors | Implemented in 2.4.0; gradient in 2.4.4 | HC-1/A-2/A-3; V-1 |
 | Data diagnostics | Implemented 2.4.0; instance/heatmap stats in 2.5.0; HC-5 baseline done | HC-2; V-2 |
+| XP attribution | Group/remote XP without identity fixed; aggregate only | ATTR-1; V-2 |
 | README feature guide | Completed in 2.4.1 | HC-6 |
 | Documentation claim audit | Completed; README re-review added UI-3/UI-4 | README-CLAIM-REVIEW |
 | Instance attribution and heatmap collection | Implemented in 2.5.0 | G-4a/G-4b; V-1/V-2 |
@@ -20,7 +21,7 @@ Current release: **2.5.2**
 | Release hygiene | Released 2.5.2 | REL-1; V-6 |
 | Memory | 3.2–3.85MB real; 23MB stable worst-case hot; guardrails/policy open | MEM-1/MEM-2; V-2 |
 | Scope/grid/limit review | Static/offline analysis first | SC-1..SC-5, G-1..G-3, A-1, HC-7; V-3 |
-| Data storage architecture | DS-1..DS-5/DS-3B/DS-3C done; DS-17.1 next | DS-1..DS-17.6; V-2 |
+| Data storage architecture | DS-1..DS-5/DS-3B/DS-3C/DS-17.1/DS-17.2/DS-17.3/DS-1-F2/DS-4P/DS-4P-F1/DS-4P-F2/DS-6/DS-7/DS-12/DS-6-F1 done; DS-17.4A next | DS-1..DS-17.6; V-2 |
 | Character lifecycle and cross-character data | Sub-task files ready | DS-17.0..DS-17.6; V-2 |
 | Journey overlay | Proposed, after DS | J-1..J-6; V-4 |
 | Cell inspector | Proposed, after DS | M-1..M-6; V-4 |
@@ -106,40 +107,66 @@ This is the critical path for limits, Journey, and the inspector.
 2. **DS-2 — Real-store baseline.**
 3. **DS-4 — Storage representation and retrieval design.**
 4. **DS-5 — SavedVariables/loading API matrix.**
-5. **DS-6 — Static metadata feasibility.**
+5. **DS-6 — Static metadata feasibility.** Done 2026-11-16; revised.
 6. **DS-3 — Storage sanity check.**
 7. **DS-3B — Massive synthetic store validation.**
 8. **DS-3C — Long-term growth and cap pressure.**
 9. **DS-17.1 — Aggregation and 64x64 sufficiency.**
-10. **DS-7 — Packing/compression feasibility.** Required for the massive cold
-   tier, not optional.
+10. **DS-7 — Packing/compression feasibility.** Done 2026-11-16; required for
+   the massive cold tier, not optional.
 
-**DS-1, DS-2, DS-3, DS-3B, DS-3C, DS-4, and DS-5 are complete.** DS-1 is in
+**DS-1, DS-2, DS-3, DS-3B, DS-3C, DS-4, DS-5, DS-6, and DS-7/DS-12 are
+complete.** DS-1 is in
 `docs/tasks/DS-1-CONSUMER-CONTRACT.md`; DS-2 is in
 `docs/tasks/DS-2-REAL-STORE-BASELINE.md`; DS-3 is in
 `docs/DS-3-STORAGE-SANITY-RESULT.md`; DS-3B is in
 `docs/DS-3B-MASSIVE-SYNTHETIC-RESULT.md`; DS-3C is in
 `docs/DS-3C-LONG-TERM-GROWTH.md`; DS-4 is in `docs/STORAGE-DIRECTION.md`;
-DS-5 is in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Next: DS-17.1.
+DS-5 is in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`; DS-17.1 is in
+`docs/DS-17-1-AGGREGATION-DECISION.md`; DS-17.2, DS-17.3, DS-1-F2, DS-4P,
+DS-4P-F1, DS-4P-F2, DS-6, DS-7/DS-12, and DS-6-F1 are complete.
+Next: DS-17.4A (Journey/Knowledge model validation).
 
 ### Phase 3 — storage design and prototypes
 
-1. **DS-17.2 — Modes and lifecycle.**
-2. **DS-17.3 — Retention and compression.**
-3. **DS-4P — Hybrid hot/cold prototype (required for massive scale).**
-4. **DS-8 — Display redesign study.**
-5. **DS-9 — Retention and migration.**
-6. **DS-17.4 — Cross-character knowledge and route recommendations.**
-7. **DS-17.5 — Schema and migration.**
-8. **DS-12 — Packed block codec.**
-9. **DS-13 — On-demand companion packaging.**
-10. **DS-14 — Constant-table/oversize guard.**
-11. **DS-15 — Lazy retrieval/cache.**
-12. **DS-16 — Save/checkpoint policy.**
-13. **DS-10 — Offline prototype.**
-14. **DS-17.6 — Validation and decision.**
-15. **DS-11 — Decision record.**
-16. **H64-10 — Schema/downgrade decision.** Decide schema `1` vs a bump after
+**Full data-model plan:** `docs/DATA-MODEL-PLAN.md`
+
+1. **DS-17.2 — Modes and lifecycle.** Done 2026-11-16.
+2. **DS-17.3 — Retention and compression.** Done 2026-11-16.
+3. **DS-4P — Hybrid hot/cold prototype.** Done 2026-11-16.
+4. **DS-4P-F1 — Hot-index memory optimization.** Done 2026-11-16.
+5. **DS-4P-F2 — Scoped/lazy name index.** Done 2026-11-16.
+6. **DS-6 — Static metadata feasibility.** Done 2026-11-16; revised after
+   review. Result: `docs/DS-6-STATIC-METADATA-RESULT.md`. No all-name list is
+   shipped; names are learned live; mobs are zone/instance/grid-localized.
+   **DS-6-F1 — Mob metadata registry.** Done 2026-11-16. Result:
+   `docs/DS-6-F1-MOB-METADATA-REGISTRY-RESULT.md`.
+7. **DS-8 — Display redesign study.**
+8. **DS-9 — Retention and migration.**
+9. **DS-17.4 — Cross-character knowledge and route recommendations.** Split
+   into DS-17.4A–D below.
+10. **DS-17.5 — Schema and migration.** After DS-17.4A–C.
+    `docs/tasks/DS-17-05-SCHEMA-AND-MIGRATION.md`.
+11. **DS-7 + DS-12 — Packed block codec.** Done 2026-11-16. Result:
+   `docs/DS-7-12-PACKED-BLOCK-CODEC-RESULT.md`.
+12. **DS-13 — On-demand companion packaging.**
+13. **DS-14 — Constant-table/oversize guard.**
+14. **DS-17.4A — Journey/Knowledge model validation.** Next.
+    `docs/tasks/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL.md`.
+    **DS-17.4B — Danger and XP/hour prototypes.**
+    `docs/tasks/DS-17-04B-DANGER-AND-XP-HOUR.md`.
+    **DS-17.4C — Retention/aggregation compatibility.**
+    `docs/tasks/DS-17-04C-RETENTION-MERGE-COMPATIBILITY.md`.
+    **DS-17.4D — Account Knowledge derivation prototype.** Future.
+    `docs/tasks/DS-17-04D-ACCOUNT-KNOWLEDGE-PROTOTYPE.md`.
+15. **DS-15 — Lazy retrieval/cache.** Blocked by DS-17.4A–C/DS-17.5.
+    `docs/tasks/DS-15-LAZY-RETRIEVAL-CACHE.md`.
+16. **DS-16 — Save/checkpoint policy.**
+    `docs/tasks/DS-16-SAVE-CHECKPOINT.md`.
+17. **DS-10 — Offline prototype.**
+18. **DS-17.6 — Validation and decision.**
+19. **DS-11 — Decision record.**
+20. **H64-10 — Schema/downgrade decision.** Decide schema `1` vs a bump after
     DS-9/DS-11; this is not a Phase 1 decision.
 
 ### Phase 4 — limits and grid decisions
@@ -215,7 +242,7 @@ Use these groups to avoid duplicate harnesses and release churn:
 | **REL-1** 2.5.2 release hygiene | UI-2, CL-1 interface, HC-5 fix | **Released 2.5.2** |
 | **WP-1** heatmap measurement/fixes | H64-9 (done), H64-9-F1/F2/F3/F4, SC-2, DS-3, then G-2/G-3 | One synthetic harness; measured rescale/disabled/normalize follow-ups |
 | **WP-2** research and targeted evidence | DS-1, DS-4, DS-3, SC-1, DS-2 | Use Lua/WoW docs and code first; test only unresolved behavior |
-| **WP-3** storage lifecycle | DS-17.1..DS-17.6, DS-4P/9/11/12/13/14/15/16 | Sequential design: aggregation → modes → compression → shared data → schema → decision |
+| **WP-3** storage lifecycle | DS-17.1..DS-17.6, DS-4P/4P-F1/9/11/12/13/14/15/16 | Sequential design: aggregation → modes → compression → shared data → schema → decision |
 | **WP-4** overlay audit | R-4 (with R-5/R-9/R-10 already complete) | Static art/data audit, independent of storage |
 | **WP-5** limits and grid decision | SC-3/SC-4/SC-5, G-1/G-3, HC-7 | Depends on WP-1/WP-2 measurements |
 | **WP-6** memory | MEM-1, MEM-2, H64-9-F3 (gated) | Measure real memory and define load/unload/eviction |
@@ -238,20 +265,26 @@ Use these groups to avoid duplicate harnesses and release churn:
 6. **WP-2 / DS-2 — Real-store baseline.** **Done 2026-11-14.**
    `docs/tasks/DS-2-REAL-STORE-BASELINE.md`.
 7. **WP-2 / DS-3B — Massive synthetic validation.** **Done 2026-11-15.**
-   Actual 8.69 MB compact / 9.94 MB client estimate; 23 MB stable / 27–37 MB transient heap.
 8. **WP-2 / DS-3C — Long-term growth and cap pressure.** **Done 2026-11-15.**
-   2h/day reaches 2,000 mobs in ~3 months; rate buffer turns over in 2.4h.
-9. **WP-3 / DS-17.1** — aggregation and 64×64 sufficiency. Capacity math and
-   DS-3B actuals done; remaining feature-to-data, hot/cold boundary, required
-   keys, and grid decision. Then DS-17.2/DS-17.3.
-10. **WP-3 / DS-4P + DS-7 + DS-12** — hybrid hot/cold prototype and packed-block
-   codec. Mandatory for massive data; not optional.
-11. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
-   evidence is scoped.
-12. **WP-4 / R-4** — static overlay/art audit.
-13. **WP-5** — limits/grid decisions after measurements.
-14. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
-15. **WP-7 / J/M** — only after DS-11.
+9. **WP-3 / DS-17.1** — aggregation and 64×64 sufficiency. **Done 2026-11-16.**
+10. **WP-3 / DS-17.2 + DS-1-F2** — lifecycle and in-memory indexes. **Done
+    2026-11-16.**
+11. **WP-3 / DS-17.3** — retention/compression and hot/warm/cold movement.
+    **Done 2026-11-16.**
+12. **WP-3 / DS-4P** — hybrid hot/cold prototype. **Done 2026-11-16.**
+13. **WP-3 / DS-4P-F1** — hot-index memory optimization. **Done 2026-11-16.**
+14. **WP-3 / DS-4P-F2** — scoped/lazy name index. **Done 2026-11-16.**
+15. **WP-2 / DS-6 — static metadata feasibility.** **Done 2026-11-16.**
+16. **WP-3 / DS-7 + DS-12** — final packed-block codec. **Done 2026-11-16.**
+17. **WP-3 / DS-6-F1** — mob metadata registry. **Done 2026-11-16.**
+18. **WP-3 / DS-17.4A** — Journey/Knowledge model validation. **Next.**
+19. **WP-3 / DS-15** — lazy retrieval/cache.
+20. **WP-1 / H64-9-F1 + F2** — rescale/disabled UI fixes after the storage
+    evidence is scoped.
+21. **WP-4 / R-4** — static overlay/art audit.
+22. **WP-5** — limits/grid decisions after measurements.
+23. **WP-6 / MEM-1** — dense/future Midnight memory sample, gating F3.
+24. **WP-7 / J/M** — only after DS-11.
 
 ### Safe execution order for massive storage
 
@@ -261,18 +294,21 @@ cap changes.
 1. **DS-3B — massive synthetic store validation.** **Done 2026-11-15.**
 2. **DS-3C — long-term growth/cap pressure.** **Done 2026-11-15.** Current caps
    are too small; no fixed target.
-3. **DS-17.1 — feature-to-data matrix and required keys.** No code. Use DS-3B,
-   DS-3C, and the capacity/strategy document.
-4. **DS-1-F2 — in-memory identity/zone/instance indexes.** First safe code
-   change: no schema, no persistence change, no data migration. Removes
-   tooltip/name/zone-list scans.
-5. **DS-17.1 — 64×64/grid decision.** Offline measurement only.
-6. **DS-17.2 / DS-17.3 — lifecycle and retention boundaries.** Design only.
-7. **DS-4P + DS-7 / DS-12 — hybrid hot/cold prototype and packed-block codec.**
-   Offline/isolated; required before production storage.
-8. **MEM-2 — load/unload/eviction policy.** Design using DS-17.3/DS-15/DS-16.
-9. **DS-15 / DS-16 / DS-14 — retrieval, save, oversize implementation.**
-10. **DS-17.5 / DS-11 — schema, migration, and final decision.**
+3. **DS-17.1 — feature-to-data, keys, and 64×64 decision.** **Done 2026-11-16.**
+4. **DS-1-F2 — in-memory identity/zone/instance indexes.** **Done 2026-11-16.**
+5. **DS-17.2 — lifecycle and archive modes.** **Done 2026-11-16.**
+6. **DS-17.3 — retention and hot/warm/cold movement.** **Done 2026-11-16.**
+7. **DS-4P — hybrid hot/cold prototype.** **Done 2026-11-16.**
+8. **DS-4P-F1 — hot-index memory optimization.** **Done 2026-11-16.**
+9. **DS-4P-F2 — scoped/lazy name index.** **Done 2026-11-16.**
+10. **DS-6 — static metadata feasibility.** **Done 2026-11-16.**
+11. **DS-7 / DS-12 — final packed-block codec.** **Done 2026-11-16.**
+12. **DS-6-F1 — mob metadata registry.** **Done 2026-11-16.**
+13. **DS-17.4A — Journey/Knowledge model validation.** Next.
+14. **DS-15 — lazy retrieval/cache.** After DS-17.4A.
+15. **MEM-2 — load/unload/eviction policy.** Design using DS-17.3/DS-15/DS-16.
+16. **DS-16 / DS-14 — save and oversize implementation.**
+17. **DS-17.5 / DS-11 — schema, migration, and final decision.**
 
 Do not start global-cap removal, schema migration, the LoadOnDemand companion,
 or a production cold tier before step 5 is proven.
@@ -676,6 +712,10 @@ checks in V-1/V-2.
 
 **Tasks**
 
+- [x] **ATTR-1 — Group/remote XP without identity.** Fixed 2026-11-16. Identity-
+      less group XP is stored as `unattributed` XP, not a fake `name:unknown`
+      mob. It contributes XP/rate/level history, not kills/areas/heatmaps.
+      Result: `docs/ATTR-1-GROUP-UNATTRIBUTED-XP.md`.
 - [x] **HC-1 — Heatmap intensity/color settings.**
 - [x] **HC-2 — Data diagnostics frame and icon/command access.**
 - [x] **HC-3 — Clarify cap scope in README/BROCHURE and diagnostics.**
@@ -722,6 +762,9 @@ cap and the shape of the tables**, not per-kill storage.
 3. Do we need per-cell mob/level detail, or is the heatmap sufficient as a
    separate aggregate plus a zone-level mob list?
 4. Can static metadata be shipped as Lua, like QuestieDB, to shrink saved data?
+   (Answered by DS-6/F1: no all-name list; account-wide stable metadata for
+   `npc:<id>`, per-character name-only metadata, and no pre-kill spawn data
+   required.)
 5. Does the client support multiple SavedVariables, per-character variables, or
    LoadOnDemand variables usefully? (No per-zone SavedVariables files exist.)
 6. Which WoW loading/SavedVariables APIs let us store compactly and expand on
@@ -860,9 +903,10 @@ budget.
    `C_AddOns.LoadAddOn`, `IsAddOnLoaded`, `DoesAddOnExist`,
    `IsAddOnLoadOnDemand`, `SaveAddOns`, and `SAVED_VARIABLES_TOO_LARGE`.
    Confirm LoadOnDemand companion timing at runtime in V-2, not here.
-6. **Evaluate static metadata.** Estimate size/licensing/maintenance for a
-   generated NPC/mob/zone metadata DB. Do not copy QuestieDB/ATT/Carbonite
-   data. Use official client data or our own generated tables.
+6. **Evaluate the per-character mob metadata registry.** No all-name list.
+   Learn name, fixed level range, and at most 4 zone/instance refs from live
+   kills. A pre-kill spawn index is deferred. Do not copy QuestieDB/ATT/
+   Carbonite data. Use official client data or our own observations.
 7. **Evaluate packing.** Compare plain tables, numeric-only arrays, packed
    strings, and compression; measure save/load/CPU and debuggability.
 8. **Design display.** Zone-scoped mob list with a level filter; heatmap cell
@@ -876,8 +920,8 @@ budget.
   current UI, tooltip, commands, diagnostics, calibration, and world modules.
   Follow-ups in `docs/tasks/DS-1-FOLLOWUP-TASKS.md`:
   - [ ] **DS-1-F1 — Canonical versus derived ownership.**
-  - [ ] **DS-1-F2 — Zone-scoped identity/query index.** Ready; safe first code
-    task; in-memory only, no schema/persistence change.
+  - [x] **DS-1-F2 — Zone-scoped identity/query index.** Executed 2026-11-16;
+    in-memory indexes and tests. Result: `docs/DS-1-F2-INDEX-RESULT.md`.
   - [ ] **DS-1-F3 — Instance/area separation and count rules.**
   - [ ] **DS-1-F4 — Missing-subset/archive fallback.**
   - [ ] **DS-1-F5 — Diagnostics count-only access.**
@@ -954,13 +998,30 @@ budget.
   `docs/tasks/DS-4-STORAGE-REPRESENTATION.md`,
   `docs/STORAGE-DIRECTION.md`, and
   `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`. DS-4P is required.
-- [ ] **DS-4P — Hybrid hot/cold prototype.** Required for massive scale. Prove
-  a bounded hot index plus packed cold zone/level blocks, a per-zone retention
-  rule, and no-global-scan retrieval. DS-4 hot-tier answers are retained; the
-  current 2,000-mob/40-zone/100-instance caps are not the massive design. Test
-  beyond those caps: 10k/100k mobs, 200+ zones/instances, 3/6/12-month profiles,
-  and a dynamic hot cache; the design must not depend on a 2,000/40/100 stop. A
-  live prototype remains V-2.
+- [x] **DS-4P — Hybrid hot/cold prototype.** Executed 2026-11-16. Tier C:
+  100k mobs/200 zones/200 instances: 38.50 MB hot heap, 8.07 MB cold blocks,
+  46.56 MB structural; selected-zone decode 3.7 ms; tooltip 10k 0.55 ms; no full
+  scan; prototype save/reload 10.78 MB/97.5 ms. No 2,000/40/100 stop. Result:
+  `docs/DS-4P-HYBRID-PROTOTYPE-RESULT.md`.
+- [x] **DS-4P-F1 — Hot-index memory optimization.** Executed 2026-11-16.
+  Baseline 20.67 MB hot at 100k; static names + numeric arrays 7.67 MB hot
+  (+14 MB shared index); static without index 6.83 MB hot (+6 MB shared).
+  Numeric arrays + shared names + scoped name index is the best shape. Result:
+  `docs/DS-4P-F1-HOT-INDEX-RESULT.md`.
+- [x] **DS-4P-F2 — Scoped/lazy name index.** Executed 2026-11-16. 100k mobs:
+  7.73 MB hot + 5.97 MB shared, 11,001 index entries; no global name index;
+  name-only/missing-static fallback works; ambiguous returns nil. Result:
+  `docs/DS-4P-F2-SCOPED-NAME-INDEX-RESULT.md`.
+- [x] **DS-6 — Static metadata feasibility.** Executed 2026-11-16; revised
+  after review. **No shipped all-name list.** Stable `npc:<id>` metadata is
+  learned live into an account-wide registry; name-only `name:<lower>` metadata
+  stays per character; missing names fall back to `NPC <id>`. Mobs are
+  zone/instance/grid-localized, so cold history is per-zone/per-instance blocks,
+  not a global all-mob matrix. A pre-kill spawn index is deferred and is not
+  copied from a third-party database.
+  Shipped-name measurements (100k/24 3.51 MB packed vs 10.67 MB map; 350k
+  12.80 vs 40.35 MB) are retained as the rejected alternative. Result:
+  `docs/DS-6-STATIC-METADATA-RESULT.md`.
 - [x] **DS-5 — SavedVariables/loading API matrix.** Executed 2026-11-14.
   Result: `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Key conclusions:
   account + per-character split is correct; multiple normal variables still load
@@ -968,11 +1029,11 @@ budget.
   timing is a V-2 check; `SaveAddOns` is a checkpoint, not per-kill durability;
   `SAVED_VARIABLES_TOO_LARGE` is a load-failure/recovery path; no per-zone SV
   files; do not load a companion from inside `ADDON_LOADED`.
-- [ ] **DS-6 — Static metadata feasibility.** Size, source, licensing, version
-  pinning, and regeneration process.
-- [ ] **DS-7 — Packing/compression feasibility.** Required for massive data.
-  Measure size/CPU and select the cold-block codec; opacity and migration cost
-  are design constraints, not reasons to omit the cold tier.
+- [x] **DS-7 — Packing/compression feasibility.** Executed 2026-11-16.
+  Selected hybrid sparse/bitset cell encoding, varint/delta fields, per-zone/
+  instance/level-band blocks, no inline names, per-block checksum, and per-block
+  base64 in SavedVariables. Result:
+  `docs/DS-7-12-PACKED-BLOCK-CODEC-RESULT.md`.
 - [ ] **DS-8 — Display redesign study.** Zone-first Mobs/Areas/Levels and
   heatmap-cell detail without losing identity.
 - [ ] **DS-9 — Retention and migration.** Per-zone caps, global totals, pruning,
@@ -984,8 +1045,19 @@ budget.
 - [ ] **DS-11 — Decision record.** Choose current, identity/count split,
   zone-first, static DB, packing, lifecycle/archive, cross-character knowledge,
   or a phased combination; include estimates and a migration plan.
-- [ ] **DS-12 — Packed block codec.** Define the zone-block binary/string format,
-  versioning, checksums, encode/decode functions, and corruption handling.
+- [x] **DS-12 — Packed block codec.** Executed 2026-11-16 with DS-7. Block
+  metadata, adaptive cells, base64 storage, checksum, corruption/truncation, and
+  block-size guidance are defined. Result:
+  `docs/DS-7-12-PACKED-BLOCK-CODEC-RESULT.md`.
+- [x] **DS-6-F1 — Mob metadata registry.** Executed 2026-11-16. Local
+  `/mnt/r/AceM2L2.lua` sample: 158 mobs, 100 npcID / 58 name-only; 135 in one
+  zone/instance, 23 in two; max observed 2 (assume ≤4); fixed level range,
+  max width 4. **Account-wide stable `npc:<id>` metadata** (name, level range,
+  ≤4 zone refs) + per-character name-only metadata. Local account part: 100
+  entries, 0.02 MB / 3.8 KB packed; local name-only: 58 entries, 0.01 MB /
+  3.7 KB packed. Account-only 10k: 2.38 MB map / 0.42 MB packed; 100k: 35.97 /
+  4.16 MB. Raw history/observed XP stays per character. Result:
+  `docs/DS-6-F1-MOB-METADATA-REGISTRY-RESULT.md`.
 - [ ] **DS-13 — On-demand companion packaging.** Design the LoadOnDemand
   companion, its TOC, SavedVariables, load call, missing-companion fallback, and
   release packaging from `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`. Use
@@ -1000,39 +1072,43 @@ budget.
   event as a normal size warning. `SAVED_VARIABLES_TOO_LARGE` fires after
   `ADDON_LOADED`, can affect account and/or per-character variables, and the
   variables will not save on the next logout.
-- [ ] **DS-15 — Lazy retrieval, zone-scoped queries, and cache.** Decode only the
-  selected zone; provide tooltip lookup from the current zone or a compact
-  global identity index; load the heatmap's current/selected zone; keep a
-  bounded LRU; expose query APIs to Mobs/Areas/Levels/tooltips; measure
-  decode/UI latency and fallback correctness. There are no per-zone
-  SavedVariables files: laziness is decode/normalize/UI, or a LoadOnDemand
-  companion. Coordinate with MEM-2's load/unload/eviction policy.
+- [ ] **DS-17.4A — Journey/Knowledge model validation.** Next. Validate the
+  per-character Journey schema, danger/XP contexts, best-zone XP/hour, heatmap
+  ranking, retention compatibility, and account Knowledge target. Task:
+  `docs/tasks/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL.md`.
+- [ ] **DS-15 — Lazy retrieval, zone-scoped queries, and cache.** Blocked by
+  DS-17.4A–C and DS-17.5. Decode only the selected block; base64-decode only
+  that block; resolve mob keys through the Journey and account Knowledge;
+  provide tooltip/danger/best-zone/heatmap queries with `NPC <id>` fallback;
+  keep a bounded LRU; measure decode/UI latency and fallback correctness. No
+  per-zone SavedVariables files; laziness is decode/normalize/UI, or a
+  LoadOnDemand companion. Task: `docs/tasks/DS-15-LAZY-RETRIEVAL-CACHE.md`.
+  Coordinate with MEM-2's load/unload/eviction policy.
 - [ ] **DS-16 — Explicit save/checkpoint policy.** Define checkpoint triggers
   around `C_AddOns.SaveAddOns`, logout/reload, and
   `ADDONS_UNLOADING: closingClient`. Do not save per kill. Do not promise
   synchronous durability; verify actual behavior in V-2. Include the
-  `SAVED_VARIABLES_TOO_LARGE` stop-saving path.
+  `SAVED_VARIABLES_TOO_LARGE` stop-saving path. Task:
+  `docs/tasks/DS-16-SAVE-CHECKPOINT.md`.
 - [ ] **DS-17 — Character lifecycle, compression, and cross-character data.**
   Model a full 1–60/1–max leveling life, leveling vs endgame modes, hot/warm/cold
   archive tiers, and account-wide aggregate leveling knowledge for alts. Includes
   official zone/instance counts and cap-pressure analysis. Master:
   `docs/TASK-DS-17-CHARACTER-LIFECYCLE-DATA.md`.
-  - [ ] **DS-17.1 — Aggregation and 64x64 sufficiency.** Capacity math done:
-    250 kills/level, 15k–32.5k kills, 40/100/200 zones, 50/100/200 instances,
-    2,000 mobs; contexts and dense heatmaps dominate. Remaining: feature-to-data
-    matrix (scope/fields/hot/cold/query/fallback/retention), cardinality, required
-    hot-index and cold-block keys, hot/warm/cold boundary, no-global-cap policy,
-    and explicit 64×64 recommendation. Do not reopen DS-4/DS-5 settled choices.
-    Consume DS-3B actual bytes before finalizing. Depends DS-1/DS-2/DS-3/DS-3B/
-    DS-5; blocks DS-17.2/3 and DS-4P.
-    `docs/tasks/DS-17-01-AGGREGATION-AND-GRID.md`;
-    `docs/DS-17-1-CAPACITY-AND-STRATEGY.md`.
-  - [ ] **DS-17.2 — Modes and lifecycle.** Define leveling vs endgame, archive
-    generations, mode switch, and level-cap generations. Depends DS-17.1; blocks
-    DS-17.3/DS-9/DS-11. `docs/tasks/DS-17-02-MODES-AND-LIFECYCLE.md`.
-  - [ ] **DS-17.3 — Retention and compression.** Define hot/warm/cold tiers,
-    heatmap downsampling, context collapse, and backup. Depends DS-17.1/2; blocks
-    DS-17.4/5/DS-9. `docs/tasks/DS-17-03-RETENTION-AND-COMPRESSION.md`.
+  - [x] **DS-17.1 — Aggregation and 64x64 sufficiency.** Executed 2026-11-16.
+    Feature-to-data matrix, cardinality, hot/warm/cold boundary, required keys,
+    no-global-cap policy, and 64×64 decision complete. 64×64 accepted for durable
+    heatmaps; 96/128 rejected for durable storage; no per-kill log; dynamic hot
+    cache and packed cold blocks. Result:
+    `docs/DS-17-1-AGGREGATION-DECISION.md`.
+  - [x] **DS-17.2 — Modes and lifecycle.** Executed 2026-11-16. Automatic
+    leveling archive at max level, endgame separation, level-cap generations,
+    first-alt rule, commands/migration. Result:
+    `docs/DS-17-2-MODES-LIFECYCLE-DECISION.md`.
+  - [x] **DS-17.3 — Retention and compression.** Executed 2026-11-16. Dynamic
+    hot/warm/cold movement; 64 hot / 32 warm-cold / 16 summary heatmaps;
+    context/rate/quest/death/respawn/level retention; 3/6/12-month and
+    beyond-cap profiles. Result: `docs/DS-17-3-RETENTION-DECISION.md`.
   - [ ] **DS-17.4 — Cross-character knowledge and route recommendations.**
     Define account-wide aggregate leveling knowledge, confidence, privacy, query
     use, and an explainable efficient-route recommendation with data-sufficiency
@@ -1281,7 +1357,12 @@ in-game tasks to each feature section.
       zone-heavy characters. Verify LoadOnDemand companion variable timing and
       its `ADDON_LOADED` delivery, `SaveAddOns` durability before immediate
       logout, `SAVED_VARIABLES_TOO_LARGE` threshold/recovery, and Forever 1.60.1
-      persistence.
+      persistence. Verify account-wide stable metadata (name, fixed level range,
+      ≤4 zone refs), per-character name-only metadata, per-block
+      base64/SavedVariables size, and selected-block latency on
+      Forever/Midnight. Any online verification
+      requires explicit permission; use Wowhead/official client data, never an
+      emulator database as authority.
 - [ ] **V-3 — Coordinate/grid confirmation.** Only if G-1/G-2 propose changes:
       compare death-time position capture and 64 vs 96/128 occupancy/noise and
       latency.

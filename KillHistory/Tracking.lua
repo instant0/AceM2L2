@@ -238,6 +238,7 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
     end
     mob.killsByInstance[instanceKey] =
       (tonumber(mob.killsByInstance[instanceKey]) or 0) + 1
+    self:IndexMobInstance(mobKey, instanceKey)
     if playerLevel > 0 then
       local levelKey = tostring(playerLevel)
       instanceEntry.killsAtLevel = EnsureNumberMap(instanceEntry.killsAtLevel)
@@ -258,6 +259,7 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
   elseif mapID > 0 then
     local mapKey = tostring(mapID)
     mob.killsByMap[mapKey] = (tonumber(mob.killsByMap[mapKey]) or 0) + 1
+    self:IndexMobZone(mobKey, mapKey)
     db.areas[mapKey] = (tonumber(db.areas[mapKey]) or 0) + 1
     if playerLevel > 0 then
       local areaLevels = db.areaLevels[mapKey]
@@ -486,6 +488,24 @@ function XPTooltip:CommitUnidentifiedKill(entry)
   info.mapID = info.mapID or self:GetMapID()
   info.buffSignature = info.buffSignature or self:GetBuffSignature()
   self:AttachInstanceState(info)
+
+  local lowerName = Lower(info.name)
+  if not lowerName or lowerName == "" or lowerName == "unknown" then
+    -- A group member's remote kill can grant XP with no creature identity.
+    -- Keep the XP and rate sample, but never invent an "Unknown" mob.
+    local reason = (tonumber(info.groupSize) or 0) > 1
+      and "unattributed_group" or "unattributed_unnamed"
+    self:RecordUnattributedXP(info, entry.totalXP, reason)
+    if self.settings and self.settings.debug then
+      AceM2L2:SafePrint(string.format(
+        "Kill Story: no death identity for XP %s; recorded as %s.",
+        tostring(entry.totalXP or "?"), reason
+      ))
+    end
+    self.lastPool = self:GetRestedPool()
+    return
+  end
+
   info.contextKey = ContextKey(
     info.playerLevel, info.level, info.groupSize, info.mapID,
     info.classification, info.buffSignature, info.instanceKey

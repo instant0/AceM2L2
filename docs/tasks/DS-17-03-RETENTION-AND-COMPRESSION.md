@@ -1,6 +1,7 @@
 # DS-17.3 — Retention, compression, and heatmap downsampling
 
-**Status:** research/design task, not implemented  
+**Status:** executed 2026-11-16  
+**Result:** `docs/DS-17-3-RETENTION-DECISION.md`  
 **Parent:** DS-17  
 **Depends on:** DS-17.1, DS-17.2  
 **Blocks:** DS-17.4, DS-17.5, DS-9
@@ -20,13 +21,16 @@ Define how earlier leveling state is compressed while remaining useful.
 - `SAVED_VARIABLES_TOO_LARGE` is a load failure, not a warning; the next logout
   will not save. A pre-compression backup is mandatory.
 
-Tiers:
+Tiers are movement rules, not hard caps:
 
-- **Hot:** current + recent 5 levels; full detail; 64×64.
-- **Warm:** previous 5–20 levels; per-level/zone/instance counts, top mobs,
-  32×32.
-- **Cold:** older levels; level/zone summaries, top mobs, 16×16.
+- **Hot:** active/recent level band, current/selected zone, current contexts;
+  full detail; 64×64.
+- **Warm:** recent history, per-level/zone/instance counts, top mobs; 32×32.
+- **Cold:** older levels/zones; summaries/top-N; 16×16 or packed.
 - **Shared:** account-wide aggregates (DS-17.4).
+
+The exact boundaries are measured and dynamic. Do not encode one global element
+count as the design.
 
 ## Research questions
 
@@ -63,11 +67,13 @@ cold:   older                       summary, top mobs, 16x16
 shared: account-wide bands          aggregates only
 ```
 
-Exact numbers come from DS-2/DS-3/SC measurements.
+Use DS-3B/DS-3C and 3/6/12-month profiles; do not use the small real baseline as
+the retention target.
 
 ## Work items
 
-- Define retention windows and archive boundaries.
+- Define dynamic retention windows and archive boundaries for 3/6/12-month
+  profiles.
 - Measure downsample size/error at 64/32/16.
 - Define context collapse/top-N rules.
 - Select compression mechanisms before implementation.
@@ -88,7 +94,7 @@ Exact numbers come from DS-2/DS-3/SC measurements.
 
 ## Acceptance criteria
 
-- Each tier has a defined field set and cap.
+- Each tier has a defined field set and movement rule; no arbitrary global cap.
 - Compression saves a measured amount versus hot/warm data.
 - Historical heatmaps remain readable at the chosen downsample.
 - No destructive compression occurs without backup.

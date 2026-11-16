@@ -30,8 +30,8 @@ Acceptance:
 ## DS-1-F2 — Zone-scoped identity and query index
 
 **Priority:** high  
-**Status:** ready; safe first code task; in-memory only; no schema/persistence
-change  
+**Status:** executed 2026-11-16; tested  
+**Result:** `docs/DS-1-F2-INDEX-RESULT.md`  
 **Depends on:** DS-1  
 **Blocks:** DS-15, MEM-2, DS-4
 

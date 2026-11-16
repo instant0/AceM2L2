@@ -1,63 +1,49 @@
 # Next task
 
-## DS-17.1 — Aggregation and 64×64 sufficiency
+## DS-17.4A — Journey/Knowledge model validation
 
-**Status:** next; safe design task; capacity and DS-3B validation complete  
-**Task document:** `docs/tasks/DS-17-01-AGGREGATION-AND-GRID.md`  
-**Inputs:** `docs/DS-3B-MASSIVE-SYNTHETIC-RESULT.md`,
-`docs/DS-3C-LONG-TERM-GROWTH.md`,
-`docs/DS-17-1-CAPACITY-AND-STRATEGY.md`, `docs/STORAGE-STRATEGY.md`,
-`docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`,
-`docs/tasks/DS-1-CONSUMER-CONTRACT.md`
+**Status:** next; ready  
+**Task document:** `docs/tasks/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL.md`  
+**Full plan:** `docs/DATA-MODEL-PLAN.md`  
+**Model record:** `docs/DATA-MODEL-AND-TEST-MATRIX.md`  
+**Inputs:** `docs/DS-6-F1-MOB-METADATA-REGISTRY-RESULT.md`,
+`docs/DS-7-12-PACKED-BLOCK-CODEC-RESULT.md`, `docs/DS-17-1-AGGREGATION-DECISION.md`,
+`docs/DS-17-3-RETENTION-DECISION.md`, local `/mnt/r/AceM2L2.lua`
 
 ### Why this is next
 
-- DS-3B validated the current-hot profile: 8.69 MB compact / 9.94 MB client
-  estimate, 23 MB stable / 27–37 MB transient. That is a current-cap synthetic,
-  not a long-term state.
-- DS-3C shows the current caps are too small: 2h/day reaches the 2,000-mob cap in
-  ~3 months and the 240-rate-sample buffer turns over in 2.4h.
-- DS-4/DS-5 settled the hot representation and loading constraints.
-- Remaining: feature-to-data matrix, hot/warm/cold boundary, required keys, and
-  the explicit 64×64 decision.
+- The per-character Journey is the primary asset and must not be shrunk to the
+  current caps.
+- Account-wide Knowledge is a future derived target; merge is not implemented
+  now.
+- Danger and best-zone XP/hour need context/time/outcome fields that the current
+  schema does not fully expose.
+- DS-15 retrieval should not proceed until the model and context trade-offs are
+  measured.
 
 ### Work
 
-1. Build the feature-to-data matrix:
-   scope, required fields, hot/warm/cold unit, query/index, fallback, retention.
-2. Confirm minimum durable units for heatmap, mob, level, zone, instance,
-   context, and session.
-3. Define hot/warm/cold boundaries and replace the 2,000-mob/40-zone/100-instance
-   global caps with per-zone/per-block retention. Design for long-term growth,
-   not the current cap profile.
-4. Define required hot-index fields and cold-block fields.
-5. Use DS-3B actuals to decide the efficient context/zone policy. No fixed MB or
-   element target; compare retrieval value against measured memory/IO.
-6. Run the 64×64 vs 96/128/aspect-ratio decision using the existing H64-9/DS-3
-   harness. No new matrix.
-7. Prove no per-kill event log is needed; name a feature and cost if one is.
-8. Produce DS-4P input: hot index, cold blocks, retention, indexes.
+1. Inventory the local Journey fields and missing dimensions.
+2. Measure combat/XP context cardinality and top-N/collapse trade-offs.
+3. Prototype danger outcomes by context.
+4. Prototype best-zone XP/hour ranking.
+5. Prototype heatmap best-cell ranking.
+6. Verify retention preserves aggregation inputs.
+7. Compare nested, parallel-array, and packed schema shapes.
+8. Define the account Knowledge target only; do not merge.
 
 ### Output
 
-- aggregation decision note;
-- feature-to-data matrix;
-- unique-cardinality table per player profile;
-- hot/warm/cold boundary and cap-retention policy;
-- 64×64 sufficiency recommendation;
-- required keys for hot index and cold blocks;
-- DS-4P hybrid prototype inputs.
+- `docs/DS-17-04A-JOURNEY-KNOWLEDGE-MODEL-RESULT.md`
+- measured tables and recommended schema
+- V-2 data/API gaps
+- revised inputs for DS-17.4/DS-17.5/DS-15/DS-16
 
 ### Not required
 
-- exact WoW content census;
-- live-client test;
-- schema implementation;
-- repeating DS-2/DS-3/DS-3B/DS-5;
-- reopening settled DS-4/DS-5 choices;
-- treating the current small-store caps as the massive design.
-
-### Safe first code task after this
-
-**DS-1-F2 — in-memory identity/zone/instance indexes.** No schema or persistence
-change; removes full mob scans from tooltip/name and zone-list retrieval.
+- merge implementation;
+- account-wide writes;
+- UI work;
+- live client test;
+- route recommendation;
+- online verification.

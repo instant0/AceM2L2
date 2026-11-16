@@ -6,6 +6,9 @@
 **Purpose:** keep the prior addon/method research and the resulting storage and
 retrieval strategy in one place. This is not a new investigation.
 
+**Full data-model plan:** `docs/DATA-MODEL-PLAN.md`  
+**Model/test record:** `docs/DATA-MODEL-AND-TEST-MATRIX.md`
+
 ## What was inspected
 
 ### Addon patterns
@@ -85,7 +88,7 @@ AceM2L2 caps are sufficient.
 | Heatmap | Sparse 64×64 cells; exact coordinates only for deaths/Journey |
 | Per-kill log | No |
 | Dedup | One mob record per identity; names once; derived `areas`/`levels`; lazily created optional fields |
-| Static metadata | TOC/Lua data, outside the character save |
+| Static metadata | No shipped all-name list; live account name cache + optional scoped spawn/locality index, outside raw character history |
 | Account vs character | Account root: settings + small aggregates; character root: raw active-character history |
 | Multiple normal variables | All load together; do not use them expecting deferral |
 | LoadOnDemand companion | Only real file-level deferral; timing is a V-2 check |
@@ -140,25 +143,48 @@ only.
 | Retrieval and indexes | DS-1 consumer contract done; DS-1-F2 index is the safe first code task; DS-15 pending |
 | Capacity validation | DS-3B done: 8.69 MB compact / 9.94 MB client estimate / 23 MB stable / 27–37 MB transient heap for 2k/40/12 |
 | Long-term pressure | DS-3C done: 2h/day hits 2,000 mobs in ~3 months; rate buffer turns over in 2.4h |
-| Packed cold blocks | DS-7/DS-12 pending; required for massive |
+| Hybrid prototype | DS-4P done: 100k mobs/200 zones/200 instances, 38.5 MB hot / 8.07 MB cold, selected-zone 3.7 ms, no full scan |
+| Hot index | DS-4P-F1/F2 done: numeric arrays + scoped name index; 7.73 MB hot + 5.97 MB shared at 100k |
+| Packed cold blocks | DS-7/DS-12 done: hybrid sparse/bitset cells, varint/delta, no inline names, per-block base64+checksum; 100k/4ctx 3.90 MB cold, 350k sub-blocks 13.22 MB / 2.55 ms |
 | Memory comparison and budget | MEM-1 partial; MEM-2 pending; V-2 live check |
-| Game/client static data | DS-6 pending; use IDs and static Lua where feasible |
+| Game/client static data | DS-6/F1: no shipped all-name list; per-character mob metadata registry (name, fixed level range, ≤4 zone refs); learned live |
 | Save/checkpoint/oversize | DS-5 done; DS-14/DS-16 pending |
 | Existing addon patterns | Captured here and in PLAN; not copied |
 
 ## Target architecture
 
-### 1. Static metadata
+### 1. Mob metadata registry
 
-- NPC/zone/class/instance names and IDs in TOC/Lua, not SavedVariables.
-- Shared by every character; versioned with the addon.
-- Feasibility/licensing: DS-6.
+- **No shipped all-name list.** Metadata is learned live from captured units.
+- **Account-wide stable `npc:<id>` metadata:** one name, one fixed
+  `levelMin`/`levelMax`, at most 4 zone/instance refs, optional classification.
+  Shared by all characters on the same project/interface.
+- **Per-character name-only `name:<lower>` metadata** plus the F2 scoped name
+  index. Name-only identity is not merged across characters.
+- Raw kills/XP/contexts/counts/heatmaps remain per character. Observed XP is
+  not shared; base XP is computed from level/classification.
+- Mobs are zone/instance/grid-localized; store per-zone/per-instance blocks,
+  not a global all-mob/all-grid matrix.
+- Local `/mnt/r/AceM2L2.lua` sample: 158 mobs, 100 npcID / 58 name-only;
+  135 in one zone/instance, 23 in two; max observed 2 (assume ≤4); fixed level
+  range, max width 4.
+- Local account part: 100 entries 0.02 MB / 3.8 KB packed; name-only: 58
+  entries 0.01 MB / 3.7 KB packed. Account-only 10k: 2.38 MB map / 0.42 MB
+  packed; 100k: 35.97 / 4.16 MB.
+- Account metadata loads for every character; pack it above a measured
+  threshold. It grows with unique stable `npcID`s across the account, not with
+  the number of characters. A pre-kill spawn index is deferred; locality is
+  learned from kills.
+- Do not copy QuestieDB/ATT/Carbonite. Keep Forever and Midnight separate.
+- Shipped-name alternative remains rejected: 100k 10.67 MB map / 3.51 MB packed;
+  350k 40.35 / 12.80 MB. See `docs/DS-6-F1-MOB-METADATA-REGISTRY-RESULT.md`.
 
 ### 2. Account root
 
-- `AceM2L2DB`: settings, UI profile, small bounded aggregate leveling knowledge.
-- Loads for every character, so keep it small.
-- No raw character history.
+- `AceM2L2DB`: settings, UI profile, small bounded aggregate leveling knowledge,
+  and the account-wide stable `npc:<id>` metadata registry.
+- Loads for every character, so keep it small and pack when large.
+- No raw character history or observed XP.
 
 ### 3. Per-character hot tier
 
@@ -180,17 +206,22 @@ There is **no fixed file-size or heap target**. DS-3B measured 8.69 MB compact /
 
 ### 4. Packed cold tier
 
-- Zone/level blocks, numeric IDs, varint/delta counts, optional bit-packed cells.
+- Per-zone/instance/level-band blocks, numeric IDs, varint/delta counts.
+- Hybrid cells: sparse at low density, bitset at higher density (DS-7/DS-12).
+- No inline names; names resolve from the per-character metadata registry.
+- Target ~256-512 mobs per block; split large zones/level bands.
 - Versioned, checksummed, with a plain fallback.
-- Decode only the selected block; LRU cache.
+- Per-block base64 in SavedVariables; decode only the selected block; LRU cache.
 - Old zones downsampled: 64×64 hot, 32×32/16×16 cold.
-- Contexts collapsed/archived.
+- Contexts collapsed/archived; cold keeps 4/collapsed, not 12.
 - No per-zone SavedVariables files.
 
 ### 5. Optional companion
 
-- LoadOnDemand addon only if V-2 proves variable timing and measured size/load
-  win.
+- No companion is required for names: they are learned live.
+- A LoadOnDemand companion is only for optional scoped spawn/locality data or a
+  cold-archive package, and only if V-2 proves variable timing and a measured
+  size/load win.
 - Load from `PLAYER_LOGIN` or a user action, not from `ADDON_LOADED`.
 - Missing-companion fallback required.
 

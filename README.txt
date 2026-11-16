@@ -55,6 +55,8 @@ Heatmap
 Data insights
 - Kill counts by mob, area, level, and current session.
 - Dungeon kills are attributed to the instance name instead of a world map.
+- Group/remote XP with no kill identity is tracked as unattributed XP, not as a
+  fake mob.
 - Data diagnostics: middle-click the minimap icon or use
   `/acem2l2 xpt data` to see tracked counts, limits, heatmap cells, and an
   estimated store size.
