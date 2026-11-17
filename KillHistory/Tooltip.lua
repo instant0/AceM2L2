@@ -18,6 +18,8 @@ local Trim = Util.Trim
 local ContextKey = Formula.ContextKey
 local FormatNumber = Util.FormatNumber
 local FormatPercent = Util.FormatPercent
+local FormatAgo = Util.FormatAgo
+local FormatDate = Util.FormatDate
 
 function XPTooltip:InstallTooltipHook()
   if self.tooltipHookInstalled then
@@ -135,13 +137,13 @@ function XPTooltip:IsTooltipCandidate(unit)
   return self:IsUnitEligible(unit)
 end
 
-function XPTooltip:AddTooltipKillCount(tooltip, mob, playerLevel, settings)
+function XPTooltip:AddTooltipKillCount(tooltip, mob, playerLevel, settings, historical)
   if not settings or not settings.showKillCount then
     return false
   end
   local killsTotal = tonumber(mob and mob.kills) or 0
   local suffix = ""
-  if mob and type(mob.killsAtLevel) == "table" then
+  if not historical and mob and type(mob.killsAtLevel) == "table" then
     local killsAtLevel = tonumber(mob.killsAtLevel[tostring(playerLevel)]) or 0
     suffix = " |cffaaaaaa(this level: " .. FormatNumber(killsAtLevel) .. ")|r"
   end
@@ -185,6 +187,37 @@ local function resolveTooltipMob(self, mobKey, name, npcID)
     mobLevelMax = record.mobLevelMax,
     journeyBlockFallback = true,
   }, true
+end
+
+function XPTooltip:AddTooltipHistoricalLines(tooltip, mob, playerLevel, settings)
+  local killsTotal = tonumber(mob and mob.kills) or 0
+  tooltip:AddDoubleLine("|cffaaaaaaKilled:|r",
+    "|cffffffff" .. FormatNumber(killsTotal) .. "|r")
+  local classification = SafeString(mob and mob.classification) or "normal"
+  tooltip:AddDoubleLine("|cffaaaaaaType:|r",
+    "|cffffffff" .. string.upper(classification) .. "|r")
+  local firstSeen = tonumber(mob and mob.firstSeen) or 0
+  local lastSeen = tonumber(mob and mob.lastSeen) or 0
+  if firstSeen > 0 then
+    tooltip:AddDoubleLine("|cffaaaaaaFirst seen:|r",
+      "|cffffffff" .. FormatDate(firstSeen) .. "|r")
+  end
+  if lastSeen > 0 then
+    tooltip:AddDoubleLine("|cffaaaaaaLast seen:|r",
+      "|cffffffff" .. FormatAgo(lastSeen) .. "|r")
+  end
+  local topMap, topKills
+  for mapKey, kills in pairs(type(mob and mob.killsByMap) == "table" and mob.killsByMap or {}) do
+    if not topKills or (tonumber(kills) or 0) > topKills then
+      topMap, topKills = mapKey, tonumber(kills) or 0
+    end
+  end
+  if topMap and topKills and topKills > 0 then
+    tooltip:AddDoubleLine("|cffaaaaaaTop area:|r",
+      "|cffffffff" .. self:GetMapName(topMap)
+        .. " (" .. FormatNumber(topKills) .. ")|r")
+  end
+  tooltip:AddLine("|cffaaaaaaHistorical content: XP lines omitted.|r")
 end
 
 function XPTooltip:AddTooltipMobLevel(tooltip, level, settings)
@@ -247,6 +280,21 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
   end
 
   local rawMobLevel = SafeNumber(SafeCall(UnitLevel, unit))
+  local historical = self:GetMobRelevance(mob, rawMobLevel, playerLevel) == "historical"
+  if historical then
+    local signature = table.concat({
+      tostring(unit), tostring(guid or ""), tostring(playerLevel),
+      tostring(rawMobLevel), tostring(settings.showMobLevel),
+      "historical", tostring(killsTotal), tostring(mob and mob.lastSeen or 0),
+    }, ":")
+    if tooltip.xpTooltipSignature == signature then
+      return
+    end
+    tooltip.xpTooltipSignature = signature
+    self:AddTooltipMobLevel(tooltip, rawMobLevel, settings)
+    self:AddTooltipHistoricalLines(tooltip, mob, playerLevel, settings)
+    return
+  end
   local supportsXP = self:Supports("hasTooltipXP")
   local xpMax = supportsXP and self:GetXPMax() or nil
   local xpCurrent = supportsXP and self:GetXP() or nil

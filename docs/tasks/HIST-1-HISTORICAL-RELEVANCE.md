@@ -1,6 +1,8 @@
 # HIST-1 — Historical/outleveled character value and relevance model
 
-**Status:** proposed; next design/prototype  
+**Status:** HIST-1A executed 2026-11-17; HIST-1B next  
+**Result:** `docs/HIST-1A-HISTORICAL-RELEVANCE-RESULT.md`  
+**Harness:** `tests/historical_relevance.lua`  
 **Depends on:** SC-4, SC-5, DS-17.4C, IMP-1B10  
 **Related:** heatmap, deaths, respawns, quests, account Knowledge
 

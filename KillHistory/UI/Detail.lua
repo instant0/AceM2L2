@@ -328,7 +328,41 @@ function XPTooltip:UpdateMobDetail(mobKey)
 
   local lines = {}
   lines[#lines + 1] = "Total kills: " .. FormatNumber(mob.kills or 0)
-  if blockFallback then
+  local historical = self:GetMobRelevance(mob, nil, self:GetPlayerLevel()) == "historical"
+  if historical then
+    local minLevel, maxLevel = self:GetMobLevelRange(mob)
+    if minLevel then
+      lines[#lines + 1] = "Mob level range: " .. tostring(minLevel)
+        .. "-" .. tostring(maxLevel or minLevel)
+    end
+    local topMap, topKills
+    for mapKey, kills in pairs(type(mob.killsByMap) == "table" and mob.killsByMap or {}) do
+      if not topKills or (tonumber(kills) or 0) > topKills then
+        topMap, topKills = mapKey, tonumber(kills) or 0
+      end
+    end
+    if topMap and topKills and topKills > 0 then
+      lines[#lines + 1] = "Top area: " .. self:GetMapName(topMap)
+        .. " (" .. FormatNumber(topKills) .. ")"
+    end
+    local levelMin, levelMax
+    for levelKey, kills in pairs(type(mob.killsAtLevel) == "table" and mob.killsAtLevel or {}) do
+      local level = tonumber(levelKey)
+      if level and (tonumber(kills) or 0) > 0 then
+        levelMin = levelMin and min(levelMin, level) or level
+        levelMax = levelMax and max(levelMax, level) or level
+      end
+    end
+    if levelMin then
+      lines[#lines + 1] = "Level range: " .. tostring(levelMin) .. "-" .. tostring(levelMax)
+    end
+    lines[#lines + 1] = "First seen: " .. FormatDate(mob.firstSeen)
+    lines[#lines + 1] = "Last seen: " .. FormatAgo(mob.lastSeen)
+    if blockFallback then
+      lines[#lines + 1] = "|cffaaaaaaBlock detail: session/XP context unavailable.|r"
+    end
+    lines[#lines + 1] = "|cffaaaaaaHistorical content: XP context hidden.|r"
+  elseif blockFallback then
     if tonumber(mob.mobLevelMin) and tonumber(mob.mobLevelMin) > 0 then
       lines[#lines + 1] = "Mob level range: " .. tostring(mob.mobLevelMin)
         .. "-" .. tostring(mob.mobLevelMax or mob.mobLevelMin)

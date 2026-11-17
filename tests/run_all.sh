@@ -107,6 +107,9 @@ echo "== Context cap =="
 echo "== Cap boundaries =="
 "$LUA_BIN" tests/cap_boundaries.lua forever
 
+echo "== Historical relevance =="
+"$LUA_BIN" tests/historical_relevance.lua forever
+
 echo "== Embedded library smoke test =="
 "$LUA_BIN" tests/libs_smoke.lua
 

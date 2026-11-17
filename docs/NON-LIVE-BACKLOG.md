@@ -43,9 +43,11 @@ client. Live-only residuals are in `docs/tasks/V-2-LIVE-VERIFICATION.md`.
 
 ## 3. Feature work
 
-- **HIST-1A — historical/outleveled tooltip and Detail.** Next. Use heatmap,
-  kill counts, deaths, rares, and journey anchors; hide stale XP.
-- **HIST-1B/1C** historical zone surfaces and bounded quest-anchor log.
+- **HIST-1A — historical/outleveled tooltip and Detail.** Done 2026-11-17.
+  `docs/HIST-1A-HISTORICAL-RELEVANCE-RESULT.md`.
+- **HIST-1B — historical zone surfaces.** Next. Use heatmap, kill counts,
+  deaths, rares, and journey anchors; hide stale XP.
+- **HIST-1C** bounded quest-anchor log.
 - **J-1..J-6** Journey overlay.
 - **M-1..M-6** cell inspector.
 - Tooltip danger, suggested zone, best heatmap part.

@@ -146,7 +146,7 @@ complete.** DS-1 is in
 DS-5 is in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`; DS-17.1 is in
 `docs/DS-17-1-AGGREGATION-DECISION.md`; DS-17.2, DS-17.3, DS-1-F2, DS-4P,
 DS-4P-F1, DS-4P-F2, DS-6, DS-7/DS-12, and DS-6-F1 are complete.
-Next non-live: HIST-1A (historical/outleveled tooltip and Detail). G-2 remains queued. V-2 is deferred to live-only residual checks.
+Next non-live: HIST-1B (historical zone surfaces). G-2 remains queued. V-2 is deferred to live-only residual checks.
 
 ### Phase 3 — storage design and prototypes
 
@@ -250,9 +250,10 @@ Run after DS-2/DS-3 measurements:
 
 Only after DS-11:
 
-1. **HIST-1 — Historical/outleveled character value.** Proposed. See
-   `docs/tasks/HIST-1-HISTORICAL-RELEVANCE.md`.
-   - HIST-1A relevance classifier + historical tooltip/Detail;
+1. **HIST-1 — Historical/outleveled character value.** HIST-1A done; HIST-1B
+   next. See `docs/tasks/HIST-1-HISTORICAL-RELEVANCE.md`.
+   - HIST-1A relevance classifier + historical tooltip/Detail. Done
+     2026-11-17. Result: `docs/HIST-1A-HISTORICAL-RELEVANCE-RESULT.md`;
    - HIST-1B historical zone surfaces;
    - HIST-1C bounded quest-anchor log;
    - HIST-1D account Knowledge integration later.
