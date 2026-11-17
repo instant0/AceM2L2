@@ -1,6 +1,8 @@
 # MEM-2 — Load/unload and eviction policy
 
-**Status:** task document, not implemented  
+**Status:** executed 2026-11-16  
+**Result:** `docs/MEM-2-LOAD-UNLOAD-RESULT.md`  
+**Harness:** `tests/mem_policy.lua`  
 **Priority:** high for long-lived characters and multiple alts  
 **Owner:** storage/UI owner with MEM-1 measurement  
 **Depends on:** MEM-1, DS-5, DS-15, DS-16, DS-17.3  
@@ -102,7 +104,7 @@ and release rules need one owner.
 ### Memory guardrails
 
 - Use MEM-1 real-client measurements.
-- Current samples: 3.2–3.85 MB with UI open, versus ATT ~51/65 MB and FLG ~48 MB.
+- Current samples: 3.2–3.85 MB with UI open, versus the ATT 51–686 MB reference range and FLG ~48 MB.
 - Do not impose an arbitrary MB target. DS-3B measured ~23 MB stable / 27–37 MB
   transient for the worst current-hot profile; that is acceptable relative to
   ATT unless live load/save/memory shows a real problem.

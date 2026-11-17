@@ -197,7 +197,7 @@ Document: `docs/tasks/DS-17-04D-ACCOUNT-KNOWLEDGE-PROTOTYPE.md`
 
 **G1. DS-11 — Decision record.** Done 2026-11-16.  
 Result: `docs/DS-11-DECISION-RECORD.md`  
-Next: IMP-1B5 tooltip/UI retirement, then V-2. IMP-1 slice, IMP-1A/B query, IMP-1B2/B3/B4, DS-14, and CAP-1 are complete.
+Next: V-2 live verification, then rollback retirement. IMP-1 slice, IMP-1A/B query, IMP-1B2/B3/B4/B5/B6/B7/B8/B9/B10/B12, DS-14, and CAP-1 are complete.
 
 ## 4. Dependencies
 

@@ -7,7 +7,6 @@ local AceM2L2 = AceM2L2
 local XPTooltip = AceM2L2.KillHistory
 local Util = XPTooltip.Util
 
-local MAX_MOBS = Util.MAX_MOBS
 local MAX_CONTEXTS_PER_MOB = Util.MAX_CONTEXTS_PER_MOB
 local CONTEXT_MAX_AGE = Util.CONTEXT_MAX_AGE
 local Now = Util.Now
@@ -305,7 +304,8 @@ function XPTooltip:Prune()
     end
   end
 
-  if mobCount > MAX_MOBS then
+  local mobLimit = self:GetMobCapacityLimit()
+  if mobCount > mobLimit then
     local removable = {}
     for mobKey, mob in pairs(db.mobs) do
       if type(mob) == "table" and (tonumber(mob.kills) or 0) <= 0 then
@@ -319,7 +319,7 @@ function XPTooltip:Prune()
       return a.seen < b.seen
     end)
     for _, entry in ipairs(removable) do
-      if mobCount <= MAX_MOBS then
+      if mobCount <= mobLimit then
         break
       end
       self:MarkMobDeleted(entry.key)
@@ -328,7 +328,7 @@ function XPTooltip:Prune()
     end
   end
 
-  if mobCount > MAX_MOBS then
+  if mobCount > mobLimit then
     local removable = {}
     for mobKey, mob in pairs(db.mobs) do
       if type(mob) == "table" then
@@ -342,7 +342,7 @@ function XPTooltip:Prune()
       return a.seen < b.seen
     end)
     for _, entry in ipairs(removable) do
-      if mobCount <= MAX_MOBS then
+      if mobCount <= mobLimit then
         break
       end
       self:MarkMobDeleted(entry.key)
@@ -398,6 +398,9 @@ function XPTooltip:Prune()
     end
   end
 
+  if self.InvalidateJourneyMobIndex then
+    self:InvalidateJourneyMobIndex()
+  end
   if self.ui and self.ui:IsShown() then
     self:RequestUIUpdate()
   end

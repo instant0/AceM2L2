@@ -364,6 +364,9 @@ function XPTooltip:AddKillXP(entry, info, totalXP, rawBase, buffedXP, skipObserv
   mob.sessionXP = (tonumber(mob.sessionXP) or 0) + totalXP
   mob.sessionXPKnown = true
   mob.lastSeen = Epoch()
+  if self.InvalidateJourneyMobIndex then
+    self:InvalidateJourneyMobIndex()
+  end
   if self.OnJourneyKillXP then
     self:OnJourneyKillXP(totalXP, info)
   end

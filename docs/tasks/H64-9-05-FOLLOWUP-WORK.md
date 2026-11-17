@@ -1,11 +1,12 @@
 # H64-9.5 — Follow-up work from the heatmap benchmark
 
-**Status:** follow-up tasks defined, not implemented  
+**Status:** F1/F2/F4/F5 executed 2026-11-16; F3/F6 remain defined  
 **Parent:** H64-9  
 **Source:** `docs/H64-9-BENCHMARK-REPORT.md`
 
 ## H64-9-F1 — Rescale path optimization
 
+**Status:** executed 2026-11-16 — `docs/H64-9-F1-F2-HEATMAP-RESULT.md`  
 **Priority:** high  
 **Evidence:** dense square rescale **6.4 ms**, dense 41-map rescale **11.6 ms**,
 versus **0.75–1.28 ms** incremental.  
@@ -34,6 +35,7 @@ Acceptance:
 
 ## H64-9-F2 — Disabled-state hide guard
 
+**Status:** executed 2026-11-16 — `docs/H64-9-F1-F2-HEATMAP-RESULT.md`  
 **Priority:** medium  
 **Evidence:** with collection disabled, every refresh still performs `Hide` on
 ~4,100 cells and costs ~0.6 ms.  
@@ -61,8 +63,9 @@ Acceptance:
 **Priority:** low / not justified by current real samples  
 **Evidence:** dense 4,096-cell profiles reach ~20 MB in the fixture process; the
 pool persists at 4,096 cells and is reused by later sparse zones.  
-**Reference context:** AllTheThings ~51 MB loaded / ~65 MB opened (several hundred
-MB on Midnight); ForeverLevelingGuide ~48 MB. Real 2.5.2 samples: Hunter 389 kills / 25 mobs, UI open = **3.2 MB**; Priest
+**Reference context:** AllTheThings ~51 MB loaded / ~65 MB opened in early
+samples, with a later **686 MB main-character report** (several hundred MB on
+Midnight); ForeverLevelingGuide ~48 MB. Real 2.5.2 samples: Hunter 389 kills / 25 mobs, UI open = **3.2 MB**; Priest
 762 kills / 85 mobs with the Silverpine heatmap open = **3.85 MB**. The 20 MB
 fixture figure is not a real-client budget.  
 **Why:** this may be acceptable in-game; measure real memory first (`MEM-1`),
@@ -87,6 +90,7 @@ Acceptance:
 
 ## H64-9-F4 — Zone-scoped/lazy normalization
 
+**Status:** executed 2026-11-16 — `docs/H64-9-F4-ZONE-NORMALIZATION-RESULT.md`  
 **Priority:** high for storage/load, separate from UI  
 **Evidence:** 40 dense maps normalize in **93 ms**; 41 maps in **91 ms**; one
 dense map is **2.2 ms**. Cost scales with dense map count, not kill count.
@@ -109,6 +113,7 @@ Acceptance:
 
 ## H64-9-F5 — Aspect ratio and occupied-mask follow-up
 
+**Status:** executed 2026-11-16 — `docs/H64-9-F5-ASPECT-OCCUPANCY-RESULT.md`  
 **Priority:** medium  
 **Evidence:** wide/tall profiles use only 1,024 of 4,096 cells; empty cells cost
 no storage but reduce effective resolution.  

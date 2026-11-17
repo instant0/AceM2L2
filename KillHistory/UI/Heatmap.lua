@@ -43,10 +43,11 @@ end
 
 local function ReadZones(module)
   local zones = {}
-  if type(module.GetHeatmapZones) ~= "function" then
+  local getter = module.GetHeatmapZoneIndex or module.GetHeatmapZones
+  if type(getter) ~= "function" then
     return zones
   end
-  local ok, result = pcall(module.GetHeatmapZones, module)
+  local ok, result = pcall(getter, module)
   if not ok or type(result) ~= "table" then
     return zones
   end
@@ -197,6 +198,13 @@ local function ApplyLegendGradient(heatmap, low, mid, high)
 end
 
 
+local function AddRenderOp(heatmap, key)
+  local ops = heatmap and heatmap.renderOps
+  if ops then
+    ops[key] = (ops[key] or 0) + 1
+  end
+end
+
 local function GetHeatCell(heatmap, index)
   local cell = heatmap.cells[index]
   if cell then
@@ -205,6 +213,7 @@ local function GetHeatCell(heatmap, index)
   cell = heatmap.grid:CreateTexture(nil, "ARTWORK")
   cell:SetColorTexture(0, 0, 0, 0)
   cell:Hide()
+  AddRenderOp(heatmap, "hide")
   heatmap.cells[index] = cell
   heatmap.cellCount = (heatmap.cellCount or 0) + 1
   return cell
@@ -213,6 +222,9 @@ end
 local function HideHeatCells(heatmap)
   for _, cell in pairs(heatmap.cells or {}) do
     if cell and cell.Hide then
+      if not cell.IsShown or cell:IsShown() then
+        AddRenderOp(heatmap, "hide")
+      end
       cell:Hide()
     end
   end
@@ -291,7 +303,8 @@ end
 -- offset tuple. This is the same key used by WorldMapOverlay overlays and keeps
 -- our generated data compact.
 local function OverlayKey(width, height, offsetX, offsetY)
-  return width * 2 ^ 39 + height * 2 ^ 26 + offsetX * 2 ^ 13 + offsetY
+  -- String keys avoid double-precision collisions for large map dimensions.
+  return string.format("%d:%d:%d:%d", width, height, offsetX, offsetY)
 end
 
 -- Blizzard's explored-map data is a set of overlay textures drawn above the
@@ -318,6 +331,7 @@ local function ReadExploredMapTextures(mapID)
 
   local result = {}
   local signature = {}
+  local seen = {}
   for index = 1, count do
     local info = overlays[index]
     if type(info) == "table" then
@@ -342,14 +356,16 @@ local function ReadExploredMapTextures(mapID)
         if width <= 0 or height <= 0 or textureCount <= 0 then
           return nil
         end
-        local firstTexture = textures[1]
-        local lastTexture = textures[textureCount]
         local drawOnTop = false
         local topOK, topValue = pcall(function()
           return info.isDrawOnTopLayer == true
         end)
         if topOK then
           drawOnTop = topValue
+        end
+        local textureParts = {}
+        for textureIndex = 1, textureCount do
+          textureParts[textureIndex] = TextureKey(textures[textureIndex])
         end
         return {
           width = width,
@@ -360,11 +376,13 @@ local function ReadExploredMapTextures(mapID)
           drawOnTop = drawOnTop,
           key = OverlayKey(width, height, offsetX, offsetY),
         }, string.format(
-          "%d:%d:%d:%d:%d:%s:%s", width, height, offsetX, offsetY,
-          textureCount, TextureKey(firstTexture), TextureKey(lastTexture)
+          "%d:%d:%d:%d:%d:%s", width, height, offsetX, offsetY,
+          textureCount, table.concat(textureParts, ",")
         )
       end)
-      if infoOK and type(normalized) == "table" then
+      if infoOK and type(normalized) == "table"
+        and not seen[normalizedSignature] then
+        seen[normalizedSignature] = true
         result[#result + 1] = normalized
         signature[#signature + 1] = normalizedSignature
       end
@@ -432,6 +450,7 @@ local function ReadStaticMapOverlays(mapID)
 
   local result = {}
   local signature = {}
+  local seen = {}
   for index = 1, #entries do
     local entry = entries[index]
     if type(entry) == "table" then
@@ -441,17 +460,22 @@ local function ReadStaticMapOverlays(mapID)
       local offsetY = tonumber(entry[4]) or 0
       local textures = ParseFileDataIDs(entry[5])
       if width > 0 and height > 0 and #textures > 0 then
-        result[#result + 1] = {
-          width = width,
-          height = height,
-          offsetX = offsetX,
-          offsetY = offsetY,
-          textures = textures,
-          key = OverlayKey(width, height, offsetX, offsetY),
-        }
-        signature[#signature + 1] = string.format(
-          "%d:%d:%d:%d:%d", width, height, offsetX, offsetY, #textures
+        local entrySignature = string.format(
+          "%d:%d:%d:%d:%s", width, height, offsetX, offsetY,
+          table.concat(textures, ",")
         )
+        if not seen[entrySignature] then
+          seen[entrySignature] = true
+          result[#result + 1] = {
+            width = width,
+            height = height,
+            offsetX = offsetX,
+            offsetY = offsetY,
+            textures = textures,
+            key = OverlayKey(width, height, offsetX, offsetY),
+          }
+          signature[#signature + 1] = entrySignature
+        end
       end
     end
   end
@@ -484,6 +508,25 @@ local function HideHeatmapArt(heatmap)
       tile:Hide()
     end
   end
+end
+
+function XPTooltip:ReleaseHeatmapUIResources()
+  local heatmap = self.ui and self.ui.heatmap
+  if not heatmap then return false end
+  HideHeatCells(heatmap)
+  HideHeatmapArt(heatmap)
+  heatmap.cells = {}
+  heatmap.artTiles = {}
+  heatmap.cellCount = 0
+  heatmap.renderedCounts = {}
+  heatmap.renderedZoneKey = nil
+  heatmap.renderedGeometryKey = nil
+  heatmap.renderedThemeKey = nil
+  heatmap.renderedMaximum = 0
+  heatmap.artKey = nil
+  heatmap.artReady = false
+  heatmap.disabledClean = false
+  return true
 end
 
 local function GetArtTile(heatmap, index, layerIndex, isOverlay)
@@ -814,6 +857,8 @@ function XPTooltip:CreateHeatmapPanel(frame)
     renderedGeometryKey = nil,
     renderedThemeKey = nil,
     renderedMaximum = 0,
+    renderOps = { geometry = 0, show = 0, hide = 0, color = 0 },
+    disabledClean = false,
     noData = noData,
     legend = legend,
     legendRange = legendRange,
@@ -843,6 +888,7 @@ function XPTooltip:RefreshHeatmap()
   if not panel then
     return
   end
+  heatmap.renderOps = { geometry = 0, show = 0, hide = 0, color = 0 }
 
   local theme = self:GetTheme()
   local settings = self:GetSettings()
@@ -850,19 +896,23 @@ function XPTooltip:RefreshHeatmap()
   local supported = SupportsMapPosition(self)
 
   if settings and settings.heatmapEnabled == false then
-    heatmap.noData:SetText("Heatmap collection is disabled. Enable it in Settings > Heatmap.")
-    heatmap.noData:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
-    heatmap.noData:Show()
-    heatmap.selector:Hide()
-    heatmap.grid:Hide()
-    heatmap.legend:Hide()
-    HideHeatCells(heatmap)
-    HideHeatmapArt(heatmap)
-    if heatmap.artCaption then
-      heatmap.artCaption:Hide()
+    if not heatmap.disabledClean then
+      heatmap.noData:SetText("Heatmap collection is disabled. Enable it in Settings > Heatmap.")
+      heatmap.noData:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
+      heatmap.noData:Show()
+      heatmap.selector:Hide()
+      heatmap.grid:Hide()
+      heatmap.legend:Hide()
+      HideHeatCells(heatmap)
+      HideHeatmapArt(heatmap)
+      if heatmap.artCaption then
+        heatmap.artCaption:Hide()
+      end
+      heatmap.disabledClean = true
     end
     return
   end
+  heatmap.disabledClean = false
 
   if #zones == 0 then
     heatmap.noData:SetText(supported and "No heatmap data" or "Heatmap unavailable on this client.")
@@ -921,12 +971,27 @@ function XPTooltip:RefreshHeatmap()
   end
   heatmap.legendDetail:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
 
-  local cellsData = type(selected.cells) == "table" and selected.cells or {}
+  local cellsData = type(selected.cells) == "table" and selected.cells or nil
+  if selected.journeySource and type(self.GetJourneyHeatmapCells) == "function" then
+    local ok, journeyCells = pcall(self.GetJourneyHeatmapCells, self, selected.mapID)
+    if ok and type(journeyCells) == "table" and next(journeyCells) ~= nil then
+      cellsData = journeyCells
+    end
+  end
+  if (not cellsData or next(cellsData) == nil)
+    and type(self.GetHeatmapZoneCells) == "function" then
+    local ok, legacyCells = pcall(self.GetHeatmapZoneCells, self, selected.mapID)
+    if ok and type(legacyCells) == "table" then
+      cellsData = legacyCells
+    end
+  end
+  cellsData = cellsData or {}
   local counts = {}
   local active = {}
   local maximum = 0
   for index = 1, GRID_CELLS do
-    local count = tonumber(cellsData[index]) or 0
+    local value = cellsData[index]
+    local count = type(value) == "table" and tonumber(value.kills) or tonumber(value) or 0
     if count ~= count or count < 0 then
       count = 0
     end
@@ -994,6 +1059,9 @@ function XPTooltip:RefreshHeatmap()
   if fullRebuild then
     for _, cell in pairs(heatmap.cells) do
       if cell and cell.Hide then
+        if not cell.IsShown or cell:IsShown() then
+          AddRenderOp(heatmap, "hide")
+        end
         cell:Hide()
       end
     end
@@ -1006,9 +1074,14 @@ function XPTooltip:RefreshHeatmap()
       cell:SetPoint("TOPLEFT", heatmap.grid, "TOPLEFT",
         offsetX + col * stride, -(offsetY + row * stride))
       cell:SetSize(cellSize, cellSize)
+      AddRenderOp(heatmap, "geometry")
       local heatColor = HeatColor(counts[index], denominator, intensity, warm, accent)
       Color(cell, heatColor, heatColor[4])
-      cell:Show()
+      AddRenderOp(heatmap, "color")
+      if not cell.IsShown or not cell:IsShown() then
+        cell:Show()
+        AddRenderOp(heatmap, "show")
+      end
       heatmap.renderedCounts[index] = counts[index]
     end
     heatmap.renderedZoneKey = zoneKey
@@ -1017,17 +1090,27 @@ function XPTooltip:RefreshHeatmap()
   else
     for _, index in ipairs(active) do
       local count = counts[index]
-      if rescale or heatmap.renderedCounts[index] ~= count then
-        local cell = GetHeatCell(heatmap, index)
-        local row = floor((index - 1) / GRID_SIZE)
-        local col = (index - 1) % GRID_SIZE
-        cell:ClearAllPoints()
-        cell:SetPoint("TOPLEFT", heatmap.grid, "TOPLEFT",
-          offsetX + col * stride, -(offsetY + row * stride))
-        cell:SetSize(cellSize, cellSize)
+      local rendered = heatmap.renderedCounts[index]
+      if rescale or rendered ~= count then
+        local cell = heatmap.cells[index]
+        local isNew = rendered == nil
+        if isNew or not cell then
+          cell = GetHeatCell(heatmap, index)
+          local row = floor((index - 1) / GRID_SIZE)
+          local col = (index - 1) % GRID_SIZE
+          cell:ClearAllPoints()
+          cell:SetPoint("TOPLEFT", heatmap.grid, "TOPLEFT",
+            offsetX + col * stride, -(offsetY + row * stride))
+          cell:SetSize(cellSize, cellSize)
+          AddRenderOp(heatmap, "geometry")
+          if not cell.IsShown or not cell:IsShown() then
+            cell:Show()
+            AddRenderOp(heatmap, "show")
+          end
+        end
         local heatColor = HeatColor(count, denominator, intensity, warm, accent)
         Color(cell, heatColor, heatColor[4])
-        cell:Show()
+        AddRenderOp(heatmap, "color")
         heatmap.renderedCounts[index] = count
       end
     end
@@ -1043,6 +1126,9 @@ function XPTooltip:RefreshHeatmap()
       for _, index in ipairs(stale) do
         local cell = heatmap.cells[index]
         if cell then
+          if not cell.IsShown or cell:IsShown() then
+            AddRenderOp(heatmap, "hide")
+          end
           cell:Hide()
         end
         heatmap.renderedCounts[index] = nil

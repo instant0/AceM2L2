@@ -1,42 +1,36 @@
 # Next task
 
-## IMP-1B5 — Tooltip/UI retirement and rollback
+## SC-5 — Migration, pruning, and cap tests
 
-**Status:** next; ready; IMP-1B4 save/guard complete  
-**Task document:** `docs/tasks/IMP-1B5-TOOLTIP-UI-RETIREMENT.md`  
-**Decision record:** `docs/DS-11-DECISION-RECORD.md`  
-**Inputs:** `docs/IMP-1B4-SAVE-GUARD-RESULT.md`,
-`docs/IMP-1B3-BLOCK-RETRIEVAL-RESULT.md`,
-`docs/IMP-1B2-JOURNEY-BLOCK-STORAGE-RESULT.md`,
-`docs/IMP-1B-JOURNEY-QUERY-RESULT.md`,
-`docs/DS-15-LAZY-RETRIEVAL-CACHE-RESULT.md`
+**Status:** next; non-live  
+**Task document:** `docs/tasks/SC-5-MIGRATION-PRUNING-TESTS.md`  
+**Related:** `docs/SC-4-CONTEXT-CAP-RESULT.md`
 
 ### Why this is next
 
-- Block storage/retrieval/backup/save-blocking work.
-- Tooltip/UI still read legacy data and duplicate blocks.
-- A controlled switchover and rollback is required.
+- Adaptive mob/quest limits, respawn 4,000, heatmap 64, and context 12 are now
+  selected.
+- The remaining work is making migration/pruning/downgrade behavior explicit and
+  tested.
+- This closes the limit work before V-2 and rollback retirement.
 
 ### Work
 
-1. Switch safe tooltip/UI reads to Journey/block queries.
-2. Keep legacy fallback during migration.
-3. Define retirement/rollback order.
-4. Remove duplication only after tests/backup.
-5. Preserve smoke/query/storage/save-guard tests.
-6. No account Knowledge/merge/UI redesign.
+1. Add boundary tests for every changed cap.
+2. Verify deterministic recency pruning.
+3. Verify normalization/idempotence.
+4. Document downgrade/reset behavior.
+5. Confirm cold top-8+other is documented as future schema readiness.
+6. Feed V-2.
 
 ### Output
 
-- tooltip/UI block-backed reads;
-- rollback/retirement evidence;
-- tests;
+- cap-boundary test suite;
+- migration/pruning/downgrade document;
 - V-2 handoff.
 
 ### Not required
 
-- account Knowledge/merge;
-- UI redesign;
-- LoadOnDemand companion;
-- live client test;
-- route recommendation.
+- live memory;
+- new UI;
+- account Knowledge/merge.

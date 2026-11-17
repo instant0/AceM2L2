@@ -1,6 +1,8 @@
 # UI-4 — Quest XP ledger view
 
-**Status:** ready; Forever-only; no storage schema change  
+**Status:** executed 2026-11-16; Forever-only; no storage schema change  
+**Result:** `docs/UI-4-QUEST-LEDGER-RESULT.md`  
+**Harness:** `tests/quest_ledger.lua`  
 **Depends on:** UI-1, DS-1  
 **Blocks:** none  
 **Related:** README claim review, `docs/README-CLAIM-REVIEW.md`

@@ -58,7 +58,8 @@ Recorded AceM2L2 samples are **3.2 MB** (389 kills/25 mobs) and **3.85 MB**
 (762 kills/85 mobs with the Silverpine heatmap open). Your ~3.7 MB figure is
 consistent with that range.
 
-AllTheThings was ~**51 MB loaded / 65 MB opened**, with several hundred MB on
+AllTheThings was ~**51 MB loaded / 65 MB opened** in early samples, with a later
+**686 MB main-character report**, and several hundred MB on
 Midnight. That is a different addon with a large static database and different
 features. It shows the client can carry large data, not that the current
 AceM2L2 caps are sufficient.
@@ -100,7 +101,7 @@ AceM2L2 caps are sufficient.
 
 The current capped, hot-only store is **not massive-ready**.
 
-- Current caps: 2,000 mobs, 40 heatmap zones, 100 instances, 12 contexts/mob.
+- Current hot caps: adaptive mobs (500/zone, min 2,000, max 12,000), 64 heatmap zones, 100 instances, 12 contexts/mob.
 - The actual 2k/40-dense/12-context profile is **8.69 MB compact / 9.94 MB
   client estimate**, with **23 MB stable / 27–37 MB transient Lua heap**.
 - That is a **current-cap** profile, not long-term. DS-3C: at 2h/day, 2,000 mobs
@@ -142,7 +143,7 @@ only.
 | Best storage representation | DS-4 done/revised; capacity doc done; DS-4P hybrid prototype required |
 | Retrieval and indexes | DS-1 consumer contract done; DS-1-F2 index is the safe first code task; DS-15 pending |
 | Capacity validation | DS-3B done: 8.69 MB compact / 9.94 MB client estimate / 23 MB stable / 27–37 MB transient heap for 2k/40/12 |
-| Long-term pressure | DS-3C done: 2h/day hits 2,000 mobs in ~3 months; rate buffer turns over in 2.4h |
+| Long-term pressure | DS-3C done: 2h/day hit the old 2,000-mob cap in ~3 months; move to cold blocks/adaptive retention before relying on the new 12,000 ceiling |
 | Hybrid prototype | DS-4P done: 100k mobs/200 zones/200 instances, 38.5 MB hot / 8.07 MB cold, selected-zone 3.7 ms, no full scan |
 | Hot index | DS-4P-F1/F2 done: numeric arrays + scoped name index; 7.73 MB hot + 5.97 MB shared at 100k |
 | Packed cold blocks | DS-7/DS-12 done: hybrid sparse/bitset cells, varint/delta, no inline names, per-block base64+checksum; 100k/4ctx 3.90 MB cold, 350k sub-blocks 13.22 MB / 2.55 ms |
@@ -202,7 +203,7 @@ only.
 There is **no fixed file-size or heap target**. DS-3B measured 8.69 MB compact /
 9.94 MB client estimate and 23 MB stable / 27–37 MB transient for the current
 2k/40/100 implementation profile. 23 MB stable is acceptable relative to ATT
-51–65 MB. Optimize the method, not an arbitrary MB number.
+51–686 MB reference range. Optimize the method, not an arbitrary MB number.
 
 ### 4. Packed cold tier
 

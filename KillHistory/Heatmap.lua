@@ -23,7 +23,7 @@ local HEATMAP_GRID_SIZE = 64
 local HEATMAP_CELLS = HEATMAP_GRID_SIZE * HEATMAP_GRID_SIZE
 local LEGACY_GRID_SIZE = 16
 local LEGACY_32_GRID_SIZE = 32
-local MAX_HEATMAP_MAPS = 40
+local MAX_HEATMAP_MAPS = 64
 local MAX_HEATMAP_COUNT = 1000000
 
 XPTooltip.HEATMAP_GRID_SIZE = HEATMAP_GRID_SIZE
@@ -264,6 +264,159 @@ end
 function XPTooltip:InvalidateHeatmapCache()
   self.heatmapGeneration = (self.heatmapGeneration or 0) + 1
   self.heatmapNormalizeCache = nil
+  self.heatmapZoneCache = nil
+end
+
+function XPTooltip:InvalidateHeatmapZoneCache()
+  local cache = self.heatmapZoneCache
+  if cache then
+    cache.map = {}
+    cache.order = {}
+  end
+end
+
+local function zoneCacheGet(cache, key)
+  local entry = cache and cache.map[key]
+  if not entry then return nil end
+  for index = 1, #cache.order do
+    if cache.order[index] == key then
+      table.remove(cache.order, index)
+      break
+    end
+  end
+  cache.order[#cache.order + 1] = key
+  return entry
+end
+
+local function zoneCachePut(cache, key, entry)
+  cache.map[key] = entry
+  cache.order[#cache.order + 1] = key
+  if #cache.order > (cache.capacity or 4) then
+    local evicted = table.remove(cache.order, 1)
+    cache.map[evicted] = nil
+    cache.evictions = (cache.evictions or 0) + 1
+  end
+end
+
+local function normalizeHeatmapZone(target, mapID)
+  local source = type(target.heatmaps) == "table" and target.heatmaps or {}
+  local merged = { mapID = mapID, cells = {}, lastSeen = 0 }
+  for key, value in pairs(source) do
+    if not IsSecret(key) and type(value) == "table"
+      and NormalizeMapID(key) == mapID then
+      MergeMapEntry(value, merged)
+    end
+  end
+  local total = 0
+  for _, count in pairs(merged.cells) do
+    total = total + (FiniteNumber(count) or 0)
+  end
+  if total <= 0 then return nil end
+  merged.key = tostring(mapID)
+  merged.total = total
+  merged.lastSeen = max(0, merged.lastSeen)
+  return merged
+end
+
+-- Metadata-only zone list for the UI. It does not upgrade or normalize cells.
+function XPTooltip:GetHeatmapZoneIndex()
+  if not IsHeatmapEnabled(self) then
+    return {}
+  end
+  local target = self.char
+  if type(target) ~= "table" then return {} end
+  local source = type(target.heatmaps) == "table" and target.heatmaps or {}
+  local zones, byMap = {}, {}
+  for key, value in pairs(source) do
+    if not IsSecret(key) and type(value) == "table" then
+      local mapID = NormalizeMapID(key)
+      if mapID and IsZoneMap(mapID) then
+        local mapKey = tostring(mapID)
+        local entry = byMap[mapKey]
+        if not entry then
+          entry = { mapID = mapID, key = mapKey, total = 0, lastSeen = 0,
+            gridSize = HEATMAP_GRID_SIZE, cells = nil }
+          byMap[mapKey] = entry
+          zones[#zones + 1] = entry
+        end
+        local total = FiniteNumber(value.total)
+        if not total or total <= 0 then
+          total = 0
+          for _, count in pairs(type(value.cells) == "table" and value.cells or {}) do
+            total = total + (FiniteNumber(count) or 0)
+          end
+        end
+        entry.total = entry.total + total
+        entry.lastSeen = max(entry.lastSeen, FiniteNumber(value.lastSeen) or 0)
+      end
+    end
+  end
+  if self:UseJourneyIndexViews() and type(self.GetJourneyHeatmapZones) == "function" then
+    local ok, journeyZones = pcall(self.GetJourneyHeatmapZones, self)
+    if ok and type(journeyZones) == "table" then
+      for _, journeyZone in ipairs(journeyZones) do
+        local mapID = tonumber(journeyZone.mapID)
+        if mapID then
+          local mapKey = tostring(mapID)
+          local entry = byMap[mapKey]
+          if entry then
+            entry.journeySource = true
+            entry.journeyKey = journeyZone.key
+          else
+            entry = {
+              mapID = mapID,
+              key = journeyZone.key,
+              total = tonumber(journeyZone.total) or 0,
+              lastSeen = tonumber(journeyZone.lastSeen) or 0,
+              gridSize = HEATMAP_GRID_SIZE,
+              cells = nil,
+              journeySource = true,
+              journeyKey = journeyZone.key,
+            }
+            byMap[mapKey] = entry
+            zones[#zones + 1] = entry
+          end
+        end
+      end
+    end
+  end
+  local filtered = {}
+  for index = 1, #zones do
+    if (tonumber(zones[index].total) or 0) > 0 then
+      filtered[#filtered + 1] = zones[index]
+    end
+  end
+  SortZones(filtered)
+  local result = {}
+  for index = 1, min(#filtered, MAX_HEATMAP_MAPS) do
+    result[index] = filtered[index]
+  end
+  return result
+end
+
+function XPTooltip:GetHeatmapZoneCells(mapID)
+  if not IsHeatmapEnabled(self) then return nil end
+  local id = NormalizeMapID(mapID)
+  if not id or not IsZoneMap(id) then return nil end
+  local target = self.char
+  if type(target) ~= "table" then return nil end
+  local generation = self.heatmapGeneration or 0
+  local cache = self.heatmapZoneCache
+  if not cache or cache.target ~= target or cache.generation ~= generation then
+    cache = {
+      target = target, generation = generation,
+      map = {}, order = {}, capacity = 4, evictions = 0,
+    }
+    self.heatmapZoneCache = cache
+  end
+  local key = tostring(id)
+  local cached = zoneCacheGet(cache, key)
+  if cached then return cached.cells, cached.total, cached.lastSeen, true end
+  local entry = normalizeHeatmapZone(target, id)
+  if not entry then return nil end
+  zoneCachePut(cache, key, entry)
+  self.heatmapZoneNormalizations = (self.heatmapZoneNormalizations or 0) + 1
+  return entry.cells, entry.total, entry.lastSeen
 end
 
 function XPTooltip:NormalizeHeatmaps(target)
@@ -357,11 +510,12 @@ function XPTooltip:GetHeatmapZones()
   end
   local heatmaps = self:NormalizeHeatmaps()
   local zones = {}
+  local byMap = {}
   for key, entry in pairs(heatmaps) do
     if type(entry) == "table" then
       local mapID = NormalizeMapID(key)
       if mapID and IsZoneMap(mapID) then
-        zones[#zones + 1] = {
+        local zone = {
           mapID = mapID,
           key = key,
           gridSize = entry.gridSize or HEATMAP_GRID_SIZE,
@@ -369,6 +523,38 @@ function XPTooltip:GetHeatmapZones()
           lastSeen = entry.lastSeen,
           cells = entry.cells,
         }
+        zones[#zones + 1] = zone
+        byMap[tostring(mapID)] = zone
+      end
+    end
+  end
+  if self:UseJourneyIndexViews() and type(self.GetJourneyHeatmapZones) == "function" then
+    local ok, journeyZones = pcall(self.GetJourneyHeatmapZones, self)
+    if ok and type(journeyZones) == "table" then
+      for _, journeyZone in ipairs(journeyZones) do
+        local mapID = tonumber(journeyZone.mapID)
+        if mapID then
+          local zone = byMap[tostring(mapID)]
+          if zone then
+            -- Keep legacy cells as a fallback; the selected-zone read tries
+            -- the Journey block first.
+            zone.journeySource = true
+            zone.journeyKey = journeyZone.key
+          else
+            zone = {
+              mapID = mapID,
+              key = journeyZone.key,
+              gridSize = journeyZone.gridSize or HEATMAP_GRID_SIZE,
+              total = journeyZone.total,
+              lastSeen = journeyZone.lastSeen,
+              cells = nil,
+              journeySource = true,
+              journeyKey = journeyZone.key,
+            }
+            zones[#zones + 1] = zone
+            byMap[tostring(mapID)] = zone
+          end
+        end
       end
     end
   end
@@ -458,6 +644,10 @@ function XPTooltip:RecordHeatmapKill(mapID, x, y)
       break
     end
     mapCount = mapCount - 1
+  end
+  self:InvalidateHeatmapZoneCache()
+  if self.MarkJourneyDirty then
+    self:MarkJourneyDirty({ mapID = id })
   end
 
   return true

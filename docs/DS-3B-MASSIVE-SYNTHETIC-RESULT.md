@@ -105,7 +105,7 @@ The important result is the Lua heap:
 - **~37 MB transient** in the fresh reload process before GC.
 
 That is far above the 3.85 MB small-store sample, but it is below AllTheThings’
-~51–65 MB. It is not a problem by itself and it is **not a target ceiling**. It
+the 51–686 MB ATT reference range. It is not a problem by itself and it is **not a target ceiling**. It
 is also **not a long-term state**: DS-3C shows the current caps are reached in
 months. The goal is the most efficient storage/retrieval method, not fitting a
 pre-set MB number. At 12 contexts and 40 dense zones, the measured current-cap
@@ -133,7 +133,7 @@ not kill count. A 24,000-kill profile and a 15,000-kill profile with the same
 - **File estimate corrected:** 8–10 MB for the 2k/40/24k/163k profile, not
   11–14 MB.
 - **Measured heap:** ~23 MB stable, 27–37 MB transient at 12 contexts.
-- **No fixed MB target.** 23 MB stable is acceptable relative to ATT 51–65 MB;
+- **No fixed MB target.** 23 MB stable is acceptable relative to the ATT 51–686 MB reference range;
   optimize only where measurements show a real cost.
 - **Not a long-term result.** See `docs/DS-3C-LONG-TERM-GROWTH.md`; 2h/day
   reaches the 2,000-mob cap in ~3 months and rate samples turn over in 2.4h.

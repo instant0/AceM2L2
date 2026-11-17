@@ -169,7 +169,7 @@ Solid but small:
 
 - 3.2 MB (389 kills/25 mobs);
 - 3.85 MB (762 kills/85 mobs, heatmap open);
-- ATT 51/65 MB; FLG 48 MB.
+- ATT 51–686 MB reference range (main-character report: **686 MB**); FLG 48 MB.
 
 Limits:
 
@@ -218,7 +218,7 @@ Limits:
 - no live client memory/timing.
 
 **Conclusion:** the current hot profile loads. Its measured heap is ~23 MB
-stable / 27–37 MB transient, which is acceptable relative to ATT 51–65 MB. There
+stable / 27–37 MB transient, which is acceptable relative to the ATT 51–686 MB reference range. There
 is no fixed MB target; optimize the method, not an arbitrary number. It is a
 current-cap profile, not a long-term state.
 
@@ -268,7 +268,7 @@ DS-3B was executed. It validated the current hot profile:
 - invariants and fresh-process reload pass;
 - no parser/constant-table failure.
 
-It also showed that 23 MB stable is acceptable relative to ATT 51–65 MB; there
+It also showed that 23 MB stable is acceptable relative to the ATT 51–686 MB reference range; there
 is no fixed MB target.
 
 ## Remaining validation
@@ -365,7 +365,57 @@ is no fixed MB target.
 - **IMP-1B4** save/guard is complete: block backup/restore, oversize
   save-blocking, reset path, foreign-event filtering. Result:
   `docs/IMP-1B4-SAVE-GUARD-RESULT.md`.
-- **IMP-1B5** is next: tooltip/UI retirement and rollback.
-- **MEM-2** remains the load/unload policy task.
+- **IMP-1B5** is complete: legacy-first tooltip (0 decode), cold block 1 decode, cache 0 additional, partial Detail, rollback flag. Result: `docs/IMP-1B5-TOOLTIP-FALLBACK-RESULT.md`.
+- **IMP-1B6** index core is complete: lazy global rows, key lookup, top/filter
+  queries, invalidation. Result: `docs/IMP-1B6-JOURNEY-MOB-INDEX-RESULT.md`.
+- **IMP-1B7** is complete: Mobs list and Overview top mobs use the index with
+  legacy parity and rollback; repeated refreshes reuse one build. Result:
+  `docs/IMP-1B7-MOBS-LIST-OVERVIEW-RESULT.md`.
+- **IMP-1B8** is complete: index-backed `kills`/`dump`, zero-kill dump parity,
+  deterministic tie-break, remaining-read inventory, rollback. Result:
+  `docs/IMP-1B8-LEGACY-READ-AUDIT-RESULT.md`.
+- **IMP-1B9** is complete: overlap-safe Areas/Levels rows, legacy-canonical
+  counts, separate Journey stats, reset consistency, rollback. Result:
+  `docs/IMP-1B9-AREAS-LEVELS-RESULT.md`.
+- **IMP-1B10** is complete: schema 2 zone blocks carry sparse heatmap cells;
+  selected-zone reads decode one block and cache; legacy fallback; no new flag.
+  Result: `docs/IMP-1B10-HEATMAP-BOUNDED-RESULT.md`.
+- **IMP-1B12** is complete: shared area/level summary helpers; Overview,
+  footer, minimap, Detail, and `PrintStats` switched. Result:
+  `docs/IMP-1B12-AREA-LEVEL-SUMMARIES-RESULT.md`.
+- **H64-9-F1/F2** are complete: rescale is color-only and repeated disabled
+  refreshes do no per-cell work. Result:
+  `docs/H64-9-F1-F2-HEATMAP-RESULT.md`.
+- **H64-9-F4** is complete: metadata-only zone index and selected-zone
+  normalization/cache; full normalizer retained for commands/tests. Result:
+  `docs/H64-9-F4-ZONE-NORMALIZATION-RESULT.md`.
+- **R-4** is complete: 50 duplicate overlay tuples removed, collision-safe
+  overlay keys, full texture signatures, dedupe tests. Result:
+  `docs/R-4-OVERLAY-ART-AUDIT-RESULT.md`.
+- **UI-3/UI-4** are complete: History tab and Quests ledger, both with explicit
+  unavailable states and no schema change.
+- **MEM-2** is complete: bounded block/heatmap caches, UI/transient cache
+  release, diagnostics, and tests. Result: `docs/MEM-2-LOAD-UNLOAD-RESULT.md`.
+- **IMP-1B11** preparation is complete: two-flag inventory, removal checklist,
+  and static inventory test; final removal after V-2. Result:
+  `docs/IMP-1B11-ROLLBACK-RETIREMENT-PREP.md`.
+- **H64-9-F5** is complete: real spans near-square, wide/tall synthetic cheaper;
+  keep 64×64, no occupied mask. Result:
+  `docs/H64-9-F5-ASPECT-OCCUPANCY-RESULT.md`.
+- **SC-1** is complete: real store is mob-heavy (70.4%), respawns 15%, heatmaps
+  3%, with 158 mobs / 1,993 kills / 385 heatmap cells. Result:
+  `docs/SC-1-REAL-STORE-MEASUREMENT-RESULT.md`.
+- **SC-2** is complete: 4× fits current caps for the measured shape; 6× only
+  exceeds the respawn-NPC cap and remains under 1 MB serialized. Result:
+  `docs/SC-2-SCALE-BENCHMARK-RESULT.md`.
+- **SC-3** is decided: accept 6×; adaptive quest cap by visited zones; respawn
+  cap 500; no blanket increases. Result: `docs/SC-3-TIER-DECISION-RESULT.md`.
+- **SC-6** is complete: cap-pressure assessment with hysteresis, Lua heap,
+  optional addon memory, cold-block bytes, and diagnostics. Result:
+  `docs/SC-6-CAPACITY-SELF-ASSESSMENT-RESULT.md`.
+- **SC-4** is decided: hot context cap 12; cold top-8 + `other` policy;
+  expired/oldest pruning tested. Result: `docs/SC-4-CONTEXT-CAP-RESULT.md`.
+- **SC-5** is next: migration/pruning/cap tests.
+- **V-2** is deferred to live-only residual checks.
 
-DS-1-F2, IMP-1A, IMP-1B query APIs, IMP-1B2 block storage, IMP-1B3 block retrieval, and IMP-1B4 save guard are production-code changes; the other storage/design tasks remain documentation/prototype-only.
+DS-1-F2, IMP-1A, IMP-1B query APIs, IMP-1B2 block storage, IMP-1B3 block retrieval, IMP-1B4 save guard, IMP-1B5 tooltip fallback, IMP-1B6 mob index, IMP-1B7 list/Overview switch, IMP-1B8 command switch, IMP-1B9 Areas/Levels parity, IMP-1B10 heatmap blocks, IMP-1B12 area/level summaries, H64-9-F1/F2 heatmap fixes, H64-9-F4 lazy normalization, R-4 overlay audit fixes, UI-3/UI-4 views, MEM-2 cache policy, and SC-6 capacity assessment are production-code changes; the other storage/design tasks remain documentation/prototype-only.

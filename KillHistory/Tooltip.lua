@@ -140,15 +140,51 @@ function XPTooltip:AddTooltipKillCount(tooltip, mob, playerLevel, settings)
     return false
   end
   local killsTotal = tonumber(mob and mob.kills) or 0
-  local killsAtLevel = 0
-  if mob and playerLevel and type(mob.killsAtLevel) == "table" then
-    killsAtLevel = tonumber(mob.killsAtLevel[tostring(playerLevel)]) or 0
+  local suffix = ""
+  if mob and type(mob.killsAtLevel) == "table" then
+    local killsAtLevel = tonumber(mob.killsAtLevel[tostring(playerLevel)]) or 0
+    suffix = " |cffaaaaaa(this level: " .. FormatNumber(killsAtLevel) .. ")|r"
   end
   tooltip:AddDoubleLine(
     "|cffaaaaaaKilled:|r",
-    "|cffffffff" .. FormatNumber(killsTotal) .. "|r |cffaaaaaa(this level: " .. FormatNumber(killsAtLevel) .. ")|r"
+    "|cffffffff" .. FormatNumber(killsTotal) .. "|r" .. suffix
   )
   return true
+end
+
+local function resolveTooltipMob(self, mobKey, name, npcID)
+  local legacy = self.char and self.char.mobs and self.char.mobs[mobKey]
+  if type(legacy) == "table" then
+    return legacy, false
+  end
+  local journey = self.char and self.char.journey
+  if journey and journey.blockReadFallback == false then
+    return nil, false
+  end
+  if type(self.GetJourneyMob) ~= "function" then
+    return nil, false
+  end
+  local mapID = self:GetMapID()
+  local zoneKey = mapID and mapID > 0 and ("map:" .. tostring(mapID)) or nil
+  local record = zoneKey and self:GetJourneyMob(mobKey, zoneKey) or nil
+  if not record then
+    record = self:GetJourneyMob(mobKey)
+  end
+  if type(record) ~= "table" then
+    return nil, false
+  end
+  return {
+    name = record.name or name,
+    npcID = record.npcID or npcID,
+    classification = record.classification,
+    kills = record.kills,
+    xp = nil,
+    contexts = nil,
+    killsAtLevel = nil,
+    mobLevelMin = record.mobLevelMin,
+    mobLevelMax = record.mobLevelMax,
+    journeyBlockFallback = true,
+  }, true
 end
 
 function XPTooltip:AddTooltipMobLevel(tooltip, level, settings)
@@ -201,7 +237,7 @@ function XPTooltip.AddTooltipLines(self, tooltip, data)
   local guid = SafeString(SafeCall(UnitGUID, unit))
   local npcID = guid and self:ParseNPCID(guid) or nil
   local mobKey = self:GetMobKey(name, npcID)
-  local mob = self.char and self.char.mobs and self.char.mobs[mobKey] or nil
+  local mob = resolveTooltipMob(self, mobKey, name, npcID)
   local playerLevel = self:GetPlayerLevel()
 
   local killsTotal = tonumber(mob and mob.kills) or 0

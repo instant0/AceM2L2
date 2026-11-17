@@ -50,7 +50,9 @@ This is the expected quest-XP separation.
 
 ## 3. Other queries
 
-- Legacy `db.areas` kills are merged into `GetJourneyZoneStats`.
+- **Revised in IMP-1B9:** `GetJourneyZoneStats` reports Journey kills and
+  `legacyKills` separately. They are not added, because both paths record the
+  same post-instrumentation kill.
 - Heatmap top cells support numeric cells and future table cells.
 - Mob summary returns name/npcID/kills/XP/zone refs.
 - Quest anchor returns `lastTurnInAt`, map, player level.
@@ -62,7 +64,7 @@ This is the expected quest-XP separation.
 
 - total vs kill-only best-zone ranking;
 - confidence from engaged time;
-- legacy zone kills merge;
+- Journey and legacy zone kills stay separate;
 - heatmap top cells/share;
 - mob summary;
 - quest anchor;

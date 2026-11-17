@@ -39,7 +39,7 @@ hits it within roughly 3 months. A 1-hour/day player may hit it in 6 months.
 | Deaths | 100 | Last 100 death locations. |
 | Respawn NPCs | 300 × 20 samples | Per character/client. |
 | Level records | 200 | Level-up records. |
-| Contexts | 12/mob | 24,000 at 2,000 mobs. |
+| Contexts | 12/mob | 24,000 at the old 2,000-mob cap; 144,000 at the new 12,000 ceiling. |
 
 The player observation is consistent: **rate samples at 87%** means the
 240-sample rolling buffer is close to turnover. Most other stores at ~20% today

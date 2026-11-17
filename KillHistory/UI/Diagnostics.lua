@@ -16,7 +16,7 @@ local FormatPercent = Util.FormatPercent
 local SafeCall = Util.SafeCall
 local SafeString = Util.SafeString
 
-local ROW_COUNT = 17
+local ROW_COUNT = 25
 local ROW_HEIGHT = 24
 local ESTIMATE_ENTRY_LIMIT = 200000
 
@@ -182,9 +182,13 @@ function XPTooltip:GetDataStats()
     instanceKills = instanceKills,
     contexts = contexts,
     calibrationEntries = calibrationEntries,
-    maxMobs = Util.MAX_MOBS or 0,
+    maxMobs = type(self.GetMobCapacityLimit) == "function"
+      and self:GetMobCapacityLimit() or (Util.MAX_MOBS or 0),
+    hardMaxMobs = Util.MAX_MOBS or 0,
     maxContexts = Util.MAX_CONTEXTS_PER_MOB or 0,
-    maxQuests = XPTooltip.MAX_QUESTS or 0,
+    maxQuests = type(self.GetQuestCapacityLimit) == "function"
+      and self:GetQuestCapacityLimit() or (XPTooltip.MAX_QUESTS or 0),
+    hardMaxQuests = XPTooltip.MAX_QUESTS or 0,
     maxLevelRecords = XPTooltip.MAX_LEVEL_RECORDS or 0,
     maxRateSamples = XPTooltip.MAX_RATE_SAMPLES or 0,
     maxDeaths = XPTooltip.MAX_DEATHS or 0,
@@ -201,6 +205,10 @@ function XPTooltip:GetDataStats()
     + stats.respawnNpcs + stats.heatmapZones + stats.levelRecords
     + stats.rateSamples + stats.instances
 
+  stats.cache = type(self.GetCacheStats) == "function"
+    and self:GetCacheStats() or {}
+  stats.capacity = type(self.GetCapacityAssessment) == "function"
+    and self:GetCapacityAssessment(stats) or {}
   local estimate = { entries = 0, seen = {}, truncated = false }
   stats.estimatedBytes = EstimateSize(db, estimate)
   stats.estimateTruncated = estimate.truncated
@@ -333,6 +341,35 @@ function XPTooltip:RefreshDiagnosticsUI()
     { "Heatmap cells", FormatNumber(stats.heatmapCells) },
     { "Heatmap collection", stats.heatmapEnabled and "On" or "Off" },
     { "Heatmap bytes", FormatBytes(stats.estimatedHeatmapBytes) },
+    {
+      "Block cache",
+      FormatNumber(stats.cache.blockZones or 0) .. " / "
+        .. FormatNumber(stats.cache.blockCapacity or 0)
+        .. "  (" .. FormatNumber(stats.cache.blockEvictions or 0) .. " evicted)",
+    },
+    {
+      "Heatmap cache",
+      FormatNumber(stats.cache.heatmapZones or 0) .. " / "
+        .. FormatNumber(stats.cache.heatmapCapacity or 0)
+        .. "  (" .. FormatNumber(stats.cache.heatmapEvictions or 0) .. " evicted)",
+    },
+    { "Normalize cache", FormatNumber(stats.cache.normalizeZones or 0) },
+    { "Overlay caches", FormatNumber(stats.cache.overlayCaches or 0) },
+    {
+      "UI cells / art",
+      FormatNumber(stats.cache.uiCells or 0) .. " / "
+        .. FormatNumber(stats.cache.uiArtTiles or 0),
+    },
+    {
+      "Capacity pressure",
+      tostring(stats.capacity.pressure or "low") .. " — "
+        .. tostring(stats.capacity.reason or "no active cap pressure"),
+    },
+    {
+      "Lua heap",
+      stats.capacity.luaHeapKB and FormatBytes(stats.capacity.luaHeapKB * 1024) or "unavailable",
+    },
+    { "Cold blocks", FormatBytes(stats.capacity.blockBytes or 0) },
     { "Instances", LimitText(stats.instances, stats.maxInstances) },
     { "Instance kills", FormatNumber(stats.instanceKills) },
     { "Level records", LimitText(stats.levelRecords, stats.maxLevelRecords) },

@@ -7,7 +7,6 @@ local AceM2L2 = AceM2L2
 local XPTooltip = AceM2L2.KillHistory
 local UI = XPTooltip.UI
 local Util = XPTooltip.Util
-local IsAttributableMapID = Util.IsAttributableMapID
 
 local floor, min, max = math.floor, math.min, math.max
 local CreateBackdropFrame = UI.CreateBackdropFrame
@@ -136,14 +135,7 @@ function XPTooltip:RefreshOverview()
   local session = tonumber(db.session.kills) or 0
   local unique = tonumber(db.totals.uniqueMobs) or 0
 
-  local topMap, topMapKills = nil, 0
-  for mapKey, kills in pairs(db.areas or {}) do
-    if (not IsAttributableMapID or IsAttributableMapID(mapKey))
-      and (tonumber(kills) or 0) > topMapKills then
-      topMapKills = tonumber(kills) or 0
-      topMap = mapKey
-    end
-  end
+  local _, _, topAreaLabel = self:GetTopAreaSummary()
 
   overview.cards[1].label:SetText("Total kills")
   overview.cards[1].value:SetText(FormatNumber(total))
@@ -152,21 +144,31 @@ function XPTooltip:RefreshOverview()
   overview.cards[3].label:SetText("Mobs tracked")
   overview.cards[3].value:SetText(FormatNumber(unique))
   overview.cards[4].label:SetText("Top area")
-  overview.cards[4].value:SetText(topMap and self:GetMapName(topMap) or "None")
+  overview.cards[4].value:SetText(topAreaLabel or "None")
 
-  local mobs = {}
-  for mobKey, mob in pairs(db.mobs or {}) do
-    if type(mob) == "table" and (tonumber(mob.kills) or 0) > 0 then
-      mobs[#mobs + 1] = { key = mobKey, mob = mob, kills = tonumber(mob.kills) or 0 }
-    end
-  end
-  table.sort(mobs, function(a, b) return a.kills > b.kills end)
   local lines = {}
-  for index = 1, min(#mobs, 8) do
-    local entry = mobs[index]
-    lines[#lines + 1] = string.format(
-      "%d. %s  -  %s kills", index, tostring(entry.mob.name or "Unknown"), FormatNumber(entry.kills)
-    )
+  if self:UseJourneyIndexViews() then
+    local entries = self:GetJourneyTopMobs(8)
+    for index = 1, #entries do
+      local entry = entries[index]
+      lines[#lines + 1] = string.format(
+        "%d. %s  -  %s kills", index, tostring(entry.name or "Unknown"), FormatNumber(entry.kills)
+      )
+    end
+  else
+    local mobs = {}
+    for mobKey, mob in pairs(db.mobs or {}) do
+      if type(mob) == "table" and (tonumber(mob.kills) or 0) > 0 then
+        mobs[#mobs + 1] = { key = mobKey, mob = mob, kills = tonumber(mob.kills) or 0 }
+      end
+    end
+    table.sort(mobs, function(a, b) return a.kills > b.kills end)
+    for index = 1, min(#mobs, 8) do
+      local entry = mobs[index]
+      lines[#lines + 1] = string.format(
+        "%d. %s  -  %s kills", index, tostring(entry.mob.name or "Unknown"), FormatNumber(entry.kills)
+      )
+    end
   end
   if #lines == 0 then
     local profile = self:GetClientProfile()
@@ -175,23 +177,7 @@ function XPTooltip:RefreshOverview()
   end
   overview.topMobsText:SetText(table.concat(lines, "\n"))
 
-  local minLevel, maxLevel, topLevel, topLevelKills
-  for levelKey, kills in pairs(db.levels or {}) do
-    local level = tonumber(levelKey)
-    local value = tonumber(kills) or 0
-    if level and value > 0 then
-      if not minLevel or level < minLevel then
-        minLevel = level
-      end
-      if not maxLevel or level > maxLevel then
-        maxLevel = level
-      end
-      if not topLevelKills or value > topLevelKills then
-        topLevelKills = value
-        topLevel = level
-      end
-    end
-  end
+  local minLevel, maxLevel, topLevel, topLevelKills = self:GetLevelSummary()
 
   local levelLines = {}
   if minLevel then

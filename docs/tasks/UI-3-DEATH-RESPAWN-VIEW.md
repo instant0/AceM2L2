@@ -1,6 +1,8 @@
 # UI-3 — Death and respawn history view
 
-**Status:** ready; no storage schema change  
+**Status:** executed 2026-11-16; no storage schema change  
+**Result:** `docs/UI-3-HISTORY-VIEW-RESULT.md`  
+**Harness:** `tests/history_view.lua`  
 **Depends on:** UI-1, DS-1  
 **Blocks:** none  
 **Related:** README claim review, `docs/README-CLAIM-REVIEW.md`

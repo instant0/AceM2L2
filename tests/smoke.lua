@@ -1355,7 +1355,9 @@ assert(mergedZones[1].lastSeen == 20,
 
 -- The normalized store keeps only the newest MAX_HEATMAP_MAPS zones.
 module:ResetHeatmaps()
-for mapID = 100, 140 do
+local firstHeatmapMap = 100
+local lastHeatmapMap = firstHeatmapMap + module.MAX_HEATMAP_MAPS
+for mapID = firstHeatmapMap, lastHeatmapMap do
   module.char.heatmaps[tostring(mapID)] = {
     gridSize = 64,
     cells = { [1] = 1 },
@@ -1371,7 +1373,8 @@ for _ in pairs(capped) do
 end
 assert(cappedCount == module.MAX_HEATMAP_MAPS,
   "heatmap map cap not enforced")
-assert(capped["100"] == nil and capped["140"] ~= nil,
+assert(capped[tostring(firstHeatmapMap)] == nil
+  and capped[tostring(lastHeatmapMap)] ~= nil,
   "heatmap map cap kept the wrong zones")
 
 -- Resetting the store must invalidate the normalized cache so a later kill
@@ -1685,8 +1688,10 @@ heatSettings.heatmapIntensity = 100
 module:RefreshHeatmap()
 
 local dataStats = module:GetDataStats()
-assert(type(dataStats) == "table" and dataStats.maxMobs == 2000
-  and dataStats.maxHeatmapZones == 40 and dataStats.estimatedBytes > 0,
+assert(type(dataStats) == "table"
+  and dataStats.maxMobs == module:GetMobCapacityLimit()
+  and dataStats.maxHeatmapZones == module.MAX_HEATMAP_MAPS
+  and dataStats.estimatedBytes > 0,
   "data diagnostics stats mismatch")
 assert(dataStats.heatmapZones >= 1 and type(dataStats.heatmapCells) == "number",
   "data diagnostics did not count heatmap storage")

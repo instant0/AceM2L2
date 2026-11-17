@@ -8,7 +8,7 @@ local AceM2L2 = AceM2L2
 local XPTooltip = AceM2L2.KillHistory
 local Util = XPTooltip.Util
 
-local STORAGE_SCHEMA = 1
+local STORAGE_SCHEMA = 2
 local CACHE_CAPACITY = 8
 local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local B64_INDEX = {}
@@ -149,12 +149,57 @@ local function buildMobZoneIndex(db)
   return index
 end
 
-local function encodeZone(zoneKey, records)
+local function buildHeatmapZoneIndex(db)
+  local index = {}
+  for mapKey, entry in pairs(db.heatmaps or {}) do
+    if type(entry) == "table" and type(entry.cells) == "table" then
+      local zoneKey = "map:" .. tostring(mapKey)
+      local cells = {}
+      local total = 0
+      for cell, value in pairs(entry.cells) do
+        local cellIndex = tonumber(cell) or 0
+        local kills = type(value) == "table" and tonumber(value.kills) or tonumber(value)
+        if cellIndex > 0 and kills and kills > 0 then
+          cells[cellIndex] = {
+            kills = kills,
+            xp = type(value) == "table" and tonumber(value.xp) or 0,
+            presenceSeconds = type(value) == "table" and tonumber(value.presenceSeconds) or 0,
+            engagedSeconds = type(value) == "table" and tonumber(value.engagedSeconds) or 0,
+          }
+          total = total + kills
+        end
+      end
+      if total > 0 then
+        index[zoneKey] = {
+          cells = cells,
+          total = total,
+          lastSeen = tonumber(entry.lastSeen) or 0,
+        }
+      end
+    end
+  end
+  return index
+end
+
+local function encodeZone(zoneKey, records, cellEntry)
   local parts = { varint(STORAGE_SCHEMA), varint(1) }
   writeString(parts, zoneKey)
   parts[#parts + 1] = varint(#records)
   for _, record in ipairs(records) do
     encodeMob(parts, record)
+  end
+  local cells = cellEntry and cellEntry.cells or {}
+  local cellKeys = {}
+  for cell in pairs(cells) do cellKeys[#cellKeys + 1] = cell end
+  table.sort(cellKeys)
+  parts[#parts + 1] = varint(#cellKeys)
+  for _, cell in ipairs(cellKeys) do
+    local value = cells[cell]
+    parts[#parts + 1] = varint(cell)
+    parts[#parts + 1] = varint(value.kills)
+    parts[#parts + 1] = varint(value.xp)
+    parts[#parts + 1] = varint(value.presenceSeconds)
+    parts[#parts + 1] = varint(value.engagedSeconds)
   end
   return table.concat(parts)
 end
@@ -171,8 +216,11 @@ function XPTooltip:EnsureJourneyStorage()
   journey.saveBlocked = journey.saveBlocked == true
   journey.oversizeSeen = journey.oversizeSeen == true
   journey.storageMode = journey.storageMode or "additive"
+  journey.blockReadFallback = journey.blockReadFallback ~= false
   if not self.journeyBlockCache then
-    self.journeyBlockCache = { map = {}, order = {}, capacity = CACHE_CAPACITY }
+    self.journeyBlockCache = {
+      map = {}, order = {}, capacity = CACHE_CAPACITY, evictions = 0,
+    }
   end
   if not self.journeyDecodedBlocks then self.journeyDecodedBlocks = 0 end
   return journey
@@ -211,6 +259,7 @@ local function cachePut(self, zoneKey, records)
   if #cache.order > cache.capacity then
     local evicted = table.remove(cache.order, 1)
     cache.map[evicted] = nil
+    cache.evictions = (cache.evictions or 0) + 1
   end
 end
 
@@ -219,7 +268,9 @@ local function decodeZone(text)
   local schema, kind
   schema, position = readVarint(text, position)
   kind, position = readVarint(text, position)
-  if schema ~= STORAGE_SCHEMA or kind ~= 1 then error("unsupported block") end
+  if (schema ~= 1 and schema ~= 2) or kind ~= 1 then
+    error("unsupported block")
+  end
   local zoneKey, count
   zoneKey, position = readString(text, position)
   count, position = readVarint(text, position)
@@ -241,7 +292,26 @@ local function decodeZone(text)
       mobLevelMin = minLevel, mobLevelMax = maxLevel,
     }
   end
-  return zoneKey, records
+  local cells = {}
+  if schema >= 2 then
+    local cellCount
+    cellCount, position = readVarint(text, position)
+    for _ = 1, cellCount do
+      local cell, kills, xp, presenceSeconds, engagedSeconds
+      cell, position = readVarint(text, position)
+      kills, position = readVarint(text, position)
+      xp, position = readVarint(text, position)
+      presenceSeconds, position = readVarint(text, position)
+      engagedSeconds, position = readVarint(text, position)
+      cells[cell] = {
+        kills = kills,
+        xp = xp,
+        presenceSeconds = presenceSeconds,
+        engagedSeconds = engagedSeconds,
+      }
+    end
+  end
+  return zoneKey, records, cells
 end
 
 function XPTooltip:FlushJourneyBlocks()
@@ -252,6 +322,7 @@ function XPTooltip:FlushJourneyBlocks()
     return false, "save_blocked"
   end
   local index = buildMobZoneIndex(db)
+  local heatmapIndex = buildHeatmapZoneIndex(db)
   -- Rebuild the compact mob -> zone-key index from the current source data.
   -- It is small (1-4 refs/mob) and avoids stale block references.
   journey.mobZones = {}
@@ -264,14 +335,26 @@ function XPTooltip:FlushJourneyBlocks()
   end
   local dirty = journey.dirtyZones
   local buildAll = next(journey.blocks) == nil
-  local keys = {}
+  local keys, seen = {}, {}
   if buildAll then
-    for zoneKey in pairs(index) do keys[#keys + 1] = zoneKey end
+    for zoneKey in pairs(index) do
+      if not seen[zoneKey] then seen[zoneKey] = true; keys[#keys + 1] = zoneKey end
+    end
+    for zoneKey in pairs(heatmapIndex) do
+      if not seen[zoneKey] then seen[zoneKey] = true; keys[#keys + 1] = zoneKey end
+    end
   else
-    for zoneKey in pairs(dirty) do keys[#keys + 1] = zoneKey end
+    for zoneKey in pairs(dirty) do
+      if not seen[zoneKey] then seen[zoneKey] = true; keys[#keys + 1] = zoneKey end
+    end
   end
   for _, zoneKey in ipairs(keys) do
-    local records = index[zoneKey]
+    local records = index[zoneKey] or {}
+    local cellEntry = heatmapIndex[zoneKey]
+    local cellCount = 0
+    if cellEntry then
+      for _ in pairs(cellEntry.cells) do cellCount = cellCount + 1 end
+    end
     local previousBlock = journey.blocks[zoneKey]
     if previousBlock then
       journey.blockBackup[zoneKey] = {
@@ -280,16 +363,23 @@ function XPTooltip:FlushJourneyBlocks()
         at = Epoch(),
       }
     end
-    if records and #records > 0 then
-      local raw = encodeZone(zoneKey, records)
+    if #records > 0 or cellCount > 0 then
+      local raw = encodeZone(zoneKey, records, cellEntry)
+      local sum = checksum(raw)
       journey.blocks[zoneKey] = {
         data = base64Encode(raw),
-        checksum = checksum(raw),
+        checksum = sum,
         count = #records,
+        cellCount = cellCount,
         updatedAt = Epoch(),
       }
       journey.blockIndex[zoneKey] = {
-        checksum = checksum(raw), count = #records, updatedAt = Epoch(),
+        checksum = sum,
+        count = #records,
+        cellCount = cellCount,
+        heatmapKills = cellEntry and cellEntry.total or 0,
+        lastSeen = cellEntry and cellEntry.lastSeen or 0,
+        updatedAt = Epoch(),
       }
     elseif journey.blocks[zoneKey] then
       journey.blocks[zoneKey] = nil
@@ -344,7 +434,7 @@ function XPTooltip:GetJourneySaveState()
   }
 end
 
-function XPTooltip:GetJourneyBlock(zoneKey)
+function XPTooltip:GetJourneyBlockData(zoneKey)
   local journey = self:EnsureJourneyStorage()
   if not journey then return nil, "no_journey" end
   local key = tostring(zoneKey or "")
@@ -354,23 +444,77 @@ function XPTooltip:GetJourneyBlock(zoneKey)
   if type(block) ~= "table" or type(block.data) ~= "string" then
     return nil, "missing"
   end
-  local ok, raw, decoded
-  ok, raw = pcall(base64Decode, block.data)
+  local ok, raw = pcall(base64Decode, block.data)
   if not ok or type(raw) ~= "string" then return nil, "decode" end
   if checksum(raw) ~= tonumber(block.checksum) then
     return nil, "checksum"
   end
-  ok, _, decoded = pcall(decodeZone, raw)
-  if not ok or type(decoded) ~= "table" then return nil, "format" end
+  local decodedOk, zoneKeyOut, records, cells = pcall(decodeZone, raw)
+  if not decodedOk or type(records) ~= "table" then return nil, "format" end
+  local entry = {
+    zoneKey = zoneKeyOut or key,
+    records = records,
+    cells = type(cells) == "table" and cells or {},
+  }
   self.journeyDecodedBlocks = (self.journeyDecodedBlocks or 0) + 1
-  cachePut(self, key, decoded)
-  return decoded
+  cachePut(self, key, entry)
+  return entry
+end
+
+function XPTooltip:GetJourneyBlock(zoneKey)
+  local entry, err = self:GetJourneyBlockData(zoneKey)
+  if not entry then return nil, err end
+  return entry.records, nil, entry.cells
 end
 
 function XPTooltip:GetJourneyBlockMob(zoneKey, mobKey)
   local records, err = self:GetJourneyBlock(zoneKey)
   if not records then return nil, err end
   return records[tostring(mobKey or "")], nil
+end
+
+function XPTooltip:GetJourneyHeatmapCells(mapID)
+  local key = tostring(mapID or "")
+  if key:sub(1, 4) ~= "map:" then
+    key = "map:" .. key
+  end
+  local entry, err = self:GetJourneyBlockData(key)
+  if not entry then return nil, err end
+  if next(entry.cells) == nil then return nil, "empty" end
+  local total = 0
+  for _, value in pairs(entry.cells) do
+    total = total + (tonumber(value.kills) or 0)
+  end
+  return entry.cells, total
+end
+
+function XPTooltip:GetJourneyHeatmapZones()
+  local journey = self:EnsureJourneyStorage()
+  if not journey then return {} end
+  local zones = {}
+  for zoneKey, meta in pairs(journey.blockIndex or {}) do
+    if type(zoneKey) == "string" and zoneKey:sub(1, 4) == "map:"
+      and type(meta) == "table" and (tonumber(meta.heatmapKills) or 0) > 0 then
+      local mapID = tonumber(zoneKey:sub(5))
+      if mapID then
+        zones[#zones + 1] = {
+          mapID = mapID,
+          key = zoneKey,
+          gridSize = tonumber(XPTooltip.HEATMAP_GRID_SIZE) or 64,
+          total = tonumber(meta.heatmapKills) or 0,
+          lastSeen = tonumber(meta.lastSeen) or 0,
+          cellCount = tonumber(meta.cellCount) or 0,
+          source = "journey",
+        }
+      end
+    end
+  end
+  table.sort(zones, function(a, b)
+    if a.lastSeen ~= b.lastSeen then return a.lastSeen > b.lastSeen end
+    if a.total ~= b.total then return a.total > b.total end
+    return a.mapID < b.mapID
+  end)
+  return zones
 end
 
 function XPTooltip:GetJourneyMobZones(mobKey)

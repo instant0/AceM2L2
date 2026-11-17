@@ -7,7 +7,6 @@ local AceM2L2 = AceM2L2
 local XPTooltip = AceM2L2.KillHistory
 local UI = XPTooltip.UI
 local Util = XPTooltip.Util
-local IsAttributableMapID = Util.IsAttributableMapID
 
 local FormatNumber = Util.FormatNumber
 local FormatAgo = Util.FormatAgo
@@ -111,17 +110,10 @@ function XPTooltip:OnMinimapTooltip(tooltip)
         .. "   Session: " .. FormatNumber(db.session.kills or 0),
       theme.muted[1], theme.muted[2], theme.muted[3]
     )
-    local topMap, topKills = nil, 0
-    for mapKey, kills in pairs(db.areas or {}) do
-      if (not IsAttributableMapID or IsAttributableMapID(mapKey))
-        and (tonumber(kills) or 0) > topKills then
-        topKills = tonumber(kills) or 0
-        topMap = mapKey
-      end
-    end
-    if topMap then
+    local topKills, _, topAreaLabel = self:GetTopAreaSummary()
+    if topAreaLabel then
       tooltip:AddLine(
-        "Top area: " .. self:GetMapName(topMap) .. " (" .. FormatNumber(topKills) .. ")",
+        "Top area: " .. topAreaLabel .. " (" .. FormatNumber(topKills) .. ")",
         theme.muted[1], theme.muted[2], theme.muted[3]
       )
     end

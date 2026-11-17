@@ -1,6 +1,6 @@
 # README claim review
 
-**Status:** reviewed/edited 2026-11-15  
+**Status:** reviewed/edited 2026-11-15; UI-3/UI-4 implemented 2026-11-16  
 **File reviewed:** `README.txt`  
 **Question:** does the README claim features that are not actually in the addon?
 
@@ -14,8 +14,8 @@ and follow-up UI tasks were created.
 
 | Claim | Actual state | Action |
 |---|---|---|
-| “Quest XP ledger (Forever)” under Kill Story window | Data and `/acem2l2 xpt quests` exist; Overview shows only the summary. No ledger panel in the window. | README now says summary + command; **UI-4** task |
-| “Death locations, respawn intervals” under Kill Story window | Both exist via `/acem2l2 xpt deaths` and `/acem2l2 xpt respawns`. No window view. | README now says commands; **UI-3** task |
+| “Quest XP ledger (Forever)” under Kill Story window | Data, `/acem2l2 xpt quests`, and the Quests tab now exist; Overview also shows the summary. | **UI-4 done**; README restored the window claim. |
+| “Death locations, respawn intervals” under Kill Story window | Both exist via `/acem2l2 xpt deaths`, `/acem2l2 xpt respawns`, and the History tab. | **UI-3 done**; README restored the window claim. |
 | “Kill history by … session” | Current-session totals exist; there is no session-history list. | README now says “current-session totals” |
 | “Full zone art” | Map art where the client/generated data provides it; not a guarantee for every zone. | README now says “Zone-map art where … available” |
 | XP, kills-to-level, reputation repeats | Implemented in core/chat | No change |
@@ -32,8 +32,8 @@ and follow-up UI tasks were created.
 
 ## Edits made to README.txt
 
-- Quest ledger → summary plus command.
-- Death/respawn → commands, not window.
+- Quest ledger → Quests tab plus command.
+- Death/respawn → History tab plus commands.
 - Session history → current-session totals.
 - “Full zone art” → “Zone-map art where available.”
 - Added a live-unverified caveat for gear comparison, Midnight dungeon/death

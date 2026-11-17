@@ -9,7 +9,7 @@ local Util = XPTooltip.Util
 
 local floor = math.floor
 
-local MAX_MOBS = 2000
+local MAX_MOBS = 12000
 local CALIBRATION_VERSION = 2
 local MAX_CONTEXTS_PER_MOB = 12
 local MAX_PENDING_DEATHS = 50

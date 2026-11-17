@@ -54,6 +54,8 @@ The TOC intentionally lists both interface versions:
 
 Both clients share the non-XP history: kill counts, heatmap, death locations,
 respawn intervals, leveling goals, level splits, dungeon activity, and economy.
+Deaths and respawns are visible in the History tab and remain available through
+`/acem2l2 xpt deaths` and `/acem2l2 xpt respawns`.
 The XP layer is still client-specific:
 
 | Capability | Forever | Midnight |
@@ -108,16 +110,18 @@ model. Client-specific policy lives only in `KillHistory/Client.lua` and
   The Cozy Sleeping Bag uses the same Well-Rested aura; Camp Tent `1307230`
   tops up the rested pool and is shown through the rested line.
 - Per-character tracking by mob, player level, and area.
-- Quest XP ledger with totals, per-quest rewards, `/xpt quests`, and an Overview
-  summary; quest XP never enters the kill average.
+- Quest XP ledger with totals, per-quest rewards, `/xpt quests`, a Quests tab,
+  and an Overview summary; quest XP never enters the kill average.
 - Leveling history with per-level duration, XP, and kills, shown in the Overview
   and with `/xpt history [level]`.
 - XP/hour, XP/minute, and time-to-level from measured gains.
 - Dungeon XP, leveling goals, and level-time splits.
 - Session loot value, gold/hour, and gear-upgrade notifications.
 - Death locations, respawn intervals, and grinding-spot recommendations.
-- Overview, Mobs, Areas, Heatmap, and Levels tabs. The Heatmap tab can be
-  hidden independently of collection, and collection can be disabled entirely.
+- Overview, Mobs, Areas, Heatmap, Levels, Quests, and History tabs. The Quests
+  tab is a Forever-only XP ledger; the History tab combines recent deaths and
+  respawn intervals with search and sort controls. The Heatmap tab can be hidden
+  independently of collection, and collection can be disabled entirely.
 - Per-zone 64x64 kill heatmap with tiled zone-map art and full generated map
   overlays beneath the grid; empty cells stay hidden so the map remains visible.
   Cells use a multi-stop gradient (theme accent -> gold -> red) so the busiest
@@ -136,10 +140,12 @@ model. Client-specific policy lives only in `KillHistory/Client.lua` and
 **Midnight 12.1.5 — counts-focused mode**
 
 - Tracks kills by mob, player level, area, and session.
-- Shows the same Overview, Mobs, Areas, Heatmap, and Levels tabs, the mob list,
-  and the 3D model or fallback.
+- Shows the same Overview, Mobs, Areas, Heatmap, Levels, Quests, and History
+  tabs, the mob list, and the 3D model or fallback. The Quests tab shows an
+  explicit unsupported state where quest XP is unavailable.
 - Tracks dungeon kills, leveling goals, duration/kill splits, loot, gold,
-  death locations, respawns, and zone heatmaps without XP claims.
+  death locations, respawns, and zone heatmaps without XP claims. The History tab
+  shows deaths and respawn intervals.
 - Tooltips show the kill-count line and target level only; no XP, percent,
   kills-to-level, or XP-bonus claims.
 - Optional level text above nameplates. It is Midnight-only and off by default;
@@ -333,6 +339,11 @@ Storage schema: `2`
 Per-client data schema: `1`  
 Calibration schema: `2`
 
+The per-client data schema stays `1`: 64×64 heatmaps are identified by their
+stored `gridSize`, so no schema bump is required. A pre-2.2.0 32×32 heatmap
+without `gridSize` and with all cell indices `<= 256` is inferred as 16×16;
+totals are preserved, but that narrow legacy case has coarser geometry.
+
 ## Generated Map Overlays
 
 `KillHistory/MapOverlayData.lua` is generated from the official client
@@ -464,10 +475,15 @@ frame. It shows:
 - an approximate store size from a bounded recursive estimate, not a
   SavedVariables file-size API.
 
-The 2000-mob cap is per character and per project/client, across all zones. A
-zone with 500 tracked mobs uses 25% of that character's mob budget. Quests and
-deaths are separate stores; heatmaps are also separate and capped by zone count,
-not by the mob cap.
+The adaptive mob limit is per character and per project/client, across all
+zones, not per zone. A zone with 500 tracked mobs consumes 500 of the current
+zone-derived budget. The cap counts **distinct mob identities**, not kills or XP
+samples: a level 15-18 mob isolated to one zone is one record, with kills,
+killsAtLevel, killsByMap, and XP samples aggregated inside it. More kills
+improve that record's confidence; they do not create more mob entries. The cap
+is a hot-table/scan guard, not a statistical-sample requirement or a total
+history limit. Quests and deaths are separate stores; heatmaps are also separate
+and capped by zone count, not by the mob cap.
 
 ## Project Layout
 
@@ -664,11 +680,13 @@ Bindings.lua, Libs, `README.txt`, or `LICENSE`).
 - Downgrading after recording 64x64 heatmap data is not supported; older builds
   may ignore or drop those cells.
 - Area and level rows are derived views; deletion is offered only for mob rows.
-- Per-client caps: 2000 mobs, 200 quests, 200 `levelHistory` records, 240 rate
-  samples, 100 deaths, 300 respawn NPCs (20 intervals each), 40 heatmap zones
-  (64x64 cells each), 100 instance records, 20 instance keys per mob, and 12
-  calibration contexts per mob (pruned after 120 days). Older entries are pruned by recency. These are fixed engineering safety
-  caps, not values derived from measured usage; a 2-6x scope review is tracked in
+- Per-client caps: adaptive mob limit of 500 per visited area/instance, minimum 2,000, hard ceiling 12,000; adaptive quest limit of 100 per visited
+  area/instance, minimum 500, hard ceiling 10,000; 200 `levelHistory` records,
+  240 rate samples, 100 deaths, 4,000 respawn NPCs (20 intervals each), 64
+  heatmap zones (64x64 cells each), 100 instance records, 20 instance keys per
+  mob, and 12 calibration contexts per mob (pruned after 120 days). Older
+  entries are pruned by recency. These are hot-retention safety caps, not total
+  history limits; cold Journey blocks and the capacity review are tracked in
   `PLAN.md`.
 - The mob cap is global for the character/client, not per zone. Quests are
   unique quest-ledger entries; deaths are the last 100 death locations; heatmap

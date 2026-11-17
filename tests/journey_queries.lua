@@ -54,8 +54,20 @@ assert(total[1].confidence == "medium", "confidence from engaged time")
 db.areas = db.areas or {}
 db.areas["12"] = 10
 local zone = module:GetJourneyZoneStats("12")
-assert(zone.kills == 15, "legacy zone kills merged")
+assert(zone.kills == 5, "journey zone kills must not be added to legacy kills")
+assert(zone.legacyKills == 10, "legacy zone kills not reported")
 assert(zone.questXP == 200000, "zone quest XP")
+db.journey.levels = {
+  ["20"] = {
+    kills = 9, killXP = 10000, questXP = 0, otherXP = 0, xp = 10000,
+    presenceSeconds = 600, engagedSeconds = 600, deaths = 0,
+  },
+}
+db.levels = db.levels or {}
+db.levels["20"] = 20
+local level = module:GetJourneyLevelStats(20)
+assert(level.kills == 9, "journey level kills")
+assert(level.legacyKills == 20, "legacy level kills not reported")
 
 db.heatmaps = db.heatmaps or {}
 db.heatmaps["12"] = { cells = { [1] = 10, [2] = 30, [3] = 20 } }

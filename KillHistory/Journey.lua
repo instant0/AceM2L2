@@ -227,6 +227,9 @@ function XPTooltip:OnJourneyKill(info, totalXP)
   if self.MarkJourneyDirty then
     self:MarkJourneyDirty(info)
   end
+  if self.InvalidateJourneyMobIndex then
+    self:InvalidateJourneyMobIndex()
+  end
 end
 
 function XPTooltip:OnJourneyKillXP(totalXP, info)
@@ -261,12 +264,28 @@ function XPTooltip:OnJourneyQuestTurnIn(questID, questName, xpReward)
   if self.MarkJourneyDirty then
     self:MarkJourneyDirty({ mapID = mapID })
   end
+  if self.InvalidateJourneyMobIndex then
+    self:InvalidateJourneyMobIndex()
+  end
   local key = questID and ("quest:" .. tostring(questID)) or "quest:unknown"
   local quest = self.char and self.char.quests and self.char.quests[key]
   if type(quest) == "table" then
     quest.lastTurnInAt = now
     quest.mapID = mapID
     quest.playerLevel = level
+  end
+end
+
+function XPTooltip:ResetJourneyData()
+  if self.char then
+    self.char.journey = nil
+  end
+  if self.ClearJourneyBlockCache then
+    self:ClearJourneyBlockCache()
+  end
+  self.journeyMobIndex = nil
+  if self.InvalidateJourneyMobIndex then
+    self:InvalidateJourneyMobIndex()
   end
 end
 

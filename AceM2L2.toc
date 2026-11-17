@@ -31,6 +31,7 @@ KillHistory/Data.lua
 KillHistory/Journey.lua
 KillHistory/JourneyQueries.lua
 KillHistory/JourneyStorage.lua
+KillHistory/JourneyIndex.lua
 KillHistory/Calibration.lua
 KillHistory/Tracking.lua
 KillHistory/World.lua

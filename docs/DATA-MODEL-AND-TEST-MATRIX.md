@@ -562,6 +562,99 @@ Result: `docs/IMP-1B4-SAVE-GUARD-RESULT.md`
 | Recovery | explicit reset resumes saving |
 | Tests | `tests/journey_save_guard.lua`; run_all passes |
 
+## 6q. IMP-1B5 tooltip fallback result
+
+Result: `docs/IMP-1B5-TOOLTIP-FALLBACK-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Legacy tooltip | 0 block decodes; full detail |
+| Cold block tooltip | 1 decode; total kills only; no fake this-level |
+| Cache hit | 0 additional decodes |
+| Detail fallback | partial; explicit block note |
+| Rollback | flag disables block fallback |
+| Lists/overview | still legacy; need global mob index |
+
+## 6r. IMP-1B6 mob index result
+
+Result: `docs/IMP-1B6-JOURNEY-MOB-INDEX-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Index | lazy global rows + key lookup |
+| Invalidation | kill/quest/EnsureDB |
+| Queries | rows, row, count, top, filter/search |
+| Test | count/top/elite/session/search/rebuild |
+| Remaining | Mobs list/Overview switch; Areas/Levels/commands/heatmap still legacy |
+
+## 6s. IMP-1B7 list/Overview switch result
+
+Result: `docs/IMP-1B7-MOBS-LIST-OVERVIEW-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Rollout flag | `journey.indexViews`; false restores legacy |
+| Mobs list | index rows/filters with legacy parity |
+| Overview | top 8 from index with legacy parity |
+| Rebuild budget | one build per invalidation; repeated refreshes reuse |
+| Invalidation | central mob invalidation + late XP + prune |
+| Test | 7 filter/sort/search parity cases, overview parity, rollback |
+| Remaining | Areas/Levels/commands/heatmap still legacy |
+
+## 6t. IMP-1B8 command switch result
+
+Result: `docs/IMP-1B8-LEGACY-READ-AUDIT-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| `kills` | index-backed with filter/empty parity |
+| `dump` | all-rows index, including zero-kill mobs |
+| Ordering | deterministic kills/key tie-break |
+| Rebuild budget | one build for repeated commands |
+| Rollback | flag returns to legacy scans |
+| Remaining | Areas/Levels need parity; heatmap needs bounded query |
+
+## 6u. IMP-1B9 Areas/Levels parity result
+
+Result: `docs/IMP-1B9-AREAS-LEVELS-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Parity model | legacy counts canonical; Journey stats separate |
+| Query APIs | `GetAreaRows`, `GetLevelRows` |
+| Zone/level stats | no additive merge; `legacyKills` separate |
+| Switched | Areas/Levels list and `areas`/`levels` commands |
+| Reset | Journey data, blocks, and mob index cleared |
+| Rollback | existing `journey.indexViews` |
+| Remaining | Overview/footer/minimap/Detail area-level; heatmap |
+
+## 6v. IMP-1B10 heatmap block result
+
+Result: `docs/IMP-1B10-HEATMAP-BOUNDED-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Block schema | 2; sparse cells after mob records |
+| Compatibility | schema 1 decodes with empty cells |
+| Zone list | blockIndex metadata; 0 decodes |
+| Selected cells | one block decode, cached |
+| UI | selected zone only; legacy fallback |
+| Rollback | existing `journey.indexViews`; no new flag |
+| Remaining | old blocks upgrade lazily; area/level summary reads |
+
+## 6w. IMP-1B12 area/level summaries result
+
+Result: `docs/IMP-1B12-AREA-LEVEL-SUMMARIES-RESULT.md`
+
+| Finding | Result |
+|---|---|
+| Helpers | top area, level summary, area/level kill count |
+| Switched | Overview, footer, minimap, Detail, `PrintStats` |
+| Mob field scans | Journey all-rows index |
+| Rollback | existing `journey.indexViews`; no new flag |
+| Remaining | intentional rollback/capture/normalization reads |
+| Next | V-2 live verification |
+
 ## 7. Required tests
 
 ### Tier 1 — model and schema (offline, now)

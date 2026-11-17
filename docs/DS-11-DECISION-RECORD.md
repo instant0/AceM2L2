@@ -154,7 +154,16 @@ character SavedVariables. No raw Journey is copied to the account.
    **IMP-1B2 — Production block storage core.** Done 2026-11-16.
    **IMP-1B3 — Block retrieval integration.** Done 2026-11-16.
    **IMP-1B4 — Block backup/save guard.** Done 2026-11-16.
-   **IMP-1B5 — Tooltip/UI retirement.** Next.
+   **IMP-1B5 — Tooltip/Detail block fallback.** Done 2026-11-16.
+   **IMP-1B6 — Journey mob index core.** Done 2026-11-16.
+   **IMP-1B7 — Mobs list/Overview switch.** Done 2026-11-16.
+   **IMP-1B8 — Remaining legacy read audit and safe command switch.** Done
+   2026-11-16.
+   **IMP-1B9 — Areas/Levels parity and switch.** Done 2026-11-16.
+   **IMP-1B10 — Heatmap UI bounded query.** Done 2026-11-16.
+   **IMP-1B12 — Remaining area/level summaries.** Done 2026-11-16.
+   **V-2 — Live API/data and SavedVariables verification.** Next.
+   **IMP-1B11 — Rollback retirement.** After V-2.
    - v2 schema in production code;
    - dirty-block save;
    - selected-block decode;
@@ -173,6 +182,10 @@ character SavedVariables. No raw Journey is copied to the account.
 6. **DS-17.4D — account Knowledge prototype** when alt features are scheduled.
 
 ## 6. V-2 checklist
+
+V-2 is now limited to live-environment residuals. Codec, cache, parity,
+save-guard, and reset behavior are already covered by offline tests and
+benchmarks.
 
 - Killer attribution for player deaths.
 - Player health before/after and time-to-kill.

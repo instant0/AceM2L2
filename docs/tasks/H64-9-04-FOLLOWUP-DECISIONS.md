@@ -26,8 +26,8 @@ Use the measured report to answer each gate.
 ### Gate 3 — Memory/cell count
 
 - Use `MEM-1` real-client memory first.
-- AllTheThings is ~51 MB loaded / ~65 MB opened (~several hundred MB on
-  Midnight); ForeverLevelingGuide is ~48 MB. Real 2.5.2 samples: Hunter 389 kills / 25 mobs, UI open = **3.2 MB**; Priest
+- AllTheThings is ~51 MB loaded / ~65 MB opened in early samples, with a later
+  **686 MB main-character report** (~several hundred MB on Midnight); ForeverLevelingGuide is ~48 MB. Real 2.5.2 samples: Hunter 389 kills / 25 mobs, UI open = **3.2 MB**; Priest
   762 kills / 85 mobs with heatmap open = **3.85 MB**. The 20 MB fixture process
   is not a real-client budget.
 - If the real client footprint is material, create a display-detail or cap

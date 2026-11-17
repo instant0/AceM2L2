@@ -202,15 +202,28 @@ function XPTooltip:PrintKills(filter)
   end
   local list = {}
   local lowerFilter = Lower(filter)
-  for mobKey, mob in pairs(db.mobs) do
-    if type(mob) == "table" and (tonumber(mob.kills) or 0) > 0 then
-      if not lowerFilter or lowerFilter == "" or (Lower(mob.name) or ""):find(lowerFilter, 1, true) then
-        list[#list + 1] = { key = mobKey, mob = mob }
+  if self:UseJourneyIndexViews() then
+    local rows = self:GetJourneyMobsForFilter(nil, filter)
+    for index = 1, #rows do
+      local row = rows[index]
+      list[#list + 1] = { key = row.key, mob = row.mob }
+    end
+  else
+    for mobKey, mob in pairs(db.mobs) do
+      if type(mob) == "table" and (tonumber(mob.kills) or 0) > 0 then
+        if not lowerFilter or lowerFilter == "" or (Lower(mob.name) or ""):find(lowerFilter, 1, true) then
+          list[#list + 1] = { key = mobKey, mob = mob }
+        end
       end
     end
   end
   table.sort(list, function(a, b)
-    return (tonumber(a.mob.kills) or 0) > (tonumber(b.mob.kills) or 0)
+    local ak = tonumber(a.mob.kills) or 0
+    local bk = tonumber(b.mob.kills) or 0
+    if ak == bk then
+      return tostring(a.key) < tostring(b.key)
+    end
+    return ak > bk
   end)
 
   if #list == 0 then
@@ -462,25 +475,46 @@ function XPTooltip:PrintAreas()
   end
   local total = tonumber(db.totals and db.totals.kills) or 0
   local list = {}
-  for mapKey, kills in pairs(db.areas or {}) do
-    if (not IsAttributableMapID or IsAttributableMapID(mapKey))
-      and (tonumber(kills) or 0) > 0 then
+  if self:UseJourneyIndexViews() then
+    local rows = self:GetAreaRows()
+    for index = 1, #rows do
+      local row = rows[index]
       list[#list + 1] = {
-        mapID = mapKey, kills = tonumber(kills) or 0,
-        label = self:GetMapName(mapKey),
+        key = row.key,
+        mapID = row.mapID,
+        instanceKey = row.instanceKey,
+        kills = row.kills,
+        label = row.label,
       }
     end
-  end
-  for instanceKey, instance in pairs(db.instances or {}) do
-    if type(instance) == "table" and (tonumber(instance.kills) or 0) > 0 then
-      list[#list + 1] = {
-        instanceKey = instanceKey,
-        kills = tonumber(instance.kills) or 0,
-        label = instance.name or "Unknown instance",
-      }
+  else
+    for mapKey, kills in pairs(db.areas or {}) do
+      if (not IsAttributableMapID or IsAttributableMapID(mapKey))
+        and (tonumber(kills) or 0) > 0 then
+        list[#list + 1] = {
+          key = tostring(mapKey),
+          mapID = mapKey, kills = tonumber(kills) or 0,
+          label = self:GetMapName(mapKey),
+        }
+      end
+    end
+    for instanceKey, instance in pairs(db.instances or {}) do
+      if type(instance) == "table" and (tonumber(instance.kills) or 0) > 0 then
+        list[#list + 1] = {
+          key = tostring(instanceKey),
+          instanceKey = instanceKey,
+          kills = tonumber(instance.kills) or 0,
+          label = instance.name or "Unknown instance",
+        }
+      end
     end
   end
-  table.sort(list, function(a, b) return a.kills > b.kills end)
+  table.sort(list, function(a, b)
+    if a.kills == b.kills then
+      return tostring(a.key) < tostring(b.key)
+    end
+    return a.kills > b.kills
+  end)
   if #list == 0 then
     AceM2L2:SafePrint("Kill Story: no area data yet.")
     return
@@ -502,9 +536,17 @@ function XPTooltip:PrintLevels()
   end
   local total = tonumber(db.totals and db.totals.kills) or 0
   local list = {}
-  for levelKey, kills in pairs(db.levels or {}) do
-    if (tonumber(kills) or 0) > 0 then
-      list[#list + 1] = { level = tonumber(levelKey) or 0, kills = tonumber(kills) or 0 }
+  if self:UseJourneyIndexViews() then
+    local rows = self:GetLevelRows()
+    for index = 1, #rows do
+      local row = rows[index]
+      list[#list + 1] = { level = row.level, kills = row.kills }
+    end
+  else
+    for levelKey, kills in pairs(db.levels or {}) do
+      if (tonumber(kills) or 0) > 0 then
+        list[#list + 1] = { level = tonumber(levelKey) or 0, kills = tonumber(kills) or 0 }
+      end
     end
   end
   table.sort(list, function(a, b) return a.level < b.level end)
@@ -674,31 +716,47 @@ function XPTooltip:PrintStats()
     return
   end
 
-  local mobCount = 0
-  for _, mob in pairs(db.mobs or {}) do
-    if type(mob) == "table" then
-      mobCount = mobCount + 1
+  local mobCount, areaCount, instanceCount, levelCount
+  if self:UseJourneyIndexViews() then
+    mobCount = #self:GetJourneyAllMobRows()
+    areaCount, instanceCount = 0, 0
+    local areaRows = self:GetAreaRows()
+    for index = 1, #areaRows do
+      local row = areaRows[index]
+      if row.kind == "area" then
+        areaCount = areaCount + 1
+      elseif row.kind == "instance" then
+        instanceCount = instanceCount + 1
+      end
     end
-  end
+    levelCount = #self:GetLevelRows()
+  else
+    mobCount = 0
+    for _, mob in pairs(db.mobs or {}) do
+      if type(mob) == "table" then
+        mobCount = mobCount + 1
+      end
+    end
 
-  local areaCount = 0
-  for mapKey, kills in pairs(db.areas or {}) do
-    if (not IsAttributableMapID or IsAttributableMapID(mapKey))
-      and (tonumber(kills) or 0) > 0 then
-      areaCount = areaCount + 1
+    areaCount = 0
+    for mapKey, kills in pairs(db.areas or {}) do
+      if (not IsAttributableMapID or IsAttributableMapID(mapKey))
+        and (tonumber(kills) or 0) > 0 then
+        areaCount = areaCount + 1
+      end
     end
-  end
-  local instanceCount = 0
-  for _, instance in pairs(db.instances or {}) do
-    if type(instance) == "table" and (tonumber(instance.kills) or 0) > 0 then
-      instanceCount = instanceCount + 1
+    instanceCount = 0
+    for _, instance in pairs(db.instances or {}) do
+      if type(instance) == "table" and (tonumber(instance.kills) or 0) > 0 then
+        instanceCount = instanceCount + 1
+      end
     end
-  end
 
-  local levelCount = 0
-  for _, kills in pairs(db.levels or {}) do
-    if (tonumber(kills) or 0) > 0 then
-      levelCount = levelCount + 1
+    levelCount = 0
+    for _, kills in pairs(db.levels or {}) do
+      if (tonumber(kills) or 0) > 0 then
+        levelCount = levelCount + 1
+      end
     end
   end
 
@@ -716,15 +774,9 @@ function XPTooltip:PrintStats()
     .. ", levels=" .. FormatNumber(levelCount)
     .. ", sessionKills=" .. FormatNumber(db.session.kills or 0))
 
-  local topMap, topMapKills = nil, 0
-  for mapKey, kills in pairs(db.areas or {}) do
-    if (tonumber(kills) or 0) > topMapKills then
-      topMapKills = tonumber(kills) or 0
-      topMap = mapKey
-    end
-  end
-  if topMap then
-    AceM2L2:SafePrint("  Top area: " .. self:GetMapName(topMap) .. " (" .. FormatNumber(topMapKills) .. ")")
+  local topMapKills, _, topAreaLabel = self:GetTopAreaSummary()
+  if topAreaLabel then
+    AceM2L2:SafePrint("  Top area: " .. topAreaLabel .. " (" .. FormatNumber(topMapKills) .. ")")
   end
 
   local deathCount = #(type(db.deaths) == "table" and db.deaths or {})
@@ -742,13 +794,26 @@ function XPTooltip:PrintDump()
     return
   end
   local list = {}
-  for mobKey, mob in pairs(db.mobs or {}) do
-    if type(mob) == "table" then
-      list[#list + 1] = { key = mobKey, mob = mob }
+  if self:UseJourneyIndexViews() then
+    local rows = self:GetJourneyAllMobRows()
+    for index = 1, #rows do
+      local row = rows[index]
+      list[#list + 1] = { key = row.key, mob = row.mob }
+    end
+  else
+    for mobKey, mob in pairs(db.mobs or {}) do
+      if type(mob) == "table" then
+        list[#list + 1] = { key = mobKey, mob = mob }
+      end
     end
   end
   table.sort(list, function(a, b)
-    return (tonumber(a.mob.kills) or 0) > (tonumber(b.mob.kills) or 0)
+    local ak = tonumber(a.mob.kills) or 0
+    local bk = tonumber(b.mob.kills) or 0
+    if ak == bk then
+      return tostring(a.key) < tostring(b.key)
+    end
+    return ak > bk
   end)
   AceM2L2:SafePrint("Kill Story dump (" .. tostring(#list) .. " mobs):")
   for index = 1, min(#list, 50) do
@@ -829,6 +894,9 @@ function XPTooltip:ResetKills()
   db.instances = {}
   db.levels = {}
   db.areaLevels = {}
+  if type(self.ResetJourneyData) == "function" then
+    self:ResetJourneyData()
+  end
   db.calibration = { zones = {}, levels = {}, groups = {}, classes = {}, mobs = {} }
   db.calibrationVersion = CALIBRATION_VERSION
   db.totals = { kills = 0, xp = 0, uniqueMobs = 0 }

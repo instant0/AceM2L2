@@ -76,6 +76,162 @@ function XPTooltip:GetSettings()
   return settings
 end
 
+local function CountCacheKeys(map)
+  local count = 0
+  if type(map) == "table" then
+    for _ in pairs(map) do count = count + 1 end
+  end
+  return count
+end
+
+function XPTooltip:GetCacheStats()
+  local block = self.journeyBlockCache or {}
+  local zone = self.heatmapZoneCache or {}
+  local normalizeZones = 0
+  local normalize = self.heatmapNormalizeCache
+  if type(normalize) == "table" and type(normalize.heatmaps) == "table" then
+    normalizeZones = CountCacheKeys(normalize.heatmaps)
+  end
+  local heatmap = self.ui and self.ui.heatmap
+  local uiCells = 0
+  local uiArtTiles = 0
+  if heatmap then
+    uiCells = tonumber(heatmap.cellCount) or CountCacheKeys(heatmap.cells)
+    uiArtTiles = #(heatmap.artTiles or {})
+  end
+  return {
+    blockZones = CountCacheKeys(block.map),
+    blockCapacity = tonumber(block.capacity) or 0,
+    blockEvictions = tonumber(block.evictions) or 0,
+    decodedBlocks = tonumber(self.journeyDecodedBlocks) or 0,
+    heatmapZones = CountCacheKeys(zone.map),
+    heatmapCapacity = tonumber(zone.capacity) or 0,
+    heatmapEvictions = tonumber(zone.evictions) or 0,
+    heatmapNormalizations = tonumber(self.heatmapZoneNormalizations) or 0,
+    normalizeZones = normalizeZones,
+    overlayCaches = CountCacheKeys(self.mapOverlayCache),
+    uiCells = uiCells,
+    uiArtTiles = uiArtTiles,
+  }
+end
+
+local CAPACITY_LEVELS = { low = 1, normal = 2, high = 3, critical = 4 }
+local CAPACITY_NAMES = { "low", "normal", "high", "critical" }
+
+local function BaseCapacityLevel(ratio)
+  if ratio >= 0.98 then return 4 end
+  if ratio >= 0.90 then return 3 end
+  if ratio >= 0.65 then return 2 end
+  return 1
+end
+
+function XPTooltip:GetCapacityAssessment(stats)
+  stats = stats or (type(self.GetDataStats) == "function" and self:GetDataStats() or {})
+  local limits = {
+    { key = "mobs", cap = stats.maxMobs },
+    { key = "quests", cap = stats.maxQuests },
+    { key = "deaths", cap = stats.maxDeaths },
+    { key = "respawnNpcs", cap = stats.maxRespawnNpcs },
+    { key = "heatmapZones", cap = stats.maxHeatmapZones },
+    { key = "levelRecords", cap = stats.maxLevelRecords },
+    { key = "rateSamples", cap = stats.maxRateSamples },
+    { key = "instances", cap = stats.maxInstances },
+  }
+  local ratio, store = 0, nil
+  for index = 1, #limits do
+    local item = limits[index]
+    local cap = tonumber(item.cap) or 0
+    if cap > 0 then
+      local value = (tonumber(stats[item.key]) or 0) / cap
+      if value > ratio then
+        ratio = value
+        store = item.key
+      end
+    end
+  end
+
+  local previous = self.capacityPressure
+  local level = BaseCapacityLevel(ratio)
+  local previousLevel = CAPACITY_LEVELS[previous] or 1
+  if level < previousLevel then
+    if previousLevel == 4 and ratio >= 0.90 then
+      level = 4
+    elseif previousLevel == 3 and ratio >= 0.80 then
+      level = 3
+    elseif previousLevel == 2 and ratio >= 0.50 then
+      level = 2
+    end
+  end
+  local pressure = CAPACITY_NAMES[level]
+  self.capacityPressure = pressure
+
+  local heapKB
+  if type(collectgarbage) == "function" then
+    local ok, value = pcall(collectgarbage, "count")
+    if ok then heapKB = tonumber(value) end
+  end
+
+  local addonKB
+  local addonName = AceM2L2 and (AceM2L2.name or "AceM2L2") or "AceM2L2"
+  local addonAPI = _G.C_AddOns
+  local update = addonAPI and addonAPI.UpdateAddOnMemoryUsage or _G.UpdateAddOnMemoryUsage
+  local get = addonAPI and addonAPI.GetAddOnMemoryUsage or _G.GetAddOnMemoryUsage
+  if update then pcall(update) end
+  if get then
+    local ok, value = pcall(get, addonName)
+    if ok then addonKB = tonumber(value) end
+  end
+
+  local blockBytes = 0
+  local blocks = self.char and self.char.journey and self.char.journey.blocks
+  if type(blocks) == "table" then
+    for _, block in pairs(blocks) do
+      if type(block) == "table" and type(block.data) == "string" then
+        blockBytes = blockBytes + #block.data
+      end
+    end
+  end
+
+  local cache = type(self.GetCacheStats) == "function" and self:GetCacheStats() or {}
+  local reason
+  if store then
+    reason = string.format("%s at %.0f%% of cap", store, ratio * 100)
+  else
+    reason = "no active cap pressure"
+  end
+  local recommendation = "none"
+  if pressure == "high" then
+    recommendation = "prefer eviction/pruning; inspect pressure"
+  elseif pressure == "critical" then
+    recommendation = "run compaction/prune and reduce caches"
+  end
+  return {
+    pressure = pressure,
+    score = ratio,
+    store = store,
+    reason = reason,
+    recommendation = recommendation,
+    luaHeapKB = heapKB,
+    addonMemoryKB = addonKB,
+    blockBytes = blockBytes,
+    cache = cache,
+  }
+end
+
+function XPTooltip:ReleaseTransientCaches()
+  if type(self.ClearJourneyBlockCache) == "function" then
+    self:ClearJourneyBlockCache()
+  end
+  if type(self.InvalidateHeatmapZoneCache) == "function" then
+    self:InvalidateHeatmapZoneCache()
+  end
+  self.heatmapNormalizeCache = nil
+  self.mapOverlayCache = nil
+  if type(self.ReleaseHeatmapUIResources) == "function" then
+    self:ReleaseHeatmapUIResources()
+  end
+end
+
 function XPTooltip:CheckCompatibility()
   local reasons = {}
   local profile = self.clientProfile or self:GetClientProfile()

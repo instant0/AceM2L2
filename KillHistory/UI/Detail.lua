@@ -13,15 +13,27 @@ local Now = Util.Now
 local FormatNumber = Util.FormatNumber
 local FormatDate = Util.FormatDate
 local FormatAgo = Util.FormatAgo
+local FormatDuration = Util.FormatDuration
+local MIN_RESPAWN_SAMPLES = XPTooltip.MIN_RESPAWN_SAMPLES or 3
 
-local function TopMobsByField(db, field, key, limit)
+local function TopMobsByField(module, db, field, key, limit)
   local top = {}
-  for _, mob in pairs(db.mobs or {}) do
+  local function add(mob)
     if type(mob) == "table" and type(mob[field]) == "table" then
       local value = tonumber(mob[field][key]) or 0
       if value > 0 then
         top[#top + 1] = { name = mob.name or "Unknown", kills = value }
       end
+    end
+  end
+  if module:UseJourneyIndexViews() then
+    local rows = module:GetJourneyAllMobRows()
+    for index = 1, #rows do
+      add(rows[index].mob)
+    end
+  else
+    for _, mob in pairs(db.mobs or {}) do
+      add(mob)
     end
   end
   table.sort(top, function(a, b)
@@ -114,6 +126,13 @@ function XPTooltip:UpdateDetail()
   local selected = self:GetSelected()
   self:UpdateDeleteButton(selected)
   if not selected then
+    if self.tab == "deaths" then
+      self:UpdateHistoryEmptyDetail()
+      return
+    elseif self.tab == "quests" then
+      self:UpdateQuestEmptyDetail()
+      return
+    end
     self:SetDetailMode(false)
     self:HideModel("No kill data yet")
     if self.ui.heroName then
@@ -129,6 +148,12 @@ function XPTooltip:UpdateDetail()
 
   if selected.kind == "mob" then
     self:UpdateMobDetail(selected.key)
+  elseif selected.kind == "death" then
+    self:UpdateDeathDetail(selected)
+  elseif selected.kind == "respawn" then
+    self:UpdateRespawnDetail(selected)
+  elseif selected.kind == "quest" then
+    self:UpdateQuestDetail(selected)
   elseif selected.kind == "area" then
     self:HideModel("")
     self:UpdateAreaDetail(selected.key)
@@ -164,9 +189,128 @@ function XPTooltip:SetDetailMode(showModel)
   self.ui.details:SetPoint("BOTTOMRIGHT", -12, 10)
 end
 
+function XPTooltip:UpdateHistoryEmptyDetail()
+  self:SetDetailMode(false)
+  self:HideModel("")
+  local _, _, reason = self:GetHistoryAvailability()
+  if self.ui.heroName then
+    self.ui.heroName:SetText("Death & respawn history")
+  end
+  if self.ui.heroSub then
+    self.ui.heroSub:SetText(reason or "No death or respawn history recorded yet.")
+  end
+  if self.ui.details then
+    self.ui.details:SetText(
+      "Deaths: /acem2l2 xpt deaths [count]\n"
+      .. "Respawns: /acem2l2 xpt respawns [name]"
+    )
+  end
+end
+
+function XPTooltip:UpdateDeathDetail(entry)
+  self:SetDetailMode(false)
+  self:HideModel("")
+  local mapName = self:GetMapName(entry.mapID)
+  self.ui.heroName:SetText("Player death")
+  self.ui.heroSub:SetText(string.format(
+    "%s  ·  %.1f, %.1f", mapName, (entry.x or 0) * 100, (entry.y or 0) * 100
+  ))
+  self.ui.details:SetText(table.concat({
+    "Time: " .. FormatDate(entry.at),
+    "Age: " .. FormatAgo(entry.at),
+    "Map: " .. mapName .. " (" .. tostring(entry.mapID) .. ")",
+    string.format("Coordinates: %.1f, %.1f", (entry.x or 0) * 100, (entry.y or 0) * 100),
+    "",
+    "Command: /acem2l2 xpt deaths",
+  }, "\n"))
+end
+
+function XPTooltip:UpdateRespawnDetail(entry)
+  self:SetDetailMode(false)
+  self:HideModel("")
+  local samples = tonumber(entry.samples) or 0
+  self.ui.heroName:SetText(tostring(entry.name or ("NPC " .. tostring(entry.npcID))))
+  self.ui.heroSub:SetText("NPC " .. tostring(entry.npcID)
+    .. "  ·  " .. FormatNumber(samples) .. " samples")
+
+  local lines = {}
+  if entry.hasAverage and entry.average then
+    lines[#lines + 1] = "Average: " .. FormatDuration(entry.average)
+    lines[#lines + 1] = "Range: " .. FormatDuration(entry.minimum or 0)
+      .. " - " .. FormatDuration(entry.maximum or 0)
+  else
+    lines[#lines + 1] = "Average: needs " .. tostring(MIN_RESPAWN_SAMPLES)
+      .. " samples (" .. FormatNumber(samples) .. " recorded)"
+  end
+  lines[#lines + 1] = "Samples: " .. FormatNumber(samples)
+  lines[#lines + 1] = "Last seen: " .. FormatAgo(entry.lastSeen or 0)
+  lines[#lines + 1] = "NPC ID: " .. tostring(entry.npcID)
+  lines[#lines + 1] = ""
+  lines[#lines + 1] = "Command: /acem2l2 xpt respawns <name>"
+  self.ui.details:SetText(table.concat(lines, "\n"))
+end
+
+function XPTooltip:UpdateQuestEmptyDetail()
+  self:SetDetailMode(false)
+  self:HideModel("")
+  if self.ui.heroName then
+    self.ui.heroName:SetText("Quest XP ledger")
+  end
+  if self.ui.heroSub then
+    if not self:Supports("hasPerMobXP") then
+      self.ui.heroSub:SetText("Quest XP is not tracked on this client.")
+    else
+      self.ui.heroSub:SetText("No quest XP recorded yet.")
+    end
+  end
+  if self.ui.details then
+    if not self:Supports("hasPerMobXP") then
+      self.ui.details:SetText("Quest XP is only available on Forever clients.")
+    else
+      self.ui.details:SetText("Command: /acem2l2 xpt quests")
+    end
+  end
+end
+
+function XPTooltip:UpdateQuestDetail(entry)
+  self:SetDetailMode(false)
+  self:HideModel("")
+  local count = tonumber(entry.count) or 0
+  local totalXP = tonumber(entry.totalXP) or 0
+  self.ui.heroName:SetText(tostring(entry.label or entry.key or "Quest"))
+  self.ui.heroSub:SetText(FormatNumber(count) .. " gains  ·  "
+    .. FormatNumber(totalXP) .. " XP")
+  local lines = {
+    "Quest ID: " .. tostring(entry.questID or entry.key),
+    "Total XP: " .. FormatNumber(totalXP),
+    "Gains: " .. FormatNumber(count),
+  }
+  if count > 0 then
+    lines[#lines + 1] = "Average per gain: " .. FormatNumber(totalXP / count)
+  end
+  lines[#lines + 1] = "First seen: " .. FormatDate(entry.firstSeen)
+  lines[#lines + 1] = "Last seen: " .. FormatAgo(entry.lastSeen)
+  lines[#lines + 1] = ""
+  lines[#lines + 1] = "Command: /acem2l2 xpt quests"
+  self.ui.details:SetText(table.concat(lines, "\n"))
+end
+
 function XPTooltip:UpdateMobDetail(mobKey)
   self:SetDetailMode(true)
-  local mob = self.char and self.char.mobs[mobKey]
+  local legacy = self.char and self.char.mobs and self.char.mobs[mobKey]
+  local mob = legacy
+  local blockFallback = false
+  if type(mob) ~= "table" then
+    local journey = self.char and self.char.journey
+    if (not journey or journey.blockReadFallback ~= false)
+      and type(self.GetJourneyMob) == "function" then
+      local record = self:GetJourneyMob(mobKey)
+      if type(record) == "table" then
+        mob = record
+        blockFallback = true
+      end
+    end
+  end
   if type(mob) ~= "table" then
     self:HideModel("No model data")
     if self.ui.heroName then self.ui.heroName:SetText("Mob data unavailable") end
@@ -184,52 +328,60 @@ function XPTooltip:UpdateMobDetail(mobKey)
 
   local lines = {}
   lines[#lines + 1] = "Total kills: " .. FormatNumber(mob.kills or 0)
-  lines[#lines + 1] = "This session: " .. FormatNumber(mob.sessionKills or 0)
-  local playerLevel = self:GetPlayerLevel()
-  if playerLevel then
-    local atLevel = mob.killsAtLevel and tonumber(mob.killsAtLevel[tostring(playerLevel)]) or 0
-    lines[#lines + 1] = "This level: " .. FormatNumber(atLevel)
-  end
-
-  if self:Supports("hasPerMobXP")
-    and type(mob.xp) == "table" and (tonumber(mob.xp.samples) or 0) > 0 then
-    lines[#lines + 1] = "Avg base XP: " .. FormatNumber((tonumber(mob.xp.sumBase) or 0) / mob.xp.samples)
-    lines[#lines + 1] = "Avg total XP: " .. FormatNumber((tonumber(mob.xp.sumTotal) or 0) / mob.xp.samples)
-  end
-
-  local topMap, topMapKills = nil, 0
-  if type(mob.killsByMap) == "table" then
-    for mapKey, kills in pairs(mob.killsByMap) do
-      if (tonumber(kills) or 0) > topMapKills then
-        topMapKills = tonumber(kills) or 0
-        topMap = mapKey
-      end
+  if blockFallback then
+    if tonumber(mob.mobLevelMin) and tonumber(mob.mobLevelMin) > 0 then
+      lines[#lines + 1] = "Mob level range: " .. tostring(mob.mobLevelMin)
+        .. "-" .. tostring(mob.mobLevelMax or mob.mobLevelMin)
     end
-  end
-  if topMap then
-    lines[#lines + 1] = "Top area: " .. self:GetMapName(topMap) .. " (" .. FormatNumber(topMapKills) .. ")"
-  end
+    lines[#lines + 1] = "|cffaaaaaaBlock detail: session/area/XP context unavailable.|r"
+  else
+    lines[#lines + 1] = "This session: " .. FormatNumber(mob.sessionKills or 0)
+    local playerLevel = self:GetPlayerLevel()
+    if playerLevel then
+      local atLevel = mob.killsAtLevel and tonumber(mob.killsAtLevel[tostring(playerLevel)]) or 0
+      lines[#lines + 1] = "This level: " .. FormatNumber(atLevel)
+    end
 
-  local minLevel, maxLevel
-  if type(mob.killsAtLevel) == "table" then
-    for levelKey, kills in pairs(mob.killsAtLevel) do
-      local level = tonumber(levelKey)
-      if level and (tonumber(kills) or 0) > 0 then
-        if not minLevel or level < minLevel then
-          minLevel = level
-        end
-        if not maxLevel or level > maxLevel then
-          maxLevel = level
+    if self:Supports("hasPerMobXP")
+      and type(mob.xp) == "table" and (tonumber(mob.xp.samples) or 0) > 0 then
+      lines[#lines + 1] = "Avg base XP: " .. FormatNumber((tonumber(mob.xp.sumBase) or 0) / mob.xp.samples)
+      lines[#lines + 1] = "Avg total XP: " .. FormatNumber((tonumber(mob.xp.sumTotal) or 0) / mob.xp.samples)
+    end
+
+    local topMap, topMapKills = nil, 0
+    if type(mob.killsByMap) == "table" then
+      for mapKey, kills in pairs(mob.killsByMap) do
+        if (tonumber(kills) or 0) > topMapKills then
+          topMapKills = tonumber(kills) or 0
+          topMap = mapKey
         end
       end
     end
-  end
-  if minLevel then
-    lines[#lines + 1] = "Level range: " .. tostring(minLevel) .. "-" .. tostring(maxLevel)
-  end
+    if topMap then
+      lines[#lines + 1] = "Top area: " .. self:GetMapName(topMap) .. " (" .. FormatNumber(topMapKills) .. ")"
+    end
 
-  lines[#lines + 1] = "First seen: " .. FormatDate(mob.firstSeen)
-  lines[#lines + 1] = "Last seen: " .. FormatAgo(mob.lastSeen)
+    local minLevel, maxLevel
+    if type(mob.killsAtLevel) == "table" then
+      for levelKey, kills in pairs(mob.killsAtLevel) do
+        local level = tonumber(levelKey)
+        if level and (tonumber(kills) or 0) > 0 then
+          if not minLevel or level < minLevel then
+            minLevel = level
+          end
+          if not maxLevel or level > maxLevel then
+            maxLevel = level
+          end
+        end
+      end
+    end
+    if minLevel then
+      lines[#lines + 1] = "Level range: " .. tostring(minLevel) .. "-" .. tostring(maxLevel)
+    end
+
+    lines[#lines + 1] = "First seen: " .. FormatDate(mob.firstSeen)
+    lines[#lines + 1] = "Last seen: " .. FormatAgo(mob.lastSeen)
+  end
   self.ui.details:SetText(table.concat(lines, "\n"))
 end
 
@@ -254,7 +406,7 @@ function XPTooltip:UpdateInstanceDetail(instanceKey)
   end
   self.ui.heroSub:SetText(subtitle)
 
-  local top = TopMobsByField(db, "killsByInstance", instanceKey)
+  local top = TopMobsByField(self, db, "killsByInstance", instanceKey)
   local lines = { "Top mobs:" }
   for index = 1, min(#top, 6) do
     lines[#lines + 1] = "  " .. tostring(top[index].name) .. " - "
@@ -272,7 +424,7 @@ end
 function XPTooltip:UpdateAreaDetail(mapKey)
   self:SetDetailMode(false)
   local db = self.char
-  local kills = tonumber(db.areas[mapKey]) or 0
+  local kills = self:GetAreaKillCount(mapKey)
   local total = tonumber(db.totals.kills) or 0
   local percent = total > 0 and (kills / total * 100) or 0
   self.ui.heroName:SetText(self:GetMapName(mapKey))
@@ -280,7 +432,7 @@ function XPTooltip:UpdateAreaDetail(mapKey)
     "Kills: " .. FormatNumber(kills) .. "  ·  " .. string.format("%.1f%%", percent) .. " of total"
   )
 
-  local top = TopMobsByField(db, "killsByMap", mapKey)
+  local top = TopMobsByField(self, db, "killsByMap", mapKey)
   local lines = {}
   lines[#lines + 1] = "Top mobs:"
   for index = 1, min(#top, 6) do
@@ -298,7 +450,7 @@ end
 function XPTooltip:UpdateLevelDetail(levelKey)
   self:SetDetailMode(false)
   local db = self.char
-  local kills = tonumber(db.levels[levelKey]) or 0
+  local kills = self:GetLevelKillCount(levelKey)
   local total = tonumber(db.totals.kills) or 0
   local percent = total > 0 and (kills / total * 100) or 0
   self.ui.heroName:SetText("Player level " .. tostring(levelKey))
@@ -306,7 +458,7 @@ function XPTooltip:UpdateLevelDetail(levelKey)
     "Kills: " .. FormatNumber(kills) .. "  ·  " .. string.format("%.1f%%", percent) .. " of total"
   )
 
-  local top = TopMobsByField(db, "killsAtLevel", levelKey)
+  local top = TopMobsByField(self, db, "killsAtLevel", levelKey)
   local lines = {}
   lines[#lines + 1] = "Top mobs:"
   for index = 1, min(#top, 8) do

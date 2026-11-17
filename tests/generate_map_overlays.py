@@ -87,8 +87,11 @@ def build_project(project_id: int, build: str, source_dir: Path | None) -> dict[
             ",".join(str(file_id) for file_id in file_ids),
         ))
 
-    for entries in result.values():
-        entries.sort(key=lambda entry: entry[:4])
+    for art_id, entries in result.items():
+        # Identical DB2 rows can repeat; drawing the same pixels twice wastes
+        # the overlay budget. Keep same-geometry entries only when their tile
+        # lists differ.
+        result[art_id] = sorted(set(entries))
     return dict(result)
 
 

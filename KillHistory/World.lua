@@ -21,7 +21,7 @@ local FormatAgo = Util.FormatAgo
 local FormatDuration = Util.FormatDuration
 
 local MAX_DEATHS = 100
-local MAX_RESPAWN_NPCS = 300
+local MAX_RESPAWN_NPCS = 4000
 local MAX_RESPAWN_SAMPLES = 20
 local MIN_RESPAWN_SAMPLES = 3
 local RESPAWN_MIN_SECONDS = 5
@@ -246,6 +246,23 @@ function XPTooltip:HandlePlayerDeath()
     return false
   end
   return self:RecordDeath(mapID, x, y, Epoch())
+end
+
+function XPTooltip:GetHistoryAvailability()
+  local deaths = self:Supports("hasMapPosition")
+    and type(self.HasMapPositionAPI) == "function"
+    and self:HasMapPositionAPI()
+  local respawns = self:Supports("hasKillTracking")
+    and self:Supports("hasGUIDIdentity")
+  local reason
+  if not deaths and not respawns then
+    reason = "Death and respawn history is unavailable on this client."
+  elseif not deaths then
+    reason = "Death locations are unavailable on this client."
+  elseif not respawns then
+    reason = "Respawn intervals are unavailable on this client."
+  end
+  return deaths and true or false, respawns and true or false, reason
 end
 
 function XPTooltip:PrintDeaths(rest)

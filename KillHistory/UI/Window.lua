@@ -7,7 +7,6 @@ local AceM2L2 = AceM2L2
 local XPTooltip = AceM2L2.KillHistory
 local UI = XPTooltip.UI
 local Util = XPTooltip.Util
-local IsAttributableMapID = Util.IsAttributableMapID
 
 local floor, min, max = math.floor, math.min, math.max
 local DEFAULT_UI = Util.DEFAULT_UI
@@ -151,6 +150,9 @@ function XPTooltip:CreateUI()
     if self.ui and self.ui.model then
       self.ui.model.dragging = false
     end
+    if type(self.ReleaseTransientCaches) == "function" then
+      pcall(self.ReleaseTransientCaches, self)
+    end
   end)
   frame:SetScript("OnShow", function()
     self:SafeRefreshUI()
@@ -250,8 +252,10 @@ function XPTooltip:CreateUI()
     { key = "overview", label = "Overview" },
     { key = "mobs", label = "Mobs" },
     { key = "areas", label = "Areas" },
-    { key = "heatmap", label = "Heatmap" },
     { key = "levels", label = "Levels" },
+    { key = "quests", label = "Quests" },
+    { key = "deaths", label = "History" },
+    { key = "heatmap", label = "Heatmap" },
   }
   local x = 0
   for _, definition in ipairs(tabDefinitions) do
@@ -315,7 +319,7 @@ function XPTooltip:CreateUI()
         self.ui.searchPlaceholder:Hide()
       end
     end
-    if self.tab ~= "mobs" then
+    if self.tab ~= "mobs" and self.tab ~= "deaths" and self.tab ~= "quests" then
       return
     end
     pcall(self.BuildList, self)
@@ -598,9 +602,14 @@ function XPTooltip:SaveUIPosition()
 end
 
 function XPTooltip:SetTab(tab)
+  local previousTab = self.tab
   if tab ~= "overview" and tab ~= "mobs" and tab ~= "areas" and tab ~= "levels"
-    and tab ~= "heatmap" then
+    and tab ~= "quests" and tab ~= "deaths" and tab ~= "heatmap" then
     tab = "overview"
+  end
+  if previousTab == "heatmap" and tab ~= "heatmap"
+    and type(self.ReleaseHeatmapUIResources) == "function" then
+    pcall(self.ReleaseHeatmapUIResources, self)
   end
   local settings = self:GetSettings()
   if tab == "heatmap" and settings and settings.showHeatmap == false then
@@ -701,17 +710,25 @@ function XPTooltip:UpdateTabs()
   end
   if self.ui then
     local isMobs = self.tab == "mobs"
+    local showSearch = isMobs or self.tab == "deaths" or self.tab == "quests"
     if self.ui.sortButton and self.ui.sortButton.SetShown then
-      self.ui.sortButton:SetShown(isMobs)
+      self.ui.sortButton:SetShown(showSearch)
     end
     if self.ui.searchBox and self.ui.searchBox.SetShown then
-      self.ui.searchBox:SetShown(isMobs)
+      self.ui.searchBox:SetShown(showSearch)
     end
     if self.ui.searchLabel and self.ui.searchLabel.SetShown then
-      self.ui.searchLabel:SetShown(isMobs)
+      self.ui.searchLabel:SetShown(showSearch)
     end
     if self.ui.searchPlaceholder then
-      self.ui.searchPlaceholder:SetShown(isMobs and (self.searchText or "") == "")
+      local placeholder = "Search history"
+      if isMobs then
+        placeholder = "Search mobs"
+      elseif self.tab == "quests" then
+        placeholder = "Search quests"
+      end
+      self.ui.searchPlaceholder:SetText(placeholder)
+      self.ui.searchPlaceholder:SetShown(showSearch and (self.searchText or "") == "")
     end
     if self.ui.filterBar and self.ui.filterBar.SetShown then
       self.ui.filterBar:SetShown(isMobs)
@@ -732,33 +749,14 @@ function XPTooltip:UpdateFooter()
   local session = tonumber(db.session.kills) or 0
   local unique = tonumber(db.totals.uniqueMobs) or 0
 
-  local topMap, topMapKills = nil, 0
-  for mapKey, kills in pairs(db.areas or {}) do
-    if (not IsAttributableMapID or IsAttributableMapID(mapKey))
-      and (tonumber(kills) or 0) > topMapKills then
-      topMapKills = tonumber(kills) or 0
-      topMap = mapKey
-    end
-  end
-
-  local minLevel, maxLevel
-  for levelKey, kills in pairs(db.levels or {}) do
-    local level = tonumber(levelKey)
-    if level and (tonumber(kills) or 0) > 0 then
-      if not minLevel or level < minLevel then
-        minLevel = level
-      end
-      if not maxLevel or level > maxLevel then
-        maxLevel = level
-      end
-    end
-  end
+  local topMapKills, _, topAreaLabel = self:GetTopAreaSummary()
+  local minLevel, maxLevel = self:GetLevelSummary()
 
   local text = "Total kills: " .. FormatNumber(total)
     .. "   Session: " .. FormatNumber(session)
     .. "   Mobs tracked: " .. FormatNumber(unique)
-  if topMap then
-    text = text .. "   Top area: " .. self:GetMapName(topMap) .. " (" .. FormatNumber(topMapKills) .. ")"
+  if topAreaLabel then
+    text = text .. "   Top area: " .. topAreaLabel .. " (" .. FormatNumber(topMapKills) .. ")"
   end
   if minLevel then
     text = text .. "   Level range: " .. tostring(minLevel) .. "-" .. tostring(maxLevel)

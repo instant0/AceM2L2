@@ -27,10 +27,35 @@ local PruneMobInstanceMaps
 
 local STORAGE_SCHEMA = 2
 local CLIENT_DATA_SCHEMA = 1
-local MAX_QUESTS = 200
+local MAX_QUESTS = 10000
 local MAX_LEVEL_RECORDS = 200
 local MAX_RATE_SAMPLES = 240
 XPTooltip.MAX_QUESTS = MAX_QUESTS
+
+local function CountVisitedZones(db)
+  local zones = 0
+  for _ in pairs(type(db.areas) == "table" and db.areas or {}) do
+    zones = zones + 1
+  end
+  for _ in pairs(type(db.instances) == "table" and db.instances or {}) do
+    zones = zones + 1
+  end
+  return zones
+end
+
+function XPTooltip:GetMobCapacityLimit()
+  local db = self.char
+  if type(db) ~= "table" then return MAX_MOBS end
+  local zones = CountVisitedZones(db)
+  return math.min(MAX_MOBS, math.max(2000, zones * 500))
+end
+
+function XPTooltip:GetQuestCapacityLimit()
+  local db = self.char
+  if type(db) ~= "table" then return MAX_QUESTS end
+  local zones = CountVisitedZones(db)
+  return math.min(MAX_QUESTS, math.max(500, zones * 100))
+end
 XPTooltip.MAX_LEVEL_RECORDS = MAX_LEVEL_RECORDS
 XPTooltip.MAX_RATE_SAMPLES = MAX_RATE_SAMPLES
 local LEGACY_PROJECT_ID = (AceM2L2.Defaults and AceM2L2.Defaults.CAMELOT_PROJECT_ID)
@@ -609,6 +634,9 @@ end
 
 function XPTooltip:EnsureDB()
   self:InvalidateMobIndex()
+  if self.InvalidateJourneyMobIndex then
+    self:InvalidateJourneyMobIndex()
+  end
   local root, storageBlocked = self:MigrateDB()
   local projectID = self:GetProjectID()
   if self.dataProjectID and self.dataProjectID ~= projectID then
@@ -1036,6 +1064,9 @@ end
 function XPTooltip:InvalidateMobIndex()
   self.mobIndex = nil
   self.mobIndexDb = nil
+  if type(self.InvalidateJourneyMobIndex) == "function" then
+    self:InvalidateJourneyMobIndex()
+  end
 end
 
 local function AddMobIndexSet(index, kind, scopeKey, mobKey)
@@ -1711,7 +1742,8 @@ function XPTooltip:RecordQuestXP(questID, questName, xp)
   for _ in pairs(db.quests) do
     count = count + 1
   end
-  if count > MAX_QUESTS then
+  local questLimit = self:GetQuestCapacityLimit()
+  if count > questLimit then
     local removable = {}
     for questKey, quest in pairs(db.quests) do
       if type(quest) == "table" then
@@ -1728,7 +1760,7 @@ function XPTooltip:RecordQuestXP(questID, questName, xp)
       return a.seen < b.seen
     end)
     for _, item in ipairs(removable) do
-      if count <= MAX_QUESTS then
+      if count <= questLimit then
         break
       end
       db.quests[item.key] = nil
@@ -1932,7 +1964,7 @@ function XPTooltip:EnsureMob(mobKey, name, npcID, classification)
     }
     db.mobs[mobKey] = mob
     db.totals.uniqueMobs = (db.totals.uniqueMobs or 0) + 1
-    if db.totals.uniqueMobs > MAX_MOBS then
+    if db.totals.uniqueMobs > self:GetMobCapacityLimit() then
       self:SchedulePrune()
     end
   else

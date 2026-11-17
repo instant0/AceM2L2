@@ -50,6 +50,60 @@ echo "== Journey block storage =="
 echo "== Journey save guard =="
 "$LUA_BIN" tests/journey_save_guard.lua forever
 
+echo "== Tooltip/Detail fallback =="
+"$LUA_BIN" tests/tooltip_fallback.lua forever
+
+echo "== Journey mob index =="
+"$LUA_BIN" tests/journey_index.lua forever
+
+echo "== Mobs list/Overview index switch =="
+"$LUA_BIN" tests/list_overview_index.lua forever
+
+echo "== Command index switch =="
+"$LUA_BIN" tests/commands_index.lua forever
+
+echo "== Areas/Levels parity =="
+"$LUA_BIN" tests/areas_levels_parity.lua forever
+
+echo "== Heatmap bounded query =="
+"$LUA_BIN" tests/heatmap_bounded.lua forever
+
+echo "== Area/Level summaries =="
+"$LUA_BIN" tests/area_level_summaries.lua forever
+
+echo "== Heatmap render ops =="
+"$LUA_BIN" tests/heatmap_render_ops.lua forever
+
+echo "== Heatmap lazy zone =="
+"$LUA_BIN" tests/heatmap_lazy_zone.lua forever
+
+echo "== Map overlay audit =="
+"$LUA_BIN" tests/map_overlay_audit.lua forever
+
+echo "== History view =="
+"$LUA_BIN" tests/history_view.lua forever
+
+echo "== Quest ledger =="
+"$LUA_BIN" tests/quest_ledger.lua forever
+
+echo "== Memory policy =="
+"$LUA_BIN" tests/mem_policy.lua forever
+
+echo "== Rollback inventory =="
+"$LUA_BIN" tests/rollback_inventory.lua forever
+
+echo "== Schema decision =="
+"$LUA_BIN" tests/schema_decision.lua forever
+
+echo "== Limit tier =="
+"$LUA_BIN" tests/limit_tier.lua forever
+
+echo "== Capacity assessment =="
+"$LUA_BIN" tests/capacity_assessment.lua forever
+
+echo "== Context cap =="
+"$LUA_BIN" tests/context_cap.lua forever
+
 echo "== Embedded library smoke test =="
 "$LUA_BIN" tests/libs_smoke.lua
 

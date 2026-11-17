@@ -5,6 +5,10 @@ local state = F.state
 local module = F.Init()
 local db = module.char
 
+db.heatmaps = {
+  ["12"] = { cells = { [1] = 3, [4096] = 2 }, lastSeen = 100 },
+  ["13"] = { cells = { [5] = 1 }, lastSeen = 90 },
+}
 db.mobs = {
   ["npc:1001"] = {
     npcID = 1001, name = "Block Mob A", classification = "normal",
@@ -30,7 +34,7 @@ module:OnJourneyEnterWorld()
 
 assert(module:FlushJourneyBlocks(), "journey flush failed")
 local journey = db.journey
-assert(journey.storageSchema == 1, "storage schema")
+assert(journey.storageSchema == 2, "storage schema")
 assert(type(journey.blocks["map:12"]) == "table", "map 12 block missing")
 assert(type(journey.blocks["map:13"]) == "table", "map 13 block missing")
 assert(type(journey.blocks["instance:id:33:1"]) == "table", "instance block missing")
@@ -48,6 +52,21 @@ assert(module.journeyDecodedBlocks == 1, "cache should not decode again")
 
 local mob, mobErr = module:GetJourneyBlockMob("map:12", "npc:1002")
 assert(mob and mob.kills == 2, "block mob lookup: " .. tostring(mobErr))
+
+-- Heatmap cells are stored in the zone block and read through the same cache.
+assert(journey.blockIndex["map:12"].cellCount == 2, "heatmap cell count")
+assert(journey.blockIndex["map:12"].heatmapKills == 5, "heatmap kill total")
+module:ClearJourneyBlockCache()
+module.journeyDecodedBlocks = 0
+local zones = module:GetJourneyHeatmapZones()
+assert(#zones == 2, "journey heatmap zones")
+assert(module.journeyDecodedBlocks == 0, "zone metadata must not decode")
+local cells, cellTotal = module:GetJourneyHeatmapCells(12)
+assert(cells and cells[1].kills == 3 and cellTotal == 5, "heatmap cell decode")
+assert(module.journeyDecodedBlocks == 1, "selected heatmap should decode once")
+local cachedCells = module:GetJourneyHeatmapCells("map:12")
+assert(cachedCells and cachedCells[4096].kills == 2, "heatmap cache")
+assert(module.journeyDecodedBlocks == 1, "heatmap cache should not decode again")
 
 -- Dirty block rebuild.
 db.mobs["npc:1001"].kills = 9

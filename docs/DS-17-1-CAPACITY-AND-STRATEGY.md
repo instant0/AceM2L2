@@ -126,7 +126,7 @@ design.
 - Keep `areas`/`levels`/`areaLevels` as small derived caches.
 - DS-3B measured 8.69 MB compact / 9.94 MB client estimate and 23 MB stable /
   27–37 MB transient for the current implementation profile. 23 MB stable is
-  acceptable relative to ATT 51–65 MB.
+  acceptable relative to the ATT 51–686 MB reference range.
 
 ### 2. Contexts
 

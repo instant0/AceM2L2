@@ -1,6 +1,6 @@
 # MEM-1 — Memory footprint and budget
 
-**Status:** partial measurement; one real client sample recorded  
+**Status:** partial measurement; two AceM2L2 samples plus a 686 MB ATT main-character reference  
 **Priority:** low/medium — context suggests our fixture memory is not a concern  
 **Scope:** real addon memory measurement, comparison, and budget  
 **Depends on:** H64-9 (benchmark), V-2 (runtime storage)  
@@ -15,12 +15,19 @@ Observed memory use from other addons:
 | AllTheThings, loaded | **51 MB** |
 | AllTheThings, opened | **65 MB** |
 | AllTheThings on Midnight | **several hundred MB** |
+| AllTheThings, user-reported main character, 2026-11-16 | **686 MB** |
 | Forever LevelingGuide | **48 MB** |
 | AceM2L2 heatmap fixture process | ~20 MB for a dense 4,096-cell profile |
 
 The 20 MB H64-9 figure is **fixture UI-object memory**, not real in-game texture
 or Lua memory. It is already far below the reference addons. Do not optimize the
 heatmap cell pool solely because the offline fixture reached 20 MB.
+
+A later user-reported ATT reading of **686 MB on a main character** shows that
+the earlier 51/65 MB figures were not representative of every load. The exact
+ATT version, character state, and loaded/opened state were not captured, so use
+**51–686 MB as a reference range, not a target or a budget**. The important
+conclusion is the same: do not impose an arbitrary MB cap and do not chase ATT.
 
 The real question is: **what does AceM2L2 actually use in the client, and does
 the method scale efficiently?** There is no arbitrary MB target; compare measured
@@ -65,6 +72,18 @@ These real samples do not justify H64-9-F3 for ordinary play. Keep it gated for
 unusually dense or future Midnight profiles only. The addon is new, so no
 long-lived save exists; that is not a blocker.
 
+### Sample 3 — User-reported ATT main character, 2026-11-16
+
+| Field | Value |
+|---|---|
+| Addon | AllTheThings |
+| Character | user's main character |
+| ATT addon memory | **686 MB** |
+| Exact state | not captured (loaded/opened, version, data profile) |
+
+This is a reference observation only. It does not measure AceM2L2 and does not
+close MEM-1; AceM2L2 still needs a real main-character sample.
+
 ## Goals
 
 - Measure real AceM2L2 memory on Forever and Midnight.
@@ -91,7 +110,7 @@ long-lived save exists; that is not a blocker.
 5. What is it with `heatmapEnabled=false`?
 6. What is it after `/reload`?
 7. How much is Lua heap (`collectgarbage("count")`) versus UI textures/frames?
-8. How do the numbers compare with ATT 51/65 MB and FLG 48 MB?
+8. How do the numbers compare with the ATT 51–686 MB reference range and FLG 48 MB?
 9. Does the cell pool grow across zones and remain allocated?
 10. Does memory return after closing the heatmap or clearing data?
 
@@ -125,8 +144,9 @@ it total addon memory.
 - A measured guardrail/decision is recorded; no arbitrary MB target.
 - H64-9-F3 is either closed as unnecessary or scheduled with a measured reason.
 - Samples 1–2 (3.2 MB Hunter; 3.85 MB Priest with heatmap open) are below any
-  reasonable budget and support closing F3 for ordinary play; keep it gated for
-  dense/future Midnight profiles.
+  plausible reference; the later 686 MB ATT main-character report reinforces
+  that there is no need for an arbitrary MB cap. Keep F3 gated for dense/future
+  Midnight profiles.
 - No heatmap/storage change is made from fixture memory alone.
 
 ## Plan updates
@@ -138,7 +158,8 @@ it total addon memory.
 
 ## Review notes
 
-- 51/65/48 MB reference points make a 20 MB fixture process look unremarkable.
+- The ATT 51–686 MB reference range and FLG 48 MB make a 20 MB fixture process
+  look unremarkable, while still not defining our budget.
 - The fixture includes mock UI objects and retained frames, so it is not a
   real-client budget.
 - The correct next step is measurement, not speculative optimization.

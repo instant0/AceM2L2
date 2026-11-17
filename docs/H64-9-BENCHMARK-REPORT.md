@@ -161,8 +161,9 @@ zones at load. This is a storage/load decision, not just heatmap UI.
 - The number includes mock UI objects and retained frames; it is not real GPU
   memory.
 
-**Reference context:** AllTheThings uses ~51 MB loaded / ~65 MB opened (~several
-hundred MB on Midnight); ForeverLevelingGuide uses ~48 MB. The 20 MB fixture
+**Reference context:** AllTheThings uses ~51 MB loaded / ~65 MB opened in early
+samples, with a later **686 MB main-character report** (~several hundred MB on
+Midnight); ForeverLevelingGuide uses ~48 MB. The 20 MB fixture
 figure is not a real-client budget and is not a reason to optimize by itself.
 Real 2.5.2 samples: Hunter 389 kills / 25 mobs, UI open = **3.2 MB**; Priest
 762 kills / 85 mobs, Silverpine heatmap open (408 kills) = **3.85 MB**. Both are
@@ -195,7 +196,7 @@ G-2/SC-2/V-1 only if the measured client footprint is material.
   guard)** as small, testable UI fixes.
 - Treat **H64-9-F4 (map normalize)** as a storage/load task for DS-15/SC-1.
 - Gate **H64-9-F3 (display/cell pool)** behind **MEM-1**; the 20 MB fixture
-  figure is far below the 48–65 MB reference addons.
+  figure is far below the 48 MB–686 MB reference range.
 - Feed aspect/empty-cell findings to G-2/G-3.
 - Defer live validation to V-1/V-2.
 
