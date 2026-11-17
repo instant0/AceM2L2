@@ -104,6 +104,9 @@ echo "== Capacity assessment =="
 echo "== Context cap =="
 "$LUA_BIN" tests/context_cap.lua forever
 
+echo "== Cap boundaries =="
+"$LUA_BIN" tests/cap_boundaries.lua forever
+
 echo "== Embedded library smoke test =="
 "$LUA_BIN" tests/libs_smoke.lua
 

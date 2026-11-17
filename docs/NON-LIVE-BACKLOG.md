@@ -35,14 +35,17 @@ client. Live-only residuals are in `docs/tasks/V-2-LIVE-VERIFICATION.md`.
 | **SC-3** choose tier | Done 2026-11-17 | `docs/SC-3-TIER-DECISION-RESULT.md` |
 | **SC-4** context cap | Done 2026-11-17 | `docs/SC-4-CONTEXT-CAP-RESULT.md` |
 | **SC-6** capacity self-assessment | Done 2026-11-17 | `docs/SC-6-CAPACITY-SELF-ASSESSMENT-RESULT.md` |
-| **SC-5** migration/pruning/tests | Next | SC-3/SC-4 |
+| **SC-5** migration/pruning/tests | Done 2026-11-17 | `docs/SC-5-MIGRATION-PRUNING-RESULT.md` |
 | **G-1** code review | Coordinate limits change | SC-3 |
-| **G-2** 64 vs 96/128 occupancy | Grid decision | SC-2/H64-9-F5 |
+| **G-2** 64 vs 96/128 occupancy | Next | SC-2/H64-9-F5 |
 | **G-3** grid decision | Final grid | G-2 |
 | **HC-7** tracking-limit configurability | User-facing limits | SC-3 |
 
 ## 3. Feature work
 
+- **HIST-1A — historical/outleveled tooltip and Detail.** Next. Use heatmap,
+  kill counts, deaths, rares, and journey anchors; hide stale XP.
+- **HIST-1B/1C** historical zone surfaces and bounded quest-anchor log.
 - **J-1..J-6** Journey overlay.
 - **M-1..M-6** cell inspector.
 - Tooltip danger, suggested zone, best heatmap part.
@@ -71,8 +74,9 @@ These are feature tasks, not verification gates.
 10. ~~**SC-3**~~ — done.
 11. ~~**SC-6**~~ — done.
 12. ~~**SC-4**~~ — done.
-13. **SC-5** migration/pruning/cap tests. **Next.**
-14. **DS-17.4D / DS-17.6** as the next design block.
+13. ~~**SC-5**~~ — done.
+14. **G-2** grid occupancy study. **Next.**
+15. **DS-17.4D / DS-17.6** as the next design block.
 
 V-2 should not block these. Run it when a live client is available and keep it
 focused on the live-only table.

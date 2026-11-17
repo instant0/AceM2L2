@@ -415,7 +415,9 @@ is no fixed MB target.
   `docs/SC-6-CAPACITY-SELF-ASSESSMENT-RESULT.md`.
 - **SC-4** is decided: hot context cap 12; cold top-8 + `other` policy;
   expired/oldest pruning tested. Result: `docs/SC-4-CONTEXT-CAP-RESULT.md`.
-- **SC-5** is next: migration/pruning/cap tests.
+- **SC-5** is complete: cap-boundary and idempotence tests, reset/prune docs.
+  Result: `docs/SC-5-MIGRATION-PRUNING-RESULT.md`.
+- **G-2** is next: 64 vs 96/128 occupancy study.
 - **V-2** is deferred to live-only residual checks.
 
 DS-1-F2, IMP-1A, IMP-1B query APIs, IMP-1B2 block storage, IMP-1B3 block retrieval, IMP-1B4 save guard, IMP-1B5 tooltip fallback, IMP-1B6 mob index, IMP-1B7 list/Overview switch, IMP-1B8 command switch, IMP-1B9 Areas/Levels parity, IMP-1B10 heatmap blocks, IMP-1B12 area/level summaries, H64-9-F1/F2 heatmap fixes, H64-9-F4 lazy normalization, R-4 overlay audit fixes, UI-3/UI-4 views, MEM-2 cache policy, and SC-6 capacity assessment are production-code changes; the other storage/design tasks remain documentation/prototype-only.

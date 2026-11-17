@@ -43,6 +43,46 @@ local function CountVisitedZones(db)
   return zones
 end
 
+function XPTooltip:GetMobLevelRange(mob, unitLevel)
+  local minLevel, maxLevel
+  local observed = tonumber(unitLevel)
+  if observed and observed > 0 then
+    minLevel, maxLevel = observed, observed
+  end
+  if type(mob) == "table" then
+    local storedMin = tonumber(mob.mobLevelMin)
+    local storedMax = tonumber(mob.mobLevelMax)
+    if storedMin and storedMin > 0 then
+      minLevel = minLevel and min(minLevel, storedMin) or storedMin
+      maxLevel = maxLevel and max(maxLevel, storedMin) or storedMin
+    end
+    if storedMax and storedMax > 0 then
+      minLevel = minLevel and min(minLevel, storedMax) or storedMax
+      maxLevel = maxLevel and max(maxLevel, storedMax) or storedMax
+    end
+    for _, context in pairs(type(mob.contexts) == "table" and mob.contexts or {}) do
+      local level = type(context) == "table" and tonumber(context.mobLevel) or nil
+      if level and level > 0 then
+        minLevel = minLevel and min(minLevel, level) or level
+        maxLevel = maxLevel and max(maxLevel, level) or level
+      end
+    end
+  end
+  return minLevel, maxLevel
+end
+
+function XPTooltip:GetMobRelevance(mob, unitLevel, playerLevel)
+  local _, maxLevel = self:GetMobLevelRange(mob, unitLevel)
+  local player = tonumber(playerLevel)
+  if not player or not maxLevel then
+    return "active"
+  end
+  if player > maxLevel + 5 then
+    return "historical"
+  end
+  return "active"
+end
+
 function XPTooltip:GetMobCapacityLimit()
   local db = self.char
   if type(db) ~= "table" then return MAX_MOBS end

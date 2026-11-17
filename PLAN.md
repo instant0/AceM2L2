@@ -114,8 +114,10 @@ Next:
    Result: `docs/SC-6-CAPACITY-SELF-ASSESSMENT-RESULT.md`.
 13. ~~**SC-4 — Context cap.**~~ **Done 2026-11-17.**
    Result: `docs/SC-4-CONTEXT-CAP-RESULT.md`.
-14. **SC-5 — Migration/pruning/cap tests.** **Next; non-live.**
-15. **MEM-1 — Real memory measurement.** Compare AceM2L2 with ATT/FLG and decide
+14. ~~**SC-5 — Migration/pruning/cap tests.**~~ **Done 2026-11-17.**
+   Result: `docs/SC-5-MIGRATION-PRUNING-RESULT.md`.
+15. **G-2 — Grid occupancy study.** **Next; non-live.**
+16. **MEM-1 — Real memory measurement.** Compare AceM2L2 with ATT/FLG and decide
    whether H64-9-F3 is needed; do not optimize from the 20MB fixture figure.
 
 ### Phase 2 — storage evidence
@@ -144,7 +146,7 @@ complete.** DS-1 is in
 DS-5 is in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`; DS-17.1 is in
 `docs/DS-17-1-AGGREGATION-DECISION.md`; DS-17.2, DS-17.3, DS-1-F2, DS-4P,
 DS-4P-F1, DS-4P-F2, DS-6, DS-7/DS-12, and DS-6-F1 are complete.
-Next non-live: SC-5 (migration, pruning, cap tests). V-2 is deferred to live-only residual checks; IMP-1B11 final removal follows V-2.
+Next non-live: HIST-1A (historical/outleveled tooltip and Detail). G-2 remains queued. V-2 is deferred to live-only residual checks.
 
 ### Phase 3 — storage design and prototypes
 
@@ -237,9 +239,10 @@ Run after DS-2/DS-3 measurements:
    Result: `docs/SC-6-CAPACITY-SELF-ASSESSMENT-RESULT.md`.
 5. ~~**SC-4 — Context cap.**~~ **Done 2026-11-17.**
    Result: `docs/SC-4-CONTEXT-CAP-RESULT.md`.
-6. **SC-5 — Migration/pruning/cap tests.** **Next; non-live.**
-7. **G-1 — Coordinate code review.**
-8. **G-2 — 64 vs 96/128 occupancy study.**
+6. ~~**SC-5 — Migration/pruning/cap tests.**~~ **Done 2026-11-17.**
+   Result: `docs/SC-5-MIGRATION-PRUNING-RESULT.md`.
+7. **G-2 — 64 vs 96/128 occupancy study.** **Next; non-live.**
+8. **G-1 — Coordinate code review.**
 9. **G-3 — Grid decision.**
 10. **HC-7 — Tracking-limit configurability decision.**
 
@@ -247,8 +250,14 @@ Run after DS-2/DS-3 measurements:
 
 Only after DS-11:
 
-1. **J-1..J-6 — Journey overlay.**
-2. **M-1..M-6 — Cell inspector.**
+1. **HIST-1 — Historical/outleveled character value.** Proposed. See
+   `docs/tasks/HIST-1-HISTORICAL-RELEVANCE.md`.
+   - HIST-1A relevance classifier + historical tooltip/Detail;
+   - HIST-1B historical zone surfaces;
+   - HIST-1C bounded quest-anchor log;
+   - HIST-1D account Knowledge integration later.
+2. **J-1..J-6 — Journey overlay.**
+3. **M-1..M-6 — Cell inspector.**
 
 ### Phase 6 — final live validation
 
@@ -428,7 +437,8 @@ cap changes.
 41. **SC-3 — choose a tier.** **Done 2026-11-17.**
 42. **SC-6 — capacity self-assessment.** **Done 2026-11-17.**
 43. **SC-4 — context cap.** **Done 2026-11-17.**
-44. **SC-5 — migration/pruning/cap tests.** **Next; non-live.**
+44. **SC-5 — migration/pruning/cap tests.** **Done 2026-11-17.**
+45. **G-2 — 64 vs 96/128 occupancy study.** **Next; non-live.**
 
 Do not start global-cap removal, schema migration, the LoadOnDemand companion,
 or a production cold tier before step 5 is proven.
@@ -738,9 +748,9 @@ size. `MAX_PENDING_DEATHS`, visible rows, grinding thresholds, and
       Result: `docs/SC-3-TIER-DECISION-RESULT.md`.
 - [x] **SC-4 — Protect contexts.** Decided/validated 2026-11-17: hot cap 12,
       cold top-8+other policy. Result: `docs/SC-4-CONTEXT-CAP-RESULT.md`.
-- [ ] **SC-5 — Migration/pruning/cap tests.** **Next.** Add versioned
-      normalization, downgrade behavior, cap tests, and a documented
-      reset/retention path.
+- [x] **SC-5 — Migration/pruning/cap tests.** Executed 2026-11-17. Result:
+      `docs/SC-5-MIGRATION-PRUNING-RESULT.md`.
+- [ ] **G-2 — 64 vs 96/128 occupancy study.** **Next; non-live.**
 - [ ] **G-1 — Coordinate capture code review.** Read `CaptureUnit`,
       `GetPlayerMapPosition`, death commits, and target/mouseover paths; evaluate
       `UnitPosition`/`C_Map.GetMapPosFromWorldPos` from API docs. Live position

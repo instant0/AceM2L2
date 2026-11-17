@@ -1,6 +1,8 @@
 # SC-5 — Migration, pruning, and cap tests
 
-**Status:** next; non-live implementation/validation  
+**Status:** executed 2026-11-17  
+**Result:** `docs/SC-5-MIGRATION-PRUNING-RESULT.md`  
+**Harness:** `tests/cap_boundaries.lua`  
 **Depends on:** SC-1..SC-4, SC-6, IMP-1B11 prep  
 **Blocks:** V-2, final limit release
 
