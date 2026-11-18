@@ -153,6 +153,9 @@ function XPTooltip:CreateUI()
     if type(self.ReleaseTransientCaches) == "function" then
       pcall(self.ReleaseTransientCaches, self)
     end
+    if type(self.CloseHeatmapSelector) == "function" then
+      pcall(self.CloseHeatmapSelector, self)
+    end
   end)
   frame:SetScript("OnShow", function()
     self:SafeRefreshUI()
@@ -624,6 +627,9 @@ function XPTooltip:SaveUIPosition()
 end
 
 function XPTooltip:SetTab(tab)
+  if type(self.CloseHeatmapSelector) == "function" then
+    pcall(self.CloseHeatmapSelector, self)
+  end
   local previousTab = self.tab
   if tab ~= "overview" and tab ~= "mobs" and tab ~= "areas" and tab ~= "levels"
     and tab ~= "quests" and tab ~= "deaths" and tab ~= "heatmap" then

@@ -15,7 +15,7 @@ state.now = 100
 module:OnJourneyEnterWorld()
 local journey = module.char.journey
 assert(type(journey) == "table", "Journey table missing")
-assert(journey.schema == 1, "Journey schema mismatch")
+assert(journey.schema == 2, "Journey schema mismatch")
 
 state.now = 110
 module:OnJourneyKill({ mapID = 12, playerLevel = 10 }, 100)

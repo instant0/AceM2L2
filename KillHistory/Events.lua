@@ -182,6 +182,10 @@ function XPTooltip:OnMaxLevelUpdate(event)
 end
 
 function XPTooltip:StartSession()
+  self.journeyDecodedBlocks = 0
+  if type(self.ClearJourneyBlockCache) == "function" then
+    pcall(self.ClearJourneyBlockCache, self)
+  end
   local db = self.char
   if type(db.session) ~= "table" then
     db.session = {}

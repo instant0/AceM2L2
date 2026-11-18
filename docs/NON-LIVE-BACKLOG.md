@@ -17,8 +17,14 @@ client. Live-only residuals are in `docs/tasks/V-2-LIVE-VERIFICATION.md`.
 | **MEM-2** load/unload policy | Done 2026-11-16 | `docs/MEM-2-LOAD-UNLOAD-RESULT.md` |
 | **IMP-1B11** rollback retirement | Preparation done 2026-11-16 | `docs/IMP-1B11-ROLLBACK-RETIREMENT-PREP.md`; final removal after V-2 |
 | **DS-13** on-demand companion packaging | Code/package split can be built offline | Variable timing remains live |
-| **DS-17.4D** account Knowledge prototype | Derive from character SavedVariables | Future alt feature; fully offline |
-| **DS-17.6** validation/decision | Consolidate model evidence | Offline |
+| **DS-17.4D** account Knowledge prototype | Done 2026-11-18 | `docs/DS-17-04D-ACCOUNT-KNOWLEDGE-RESULT.md` |
+| **DS-17.6A** current data-model validation | Done: production is v1 + additive Journey | `docs/DS-17-06A-DATA-MODEL-VALIDATION-RESULT.md` |
+| **DS-17.7** data-model reconciliation | Done: v2 target, staged migration | `docs/DS-17-07-DATA-MODEL-RECONCILIATION-RESULT.md` |
+| **DS-17.8** P0 data-model safety | Done 2026-11-18 | `docs/DS-17-08-DATA-MODEL-P0-SAFETY-RESULT.md` |
+| **DS-17.9** S1 data-model scaffolding | Done 2026-11-18 | `docs/DS-17-09-DATA-MODEL-S1-SCAFFOLDING-RESULT.md` |
+| **DS-17.10** S2A mob model migration | Done: kill/backfill + v2-only reads | `docs/DS-17-10-S2A-MOB-MODEL-RESULT.md` |
+| **DS-17.11** S2A mutation parity | Next: merge/delete/prune sync | DS-17.10 |
+| **DS-17.6B** ALT/account validation | Future only | DS-17.7, DS-17.4D, V-2, MEM-1 |
 | **H64-10** schema/downgrade decision | Decide schema bump policy | Offline |
 
 ## 2. Studies and decisions
@@ -41,7 +47,7 @@ client. Live-only residuals are in `docs/tasks/V-2-LIVE-VERIFICATION.md`.
 | **G-2** 64 vs 96/128 occupancy | Done 2026-11-17 | `docs/G-2-GRID-OCCUPANCY-RESULT.md` |
 | **G-3** grid decision | Done: keep 64x64 | `docs/G-3-GRID-DECISION-RESULT.md` |
 | **HC-7** tracking-limit configurability | Done: keep internal limits | `docs/HC-7-LIMIT-CONFIGURABILITY-RESULT.md` |
-| **UI-5** heatmap zone/instance selector | Next: alphabetical name/kills/level list | UI-3/UI-4 |
+| **UI-5** heatmap zone/instance selector | Done 2026-11-18 | `docs/UI-5-HEATMAP-ZONE-SELECTOR-RESULT.md` |
 
 ## 3. Feature work
 
@@ -85,8 +91,15 @@ These are feature tasks, not verification gates.
 16. ~~**G-1A** coordinate source/policy review.~~ — done.
 17. ~~**G-1B** heatmap commit-time position refresh.~~ — done.
 18. ~~**HC-7** tracking-limit configurability decision.~~ — done.
-19. **UI-5** heatmap zone/instance selector. **Next.**
-20. **DS-17.4D / DS-17.6** as the next design block.
+19. ~~**UI-5** heatmap zone/instance selector.~~ — done.
+20. ~~**DS-17.4D** account Knowledge prototype.~~ — done.
+21. ~~**DS-17.6A** current data-model validation.~~ — done.
+22. ~~**DS-17.7** data-model reconciliation/migration plan.~~ — done.
+23. ~~**DS-17.8** P0 data-model safety fixes.~~ — done.
+24. ~~**DS-17.9** S1 data-model scaffolding.~~ — done.
+25. ~~**DS-17.10** S2A mob model migration.~~ — done.
+26. **DS-17.11** S2A mutation parity. **Next.**
+27. **DS-17.6B** ALT/account validation — future only.
 
 V-2 should not block these. Run it when a live client is available and keep it
 focused on the live-only table.

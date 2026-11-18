@@ -126,7 +126,7 @@ met, show “insufficient data” and do not present the route as authoritative.
 8. How many alts/samples are needed before a route recommendation is meaningful?
 9. Should shared knowledge include mob names/NPC IDs or only zone-level stats?
 10. What query APIs/UI does a new character need?
-11. What privacy/clearance controls are required?
+11. Which source-only fields are unnecessary in the shared view?
 12. How stale is too stale?
 13. What exactly is “efficient” for the route: XP/hour, time-to-level, deaths,
     travel, fun/preference, or a weighted combination?
@@ -192,7 +192,7 @@ separately; they are not player history.
 - Define rebuild vs cache strategy.
 - Define source-character deletion behavior.
 - Define query APIs/UI.
-- Define privacy/clear controls.
+- Define the source-field exclusion list.
 - Define route granularity and scoring model.
 - Identify missing observations (travel, downtime, quest completion, deaths).
 - Build a route-recommendation prototype from synthetic aggregates.
@@ -203,7 +203,7 @@ separately; they are not player history.
 
 - Shared-knowledge schema.
 - Confidence/staleness rules and sufficiency thresholds.
-- Privacy/exclusion list.
+- Source-field exclusion list.
 - Query/UI specification.
 - Route recommendation specification.
 - Prototype and backtest report.
@@ -234,4 +234,4 @@ separately; they are not player history.
 - Route recommendations can become stale after class or content changes.
 - Mob identity may be unstable across clients.
 - Shared data could grow unbounded if every band/zone/mob is stored.
-- Privacy expectations may require opt-out.
+- Source-field boundaries must stay clear as the model grows.

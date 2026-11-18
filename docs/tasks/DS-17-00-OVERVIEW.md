@@ -55,7 +55,7 @@ DS-5  loading API ─────────┘        ├─> DS-17.2 modes / 
 - **Modes:** leveling vs endgame, max-level archive, level-cap generations.
 - **Compression:** hot/warm/cold, heatmap downsampling, context collapse,
   packed blocks.
-- **Alts:** account-wide aggregate knowledge, confidence, privacy.
+- **Alts:** account-wide aggregate knowledge and confidence.
 - **Migration:** backup, downgrade, companion/split file.
 - **Decision:** DS-11 after DS-17.6.
 

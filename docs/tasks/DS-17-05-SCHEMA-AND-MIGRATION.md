@@ -47,7 +47,7 @@ AceM2L2CharDB.xpTooltip.clients[project] -- per-character Journey
   .journey.quests
 ```
 
-No upload, network, privacy, or cross-account roots.
+No upload, network, or cross-account roots.
 
 ## Field ownership
 

@@ -10,6 +10,7 @@ local Util = XPTooltip.Util
 
 local STORAGE_SCHEMA = 2
 local CACHE_CAPACITY = 8
+local MAX_MOB_ZONE_REFS = 4
 local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local B64_INDEX = {}
 for index = 1, #B64 do B64_INDEX[B64:sub(index, index)] = index - 1 end
@@ -333,6 +334,14 @@ function XPTooltip:FlushJourneyBlocks()
       journey.mobZones[record.key] = list
     end
   end
+  -- Bound cold fallback fan-out. Selected-zone lookups remain first; this cap
+  -- only limits the unqualified fallback index.
+  for _, list in pairs(journey.mobZones) do
+    table.sort(list)
+    while #list > MAX_MOB_ZONE_REFS do
+      table.remove(list)
+    end
+  end
   local dirty = journey.dirtyZones
   local buildAll = next(journey.blocks) == nil
   local keys, seen = {}, {}
@@ -382,8 +391,10 @@ function XPTooltip:FlushJourneyBlocks()
         updatedAt = Epoch(),
       }
     elseif journey.blocks[zoneKey] then
-      journey.blocks[zoneKey] = nil
-      journey.blockIndex[zoneKey] = nil
+      -- Do not delete a block merely because the legacy source is empty.
+      -- Retirement, a partial migration, or a clear can present an empty
+      -- legacy view while the block is still the only surviving copy.
+      -- Explicit reset/compaction owns deletion.
     end
     dirty[zoneKey] = nil
   end
@@ -491,12 +502,21 @@ end
 function XPTooltip:GetJourneyHeatmapZones()
   local journey = self:EnsureJourneyStorage()
   if not journey then return {} end
+  local db = self.char
+  local legacy = db and type(db.heatmaps) == "table" and db.heatmaps or nil
   local zones = {}
   for zoneKey, meta in pairs(journey.blockIndex or {}) do
     if type(zoneKey) == "string" and zoneKey:sub(1, 4) == "map:"
       and type(meta) == "table" and (tonumber(meta.heatmapKills) or 0) > 0 then
       local mapID = tonumber(zoneKey:sub(5))
-      if mapID then
+      local retained = true
+      if legacy then
+        local entry = legacy[tostring(mapID)]
+        retained = type(entry) == "table"
+          and ((tonumber(entry.total) or 0) > 0
+            or (type(entry.cells) == "table" and next(entry.cells) ~= nil))
+      end
+      if mapID and retained then
         zones[#zones + 1] = {
           mapID = mapID,
           key = zoneKey,

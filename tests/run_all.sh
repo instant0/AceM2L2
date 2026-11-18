@@ -44,11 +44,20 @@ echo "== Journey instrumentation =="
 echo "== Journey queries =="
 "$LUA_BIN" tests/journey_queries.lua forever
 
+echo "== S1 model helpers =="
+"$LUA_BIN" tests/s1_model_helpers.lua
+
+echo "== S2A migration simulation =="
+"$LUA_BIN" tests/s2a_migration_sim.lua
+
 echo "== Journey block storage =="
 "$LUA_BIN" tests/journey_storage.lua forever
 
 echo "== Journey save guard =="
 "$LUA_BIN" tests/journey_save_guard.lua forever
+
+echo "== P0 data-model safety =="
+"$LUA_BIN" tests/p0_data_model_safety.lua
 
 echo "== Tooltip/Detail fallback =="
 "$LUA_BIN" tests/tooltip_fallback.lua forever
@@ -80,6 +89,9 @@ echo "== Heatmap lazy zone =="
 echo "== Heatmap commit position =="
 "$LUA_BIN" tests/heatmap_commit_position.lua forever
 
+echo "== Heatmap selector =="
+"$LUA_BIN" tests/heatmap_selector.lua forever
+
 echo "== Grid occupancy =="
 "$LUA_BIN" tests/grid_occupancy.lua verify
 
@@ -106,6 +118,9 @@ echo "== Limit tier =="
 
 echo "== Capacity assessment =="
 "$LUA_BIN" tests/capacity_assessment.lua forever
+
+echo "== Account Knowledge =="
+"$LUA_BIN" tests/ds17_4d_knowledge.lua
 
 echo "== Context cap =="
 "$LUA_BIN" tests/context_cap.lua forever

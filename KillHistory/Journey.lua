@@ -8,7 +8,8 @@ local AceM2L2 = AceM2L2
 local XPTooltip = AceM2L2.KillHistory
 local Util = XPTooltip.Util
 
-local JOURNEY_SCHEMA = 1
+-- Data-model revision. Storage schema 2 is authoritative; keep this aligned.
+local JOURNEY_SCHEMA = 2
 local MAX_QUEST_ANCHORS = 5000
 local ENGAGED_GAP_CAP = 60
 

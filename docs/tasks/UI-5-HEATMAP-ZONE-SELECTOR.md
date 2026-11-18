@@ -1,6 +1,7 @@
 # UI-5 — Heatmap zone/instance selector
 
-**Status:** next; non-live UI feature  
+**Status:** executed 2026-11-18.  
+**Result:** `docs/UI-5-HEATMAP-ZONE-SELECTOR-RESULT.md`  
 **Depends on:** G-3, IMP-1B10, UI-3/UI-4, H64-9-F5  
 **Related:** Areas tab, `GetHeatmapZoneIndex`, `db.instances`  
 **Live gate:** V-1 visual/frame check after implementation
@@ -82,7 +83,8 @@ If no levels are recorded, show `—`.
 
 - Add a dedicated `Select` button next to the arrows.
 - Open a bounded popup/list anchored under the selector row.
-- Show roughly 10 rows at a time with a scroll frame.
+- Show up to 10 rows in a bounded row pool; mouse wheel shifts the offset. No
+  new ScrollFrame/scrollbar template is required.
 - Selected row is highlighted.
 - Row layout: name (left), kills (right), level range (far right), optional
   `Dungeon` tag.
@@ -90,8 +92,9 @@ If no levels are recorded, show `—`.
 - Close on selection, Escape, click outside, tab change, or window close.
 - Keep `<`, `>`, and `Current zone`.
 - No new SavedVariables; selection remains in-memory.
-- Build the row list through a testable helper and keep it in the heatmap UI
-  table for tests; do not expose it as a public data API.
+- Build the row list through `RefreshHeatmapSelector` and keep
+  `selectorEntries` in the heatmap UI table for tests; do not expose it as a
+  public data API.
 
 ### Cost
 

@@ -95,6 +95,193 @@ local function ReadMapName(module, mapID)
   return "Map " .. tostring(mapID)
 end
 
+
+local function SelectorLevelRange(levels)
+  local minLevel, maxLevel
+  if type(levels) == "table" then
+    for levelKey, count in pairs(levels) do
+      local level = tonumber(levelKey)
+      if level and (tonumber(count) or 0) > 0 then
+        if not minLevel or level < minLevel then minLevel = level end
+        if not maxLevel or level > maxLevel then maxLevel = level end
+      end
+    end
+  end
+  return minLevel, maxLevel
+end
+
+local function SelectorLevelText(minLevel, maxLevel)
+  if not minLevel then
+    return "—"
+  end
+  if not maxLevel or maxLevel == minLevel then
+    return tostring(minLevel)
+  end
+  return tostring(minLevel) .. "-" .. tostring(maxLevel)
+end
+
+local function MergeSelectorLevels(target, source)
+  if type(source) ~= "table" then return end
+  for levelKey, count in pairs(source) do
+    local amount = tonumber(count) or 0
+    if amount > 0 then
+      target[levelKey] = (target[levelKey] or 0) + amount
+    end
+  end
+end
+
+-- One row per heatmap map ID. Instance metadata is merged by map ID so
+-- difficulty variants cannot produce duplicate selector rows.
+local function BuildHeatmapSelectorRows(owner, zones)
+  local db = owner.char or {}
+  local areas = type(db.areas) == "table" and db.areas or {}
+  local areaLevels = type(db.areaLevels) == "table" and db.areaLevels or {}
+  local instances = type(db.instances) == "table" and db.instances or {}
+
+  local byMap = {}
+  for _, entry in pairs(instances) do
+    if type(entry) == "table" then
+      local mapID = tonumber(entry.mapID)
+      if mapID and mapID > 0 then
+        local info = byMap[mapID]
+        if not info then
+          info = { mapID = mapID, kills = 0, levels = {}, lastSeen = 0 }
+          byMap[mapID] = info
+        end
+        info.kills = info.kills + (tonumber(entry.kills) or 0)
+        MergeSelectorLevels(info.levels,
+          type(entry.killsAtLevel) == "table" and entry.killsAtLevel or nil)
+        local seen = tonumber(entry.lastSeen) or 0
+        local name = type(entry.name) == "string" and entry.name or ""
+        if name ~= "" and (seen > info.lastSeen
+          or (seen == info.lastSeen and name < (info.name or ""))) then
+          info.name = name
+          info.lastSeen = seen
+        end
+      end
+    end
+  end
+
+  local rows = {}
+  for _, zone in ipairs(zones or {}) do
+    local mapID = tonumber(zone.mapID)
+    if mapID and mapID > 0 then
+      local mapKey = tostring(mapID)
+      local instance = byMap[mapID]
+      local name = instance and instance.name or ReadMapName(owner, mapID)
+      if not name or name == "" or name == "Unknown instance" then
+        name = ReadMapName(owner, mapID)
+      end
+      local kills = tonumber(zone.total) or 0
+      if kills <= 0 then
+        kills = tonumber(areas[mapKey]) or (instance and instance.kills) or 0
+      end
+      local levels = instance and instance.levels or areaLevels[mapKey]
+      local minLevel, maxLevel = SelectorLevelRange(levels)
+      rows[#rows + 1] = {
+        mapID = mapID,
+        key = ZoneKey(zone) or mapKey,
+        name = name,
+        kills = kills,
+        minLevel = minLevel,
+        maxLevel = maxLevel,
+        instance = instance ~= nil,
+      }
+    end
+  end
+
+  table.sort(rows, function(a, b)
+    local left = Lower(a.name) or string.lower(tostring(a.name or ""))
+    local right = Lower(b.name) or string.lower(tostring(b.name or ""))
+    if left ~= right then
+      return left < right
+    end
+    return a.mapID < b.mapID
+  end)
+  return rows
+end
+
+local function CreateSelectorRow(owner, parent, index)
+  local row = CreateFrame("Button", nil, parent)
+  row:SetHeight(SELECTOR_ROW_HEIGHT)
+  row:SetPoint("TOPLEFT", 12, -28 - (index - 1) * SELECTOR_ROW_HEIGHT)
+  row:SetPoint("TOPRIGHT", -12, -28 - (index - 1) * SELECTOR_ROW_HEIGHT)
+
+  local border = row:CreateTexture(nil, "BACKGROUND", nil, 1)
+  border:SetAllPoints()
+  row.border = border
+  local bg = row:CreateTexture(nil, "BACKGROUND", nil, 2)
+  bg:SetPoint("TOPLEFT", 1, -1)
+  bg:SetPoint("BOTTOMRIGHT", -1, 1)
+  row.bg = bg
+
+  local nameLabel = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  nameLabel:SetPoint("LEFT", 8, 0)
+  nameLabel:SetWidth(300)
+  nameLabel:SetJustifyH("LEFT")
+  nameLabel:SetWordWrap(false)
+  row.nameLabel = nameLabel
+
+  local tagLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  tagLabel:SetPoint("LEFT", nameLabel, "RIGHT", 6, 0)
+  tagLabel:SetWidth(72)
+  tagLabel:SetJustifyH("LEFT")
+  row.tagLabel = tagLabel
+
+  local killsLabel = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  killsLabel:SetPoint("RIGHT", -110, 0)
+  killsLabel:SetWidth(82)
+  killsLabel:SetJustifyH("RIGHT")
+  row.killsLabel = killsLabel
+
+  local levelLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  levelLabel:SetPoint("RIGHT", -12, 0)
+  levelLabel:SetWidth(86)
+  levelLabel:SetJustifyH("RIGHT")
+  row.levelLabel = levelLabel
+
+  row.entry = nil
+  row.selected = false
+  row.hover = false
+
+  function row:ApplyStyle()
+    local theme = owner:GetTheme()
+    local fill = { 0, 0, 0, 0 }
+    local edge = { 0, 0, 0, 0 }
+    local nameColor = theme.text
+    if self.selected then
+      fill = { theme.accent[1], theme.accent[2], theme.accent[3], 0.28 }
+      edge = { theme.accent[1], theme.accent[2], theme.accent[3], 0.8 }
+      nameColor = theme.text
+    elseif self.hover then
+      fill = { theme.accent[1], theme.accent[2], theme.accent[3], 0.14 }
+      edge = { theme.border[1], theme.border[2], theme.border[3], 0.6 }
+    end
+    self.bg:SetColorTexture(fill[1], fill[2], fill[3], fill[4])
+    self.border:SetColorTexture(edge[1], edge[2], edge[3], edge[4])
+    self.nameLabel:SetTextColor(nameColor[1], nameColor[2], nameColor[3])
+    self.tagLabel:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
+    self.killsLabel:SetTextColor(theme.text[1], theme.text[2], theme.text[3])
+    self.levelLabel:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
+  end
+
+  row:SetScript("OnEnter", function(self)
+    self.hover = true
+    self:ApplyStyle()
+  end)
+  row:SetScript("OnLeave", function(self)
+    self.hover = false
+    self:ApplyStyle()
+  end)
+  row:SetScript("OnClick", function(self)
+    if self.entry then
+      pcall(owner.SelectHeatmapSelectorEntry, owner, self.entry)
+    end
+  end)
+  row:ApplyStyle()
+  return row
+end
+
 local function Color(texture, color, alpha)
   if not texture or type(color) ~= "table" then
     return
@@ -517,6 +704,9 @@ end
 function XPTooltip:ReleaseHeatmapUIResources()
   local heatmap = self.ui and self.ui.heatmap
   if not heatmap then return false end
+  if type(self.CloseHeatmapSelector) == "function" then
+    pcall(self.CloseHeatmapSelector, self)
+  end
   HideHeatCells(heatmap)
   HideHeatmapArt(heatmap)
   heatmap.cells = {}
@@ -788,6 +978,93 @@ function XPTooltip:CreateHeatmapPanel(frame)
     pcall(self.RefreshHeatmap, self)
   end)
 
+
+  local selectButton = CreateTextButton(selector, "Select", 76, 22)
+  selectButton:SetPoint("RIGHT", currentButton, "LEFT", -8, 0)
+  selectButton:SetScript("OnClick", function()
+    pcall(self.ToggleHeatmapSelector, self)
+  end)
+
+  local menuParent = _G.UIParent or panel
+  local menu = CreateBackdropFrame(menuParent, "AceM2L2HeatmapSelector")
+  menu:SetPoint("TOPLEFT", selector, "BOTTOMLEFT", 0, -4)
+  menu:SetSize(SELECTOR_MENU_WIDTH,
+    28 + SELECTOR_VISIBLE_ROWS * SELECTOR_ROW_HEIGHT + 24)
+  if menu.SetFrameStrata then
+    menu:SetFrameStrata("FULLSCREEN_DIALOG")
+  end
+  if menu.SetClampedToScreen then
+    menu:SetClampedToScreen(true)
+  end
+  menu:EnableMouse(true)
+  menu:Hide()
+  self:StylePanel(menu, "elevated")
+
+  local headerName = menu:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  headerName:SetPoint("TOPLEFT", 20, -6)
+  headerName:SetJustifyH("LEFT")
+  headerName:SetText("Zone / Instance")
+
+  local headerKills = menu:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  headerKills:SetPoint("TOPRIGHT", -110, -6)
+  headerKills:SetWidth(82)
+  headerKills:SetJustifyH("RIGHT")
+  headerKills:SetText("Kills")
+
+  local headerLevels = menu:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  headerLevels:SetPoint("TOPRIGHT", -12, -6)
+  headerLevels:SetWidth(86)
+  headerLevels:SetJustifyH("RIGHT")
+  headerLevels:SetText("Levels")
+
+  local selectorRows = {}
+  for index = 1, SELECTOR_VISIBLE_ROWS do
+    selectorRows[index] = CreateSelectorRow(self, menu, index)
+    selectorRows[index]:Hide()
+  end
+
+  local selectorPage = menu:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  selectorPage:SetPoint("BOTTOMLEFT", 12, 6)
+  selectorPage:SetJustifyH("LEFT")
+  selectorPage:SetText("")
+
+  local catcherParent = _G.UIParent or panel
+  local catcher = CreateFrame("Button", nil, catcherParent)
+  catcher:SetAllPoints(catcherParent)
+  if catcher.SetFrameStrata then
+    catcher:SetFrameStrata("FULLSCREEN")
+  end
+  catcher:EnableMouse(true)
+  catcher:Hide()
+  catcher:SetScript("OnClick", function()
+    pcall(self.CloseHeatmapSelector, self)
+  end)
+
+  menu:SetScript("OnHide", function()
+    local heat = self.ui and self.ui.heatmap
+    if heat then
+      heat.selectorOpen = false
+      if heat.selectorCatcher then heat.selectorCatcher:Hide() end
+    end
+  end)
+  if menu.EnableMouseWheel then
+    pcall(menu.EnableMouseWheel, menu, true)
+  end
+  menu:SetScript("OnMouseWheel", function(_, delta)
+    pcall(self.ScrollHeatmapSelector, self, -(tonumber(delta) or 0))
+  end)
+
+  local menuName = (type(menu.GetName) == "function" and menu:GetName()) or nil
+  if menuName and type(_G.UISpecialFrames) == "table" then
+    local exists = false
+    for _, value in ipairs(_G.UISpecialFrames) do
+      if value == menuName then exists = true break end
+    end
+    if not exists then
+      table.insert(_G.UISpecialFrames, menuName)
+    end
+  end
+
   local grid = CreateBackdropFrame(panel)
   grid:SetPoint("TOPLEFT", 12, -72)
   grid:SetPoint("BOTTOMRIGHT", -12, 34)
@@ -851,6 +1128,17 @@ function XPTooltip:CreateHeatmapPanel(frame)
     nextButton = nextButton,
     zoneLabel = zoneLabel,
     currentButton = currentButton,
+    selectButton = selectButton,
+    selectorMenu = menu,
+    selectorRows = selectorRows,
+    selectorEntries = {},
+    selectorOffset = 0,
+    selectorOpen = false,
+    selectorHeaderName = headerName,
+    selectorHeaderKills = headerKills,
+    selectorHeaderLevels = headerLevels,
+    selectorPage = selectorPage,
+    selectorCatcher = catcher,
     grid = grid,
     artTiles = artTiles,
     artCaption = artCaption,
@@ -876,6 +1164,9 @@ function XPTooltip:CreateHeatmapPanel(frame)
   if self.ui then
     self.ui.heatmap = heatmap
   end
+  if type(self.ApplyHeatmapSelectorTheme) == "function" then
+    pcall(self.ApplyHeatmapSelectorTheme, self)
+  end
   return heatmap
 end
 
@@ -900,6 +1191,9 @@ function XPTooltip:RefreshHeatmap()
   local supported = SupportsMapPosition(self)
 
   if settings and settings.heatmapEnabled == false then
+    if type(self.CloseHeatmapSelector) == "function" then
+      pcall(self.CloseHeatmapSelector, self)
+    end
     if not heatmap.disabledClean then
       heatmap.noData:SetText("Heatmap collection is disabled. Enable it in Settings > Heatmap.")
       heatmap.noData:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
@@ -919,6 +1213,9 @@ function XPTooltip:RefreshHeatmap()
   heatmap.disabledClean = false
 
   if #zones == 0 then
+    if type(self.CloseHeatmapSelector) == "function" then
+      pcall(self.CloseHeatmapSelector, self)
+    end
     heatmap.noData:SetText(supported and "No heatmap data" or "Heatmap unavailable on this client.")
     heatmap.noData:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
     heatmap.noData:Show()
@@ -1163,6 +1460,168 @@ function XPTooltip:RefreshHeatmap()
       heatmap.artCaption:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
       heatmap.artCaption:Show()
     end
+  end
+  if heatmap.selectorOpen then
+    pcall(self.RefreshHeatmapSelector, self, zones)
+  end
+end
+
+
+function XPTooltip:UpdateHeatmapSelectorRows()
+  local heatmap = self.ui and self.ui.heatmap
+  if not heatmap or not heatmap.selectorRows then return end
+  local entries = heatmap.selectorEntries or {}
+  local offset = floor(tonumber(heatmap.selectorOffset) or 0)
+  local maximum = max(0, #entries - SELECTOR_VISIBLE_ROWS)
+  if offset < 0 then offset = 0 end
+  if offset > maximum then offset = maximum end
+  heatmap.selectorOffset = offset
+
+  for index = 1, SELECTOR_VISIBLE_ROWS do
+    local row = heatmap.selectorRows[index]
+    local entry = entries[offset + index]
+    row.entry = entry
+    if entry then
+      row.nameLabel:SetText(entry.name or "")
+      row.tagLabel:SetText(entry.instance and "Dungeon" or "")
+      row.killsLabel:SetText(FormatNumber(entry.kills or 0))
+      row.levelLabel:SetText(SelectorLevelText(entry.minLevel, entry.maxLevel))
+      row.selected = entry.key == self.heatmapZoneKey
+      row:Show()
+      row:ApplyStyle()
+    else
+      row.selected = false
+      row:Hide()
+    end
+  end
+
+  if heatmap.selectorPage then
+    if #entries == 0 then
+      heatmap.selectorPage:SetText("No heatmap zones")
+    else
+      local first = offset + 1
+      local last = min(#entries, offset + SELECTOR_VISIBLE_ROWS)
+      heatmap.selectorPage:SetText(string.format(
+        "%d-%d of %d%s", first, last, #entries,
+        maximum > 0 and "  ·  scroll" or ""
+      ))
+    end
+  end
+end
+
+function XPTooltip:RefreshHeatmapSelector(zones)
+  local heatmap = self.ui and self.ui.heatmap
+  if not heatmap or not heatmap.selectorRows then return {} end
+  local entries = BuildHeatmapSelectorRows(self, zones or ReadZones(self))
+  heatmap.selectorEntries = entries
+  self:UpdateHeatmapSelectorRows()
+  return entries
+end
+
+function XPTooltip:SetHeatmapSelectorOffset(value)
+  local heatmap = self.ui and self.ui.heatmap
+  if not heatmap then return end
+  local entries = heatmap.selectorEntries or {}
+  local maximum = max(0, #entries - SELECTOR_VISIBLE_ROWS)
+  local offset = floor(tonumber(value) or 0)
+  if offset < 0 then offset = 0 end
+  if offset > maximum then offset = maximum end
+  heatmap.selectorOffset = offset
+  self:UpdateHeatmapSelectorRows()
+end
+
+function XPTooltip:ScrollHeatmapSelector(delta)
+  local heatmap = self.ui and self.ui.heatmap
+  if not heatmap then return end
+  self:SetHeatmapSelectorOffset(
+    (tonumber(heatmap.selectorOffset) or 0) + (tonumber(delta) or 0)
+  )
+end
+
+function XPTooltip:OpenHeatmapSelector()
+  local heatmap = self.ui and self.ui.heatmap
+  if not heatmap or not heatmap.selectorMenu then return false end
+  local zones = ReadZones(self)
+  if #zones == 0 then
+    return false
+  end
+  self:RefreshHeatmapSelector(zones)
+
+  local entries = heatmap.selectorEntries or {}
+  local selected
+  for index = 1, #entries do
+    if entries[index].key == self.heatmapZoneKey then
+      selected = index
+      break
+    end
+  end
+  if selected then
+    local maximum = max(0, #entries - SELECTOR_VISIBLE_ROWS)
+    heatmap.selectorOffset = max(0, min(maximum,
+      selected - 1 - floor(SELECTOR_VISIBLE_ROWS / 2)))
+    self:UpdateHeatmapSelectorRows()
+  end
+
+  heatmap.selectorOpen = true
+  if heatmap.selectorCatcher then heatmap.selectorCatcher:Show() end
+  heatmap.selectorMenu:Show()
+  if heatmap.selectButton then
+    heatmap.selectButton:SetButtonState("PUSHED", true)
+  end
+  return true
+end
+
+function XPTooltip:CloseHeatmapSelector()
+  local heatmap = self.ui and self.ui.heatmap
+  if not heatmap then return end
+  heatmap.selectorOpen = false
+  if heatmap.selectorCatcher then heatmap.selectorCatcher:Hide() end
+  if heatmap.selectorMenu and heatmap.selectorMenu:IsShown() then
+    heatmap.selectorMenu:Hide()
+  end
+  if heatmap.selectButton then
+    heatmap.selectButton:SetButtonState("PUSHED", false)
+  end
+end
+
+function XPTooltip:ToggleHeatmapSelector()
+  local heatmap = self.ui and self.ui.heatmap
+  if not heatmap then return end
+  if heatmap.selectorOpen then
+    self:CloseHeatmapSelector()
+  else
+    self:OpenHeatmapSelector()
+  end
+end
+
+function XPTooltip:SelectHeatmapSelectorEntry(entry)
+  if type(entry) ~= "table" or not entry.key then return end
+  self.heatmapZoneKey = entry.key
+  self:CloseHeatmapSelector()
+  self:RefreshHeatmap()
+end
+
+function XPTooltip:ApplyHeatmapSelectorTheme()
+  local heatmap = self.ui and self.ui.heatmap
+  if not heatmap then return end
+  local theme = self:GetTheme()
+  if heatmap.selectorMenu then
+    self:StylePanel(heatmap.selectorMenu, "elevated")
+  end
+  if heatmap.selectorHeaderName then
+    heatmap.selectorHeaderName:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
+  end
+  if heatmap.selectorHeaderKills then
+    heatmap.selectorHeaderKills:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
+  end
+  if heatmap.selectorHeaderLevels then
+    heatmap.selectorHeaderLevels:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
+  end
+  if heatmap.selectorPage then
+    heatmap.selectorPage:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
+  end
+  for _, row in ipairs(heatmap.selectorRows or {}) do
+    if row and row.ApplyStyle then row:ApplyStyle() end
   end
 end
 

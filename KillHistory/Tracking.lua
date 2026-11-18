@@ -382,6 +382,14 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
     self:RecordObservation(mob, info, rawBase, buffedXP, totalXP)
   end
 
+  if type(self.RecordModelMobKill) == "function" then
+    local ok, err = pcall(self.RecordModelMobKill, self, mobKey, info,
+      mapID, instanceKey, playerLevel, totalXP)
+    if not ok then
+      self:ReportError("RecordModelMobKill", err, false)
+    end
+  end
+
   if self.ui and self.ui:IsShown() then
     self:RequestUIUpdate()
   end

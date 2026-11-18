@@ -436,7 +436,27 @@ is no fixed MB target.
 - **HC-7** is complete: keep internal adaptive limits; no player-facing cap
   controls until MEM-1/live guardrails. Result:
   `docs/HC-7-LIMIT-CONFIGURABILITY-RESULT.md`.
-- **UI-5** is next: heatmap zone/instance selector.
+- **UI-5** is complete: alphabetical heatmap zone/instance selector with
+  name/kills/player-level range. Result:
+  `docs/UI-5-HEATMAP-ZONE-SELECTOR-RESULT.md`.
+- **DS-17.4D** is complete: synthetic account Knowledge derivation is feasible,
+  byte-idempotent, and aggregate-only. Result:
+  `docs/DS-17-04D-ACCOUNT-KNOWLEDGE-RESULT.md`.
+- **DS-17.6A** is complete: production is v1 legacy aggregates + an additive
+  Journey, not the DS-17.5 v2 model. Result:
+  `docs/DS-17-06A-DATA-MODEL-VALIDATION-RESULT.md`.
+- **DS-17.7** is complete: v2 is the target, v1+additive Journey is transitional,
+  and migration is staged. Result:
+  `docs/DS-17-07-DATA-MODEL-RECONCILIATION-RESULT.md`.
+- **DS-17.8** is complete: P0 safety fixes for flush deletion, stale blocks,
+  command fallback, mob-zone cap, decode counter, and schema alignment. Result:
+  `docs/DS-17-08-DATA-MODEL-P0-SAFETY-RESULT.md`.
+- **DS-17.9** is complete: read-only v2-shaped owner/parity helpers. Result:
+  `docs/DS-17-09-DATA-MODEL-S1-SCAFFOLDING-RESULT.md`.
+- **DS-17.10** is complete: v2 mob kill/backfill path and v2-only reads. Result:
+  `docs/DS-17-10-S2A-MOB-MODEL-RESULT.md`.
+- **DS-17.11** is next: mutation parity for merge/delete/prune.
+- Live gates remain MEM-1/V-1/V-2.
 - **V-2** is deferred to live-only residual checks.
 
-DS-1-F2, IMP-1A, IMP-1B query APIs, IMP-1B2 block storage, IMP-1B3 block retrieval, IMP-1B4 save guard, IMP-1B5 tooltip fallback, IMP-1B6 mob index, IMP-1B7 list/Overview switch, IMP-1B8 command switch, IMP-1B9 Areas/Levels parity, IMP-1B10 heatmap blocks, IMP-1B12 area/level summaries, H64-9-F1/F2 heatmap fixes, H64-9-F4 lazy normalization, R-4 overlay audit fixes, UI-3/UI-4 views, MEM-2 cache policy, SC-6 capacity assessment, and HIST-1A/1B/1C historical views are production-code changes; the other storage/design tasks remain documentation/prototype-only.
+DS-1-F2, IMP-1A, IMP-1B query APIs, IMP-1B2 block storage, IMP-1B3 block retrieval, IMP-1B4 save guard, IMP-1B5 tooltip fallback, IMP-1B6 mob index, IMP-1B7 list/Overview switch, IMP-1B8 command switch, IMP-1B9 Areas/Levels parity, IMP-1B10 heatmap blocks, IMP-1B12 area/level summaries, H64-9-F1/F2 heatmap fixes, H64-9-F4 lazy normalization, R-4 overlay audit fixes, UI-3/UI-4 views, G-1B heatmap position refresh, UI-5 heatmap selector, MEM-2 cache policy, SC-6 capacity assessment, and HIST-1A/1B/1C historical views are production-code changes; the other storage/design tasks remain documentation/prototype-only.

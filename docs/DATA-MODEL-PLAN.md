@@ -1,8 +1,9 @@
 # Data model plan — Journey, account-wide Knowledge, storage, and retrieval
 
 **Status:** authoritative working plan; documented 2026-11-16  
-**Scope:** local SavedVariables only. No uploads, no external sharing, no privacy
-layer. “Account-wide” means the same player’s characters on the same computer.  
+**Scope:** local SavedVariables only. No uploads, no external sharing, no
+cross-account data. “Account-wide” means the same player’s characters on the
+same computer.  
 **Primary asset:** the per-character Journey.  
 **Future target:** derived account-wide Knowledge for the player’s own alts.
 
@@ -162,7 +163,8 @@ Document: `docs/tasks/DS-15-LAZY-RETRIEVAL-CACHE.md`
 
 ### Phase D — account-wide Knowledge prototype (future)
 
-**D1. DS-17.4D — Account Knowledge derivation prototype.**  
+**D1. DS-17.4D — Account Knowledge derivation prototype.** Done 2026-11-18.  
+Result: `docs/DS-17-04D-ACCOUNT-KNOWLEDGE-RESULT.md`  
 Document: `docs/tasks/DS-17-04D-ACCOUNT-KNOWLEDGE-PROTOTYPE.md`
 
 - read character SavedVariables;
@@ -317,7 +319,7 @@ Verdicts: **P** proceed, **R** revise/proceed with constraints, **D** defer.
 ## 7. Non-goals
 
 - No uploads or external sharing.
-- No privacy/clearance layer.
+- No network or cross-account model.
 - No merge implementation now.
 - No per-kill event log.
 - No global all-name list.

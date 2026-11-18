@@ -135,13 +135,20 @@ local function SortZones(list)
   end)
 end
 
+local function CellKillCount(value)
+  if type(value) == "table" then
+    return FiniteNumber(value.kills) or 0
+  end
+  return FiniteNumber(value) or 0
+end
+
 local function CountCells(cells)
   local count = 0
   if type(cells) ~= "table" then
     return count
   end
   for _, value in pairs(cells) do
-    if (FiniteNumber(value) or 0) > 0 then
+    if CellKillCount(value) > 0 then
       count = count + 1
     end
   end
@@ -583,10 +590,10 @@ local function DropOldestMap(heatmaps)
     end
   end
   if oldestKey == nil then
-    return false
+    return nil
   end
   heatmaps[oldestKey] = nil
-  return true
+  return oldestKey
 end
 
 function XPTooltip:RecordHeatmapKill(mapID, x, y)
@@ -639,11 +646,17 @@ function XPTooltip:RecordHeatmapKill(mapID, x, y)
   for _ in pairs(heatmaps) do
     mapCount = mapCount + 1
   end
+  local droppedAny = false
   while mapCount > MAX_HEATMAP_MAPS do
-    if not DropOldestMap(heatmaps) then
+    local dropped = DropOldestMap(heatmaps)
+    if not dropped then
       break
     end
+    droppedAny = true
     mapCount = mapCount - 1
+  end
+  if droppedAny and type(self.SyncJourneyHeatmapIndex) == "function" then
+    pcall(self.SyncJourneyHeatmapIndex, self)
   end
   self:InvalidateHeatmapZoneCache()
   if self.MarkJourneyDirty then
@@ -665,10 +678,52 @@ local function ZoneName(owner, mapID)
   return "Map " .. tostring(mapID)
 end
 
+function XPTooltip:SyncJourneyHeatmapIndex()
+  local db = type(self.char) == "table" and self.char or nil
+  local journey = db and db.journey
+  local index = journey and journey.blockIndex
+  if type(index) ~= "table" or type(db.heatmaps) ~= "table" then
+    return false
+  end
+  local changed = false
+  for zoneKey, meta in pairs(index) do
+    if type(zoneKey) == "string" and zoneKey:sub(1, 4) == "map:"
+      and type(meta) == "table" then
+      local mapID = tonumber(zoneKey:sub(5))
+      local entry = mapID and db.heatmaps[tostring(mapID)]
+      local retained = type(entry) == "table"
+        and ((tonumber(entry.total) or 0) > 0
+          or (type(entry.cells) == "table" and next(entry.cells) ~= nil))
+      if not retained then
+        if (tonumber(meta.count) or 0) <= 0 then
+          if type(journey.blocks) == "table" then
+            journey.blocks[zoneKey] = nil
+          end
+          index[zoneKey] = nil
+        else
+          meta.heatmapKills = 0
+          meta.lastSeen = 0
+          if type(self.MarkJourneyDirty) == "function" then
+            pcall(self.MarkJourneyDirty, self, { mapID = mapID })
+          end
+        end
+        changed = true
+      end
+    end
+  end
+  if changed and type(self.ClearJourneyBlockCache) == "function" then
+    pcall(self.ClearJourneyBlockCache, self)
+  end
+  return changed
+end
+
 function XPTooltip:ClearHeatmaps()
   local db = type(self.char) == "table" and self.char or nil
   if db then
     db.heatmaps = {}
+  end
+  if type(self.SyncJourneyHeatmapIndex) == "function" then
+    pcall(self.SyncJourneyHeatmapIndex, self)
   end
   self:InvalidateHeatmapCache()
   self.heatmapZoneKey = nil
@@ -753,7 +808,16 @@ function XPTooltip:PrintHeatmap(rest)
       return
     end
 
-    local cellCount = CountCells(zone.cells)
+    local cellsData = type(zone.cells) == "table" and zone.cells or nil
+    if (not cellsData or next(cellsData) == nil) and zone.journeySource
+      and type(self.GetJourneyHeatmapCells) == "function" then
+      local ok, journeyCells = pcall(self.GetJourneyHeatmapCells, self, zone.mapID)
+      if ok and type(journeyCells) == "table" then
+        cellsData = journeyCells
+      end
+    end
+    cellsData = cellsData or {}
+    local cellCount = CountCells(cellsData)
     local gridSize = floor(tonumber(zone.gridSize) or HEATMAP_GRID_SIZE)
     if gridSize < 1 or gridSize > HEATMAP_GRID_SIZE then
       gridSize = HEATMAP_GRID_SIZE
@@ -766,10 +830,10 @@ function XPTooltip:PrintHeatmap(rest)
     ))
 
     local cells = {}
-    for cell, count in pairs(zone.cells) do
+    for cell, count in pairs(cellsData) do
       local number = FiniteNumber(cell)
-      local value = FiniteNumber(count)
-      if number and value and value > 0 then
+      local value = CellKillCount(count)
+      if number and value > 0 then
         cells[#cells + 1] = { cell = number, count = value }
       end
     end

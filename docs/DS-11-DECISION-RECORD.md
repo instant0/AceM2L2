@@ -10,7 +10,7 @@
 - Everything is local on the player's computer.
 - Account-wide means the player's own characters in `AceM2L2DB`.
 - Character Journey is in `AceM2L2CharDB`.
-- No uploads, network sharing, privacy layer, or cross-account data.
+- No uploads, network sharing, or cross-account data.
 - No merge implementation in this phase.
 
 ## 2. Settled decisions
@@ -179,7 +179,8 @@ character SavedVariables. No raw Journey is copied to the account.
    - suggested zone;
    - heatmap best part;
    - UI-3/UI-4.
-6. **DS-17.4D — account Knowledge prototype** when alt features are scheduled.
+6. **DS-17.4D — account Knowledge prototype.** Offline prototype executed
+   2026-11-18; runtime/account persistence remains future.
 
 ## 6. V-2 checklist
 
@@ -201,6 +202,17 @@ benchmarks.
 - LoadOnDemand companion variable timing.
 - Selected-block decode latency on live client.
 - Forever/Midnight differences.
+
+## 6a. Post-decision correction — 2026-11-18
+
+DS-17.6A found that the DS-17.5 v2 Journey was **not** implemented in
+production. The actual store is v1 legacy aggregates plus an additive `journey`
+overlay and schema-2 block machinery. The codec/storage work is real; the
+data-model migration is not.
+
+DS-17.7 decided v2 is the target, v1+additive Journey is the transitional
+baseline, and migration is staged. DS-17.8 starts with P0 safety fixes. Until the
+migration is complete, do not describe v2 as implemented or retire legacy roots.
 
 ## 7. What we learned
 

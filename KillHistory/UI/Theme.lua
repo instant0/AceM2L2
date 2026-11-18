@@ -283,6 +283,9 @@ function XPTooltip:ApplyTheme()
   refreshButton(self.ui.sortButton)
   refreshButton(self.ui.settingsButton)
   refreshButton(self.ui.closeButton)
+  if self.ui.heatmap then
+    refreshButton(self.ui.heatmap.selectButton)
+  end
   refreshButton(self.ui.deleteButton)
   if self.ui.searchBorder then
     self.ui.searchBorder:SetColorTexture(theme.border[1], theme.border[2], theme.border[3], 1)
@@ -295,6 +298,9 @@ function XPTooltip:ApplyTheme()
   end
   if self.ui.searchPlaceholder then
     self.ui.searchPlaceholder:SetTextColor(theme.muted[1], theme.muted[2], theme.muted[3])
+  end
+  if type(self.ApplyHeatmapSelectorTheme) == "function" then
+    pcall(self.ApplyHeatmapSelectorTheme, self)
   end
   self:UpdateAmbient()
   self:UpdateStatusChip()

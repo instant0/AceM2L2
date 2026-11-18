@@ -30,6 +30,7 @@ KillHistory/Formula.lua
 KillHistory/Data.lua
 KillHistory/Journey.lua
 KillHistory/JourneyQueries.lua
+KillHistory/JourneyModel.lua
 KillHistory/JourneyStorage.lua
 KillHistory/JourneyIndex.lua
 KillHistory/Calibration.lua

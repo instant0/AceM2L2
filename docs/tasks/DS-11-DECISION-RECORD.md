@@ -19,7 +19,7 @@ Record the final storage/data-model decision and separate:
 1. **Storage model**
    - per-character Journey in `AceM2L2CharDB`;
    - account-wide Knowledge target in `AceM2L2DB`, derived later;
-   - no uploads/privacy/community sharing.
+   - no uploads/community sharing.
 2. **Hot/cold**
    - dynamic hot/warm/cold, no arbitrary 2,000/40/100/12 design caps;
    - per-zone/instance/level blocks;

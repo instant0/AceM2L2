@@ -14,7 +14,7 @@ and what still has to be tested before the model is final.
   all-name list.
 - **Account-wide:** the same player's characters on the same computer only.
 
-There is no upload, network, privacy, or cross-account model.
+There is no upload, network, or cross-account model.
 
 ## 2. Requirements retained from review
 

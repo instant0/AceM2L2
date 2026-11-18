@@ -16,13 +16,13 @@ Current release: **2.5.2**
 | README feature guide | Completed in 2.4.1 | HC-6 |
 | Documentation claim audit | Completed; README re-review added UI-3/UI-4 | README-CLAIM-REVIEW |
 | Instance attribution and heatmap collection | Implemented in 2.5.0 | G-4a/G-4b; V-1/V-2 |
-| UI responsiveness | UI-1..UI-4 done; UI-5 next | V-6 visual/frame |
+| UI responsiveness | UI-1..UI-5 done | V-6 visual/frame |
 | Client compatibility | 120107 interface added; 12.1.7 API/live audit pending | CL-1; V-6 |
 | Release hygiene | Released 2.5.2 | REL-1; V-6 |
 | Memory | 3.2–3.85MB real; policy done; guardrails open | MEM-1; V-2 |
 | Scope/grid/limit review | Static/offline analysis first | SC-1..SC-5, G-1..G-3, A-1, HC-7; V-3 |
-| Data storage architecture | DS-1..DS-5/DS-3B/DS-3C/DS-17.1/DS-17.2/DS-17.3/DS-1-F2/DS-4P/DS-4P-F1/DS-4P-F2/DS-6/DS-7/DS-12/DS-6-F1/DS-17.4A/B/C/DS-17.5/DS-16/DS-15/DS-11/DS-14/CAP-1/IMP-1 slice/IMP-1A/IMP-1B query/IMP-1B2/B3/B4/B5/B6/B7/B8/B9/B10/B12 done; V-2 next | DS-1..DS-17.6; V-2 |
-| Character lifecycle and cross-character data | Sub-task files ready | DS-17.0..DS-17.6; V-2 |
+| Data storage architecture | S2A kill/backfill done; mutation parity next | DS-17.11; S2B+; V-2 |
+| Character lifecycle and cross-character data | S2A mutation parity next; ALT future | DS-17.11 now; DS-17.6B later; V-2 |
 | Journey overlay | Proposed, after DS | J-1..J-6; V-4 |
 | Cell inspector | Proposed, after DS | M-1..M-6; V-4 |
 | Carbonite | Deferred | CB-0..CB-6 when reopened |
@@ -126,7 +126,22 @@ Next:
     Result: `docs/G-1B-POSITION-REFRESH-RESULT.md`.
 19. ~~**HC-7 — Tracking-limit configurability decision.**~~ **Done 2026-11-18: keep internal limits.**
     Result: `docs/HC-7-LIMIT-CONFIGURABILITY-RESULT.md`.
-20. **UI-5 — Heatmap zone/instance selector.** **Next; non-live.**
+20. ~~**UI-5 — Heatmap zone/instance selector.**~~ **Done 2026-11-18.**
+    Result: `docs/UI-5-HEATMAP-ZONE-SELECTOR-RESULT.md`.
+21. ~~**DS-17.4D — Account Knowledge derivation prototype.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-04D-ACCOUNT-KNOWLEDGE-RESULT.md`.
+22. ~~**DS-17.6A — Current data-model validation.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-06A-DATA-MODEL-VALIDATION-RESULT.md`.
+23. ~~**DS-17.7 — Data-model reconciliation and migration plan.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-07-DATA-MODEL-RECONCILIATION-RESULT.md`.
+24. ~~**DS-17.8 — Data-model P0 safety fixes.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-08-DATA-MODEL-P0-SAFETY-RESULT.md`.
+25. ~~**DS-17.9 — S1 data-model scaffolding.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-09-DATA-MODEL-S1-SCAFFOLDING-RESULT.md`.
+26. ~~**DS-17.10 — S2A mob model migration.**~~ **Done 2026-11-18 (kill/backfill).**
+    Result: `docs/DS-17-10-S2A-MOB-MODEL-RESULT.md`.
+27. **DS-17.11 — S2A mutation parity.** **Next; implementation.**
+28. **DS-17.6B — ALT/account-feature validation.** Future; only after migration and ALT scheduling.
 21. **MEM-1 — Real memory measurement.** Compare AceM2L2 with ATT/FLG and decide
     whether H64-9-F3 is needed; do not optimize from the 20MB fixture figure.
 
@@ -156,7 +171,7 @@ complete.** DS-1 is in
 DS-5 is in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`; DS-17.1 is in
 `docs/DS-17-1-AGGREGATION-DECISION.md`; DS-17.2, DS-17.3, DS-1-F2, DS-4P,
 DS-4P-F1, DS-4P-F2, DS-6, DS-7/DS-12, and DS-6-F1 are complete.
-Next non-live: UI-5 (heatmap zone/instance selector). HC-7 is complete; G-1A/G-1B, G-2/G-3 are complete and keep 64x64. V-2 is deferred to live-only residual checks.
+Next non-live: DS-17.11 (S2A mutation parity). UI-5, HC-7, G-1A/G-1B, and G-2/G-3 are complete; keep 64x64. V-2 is deferred to live-only residual checks.
 
 ### Phase 3 — storage design and prototypes
 
@@ -221,7 +236,7 @@ Next non-live: UI-5 (heatmap zone/instance selector). HC-7 is complete; G-1A/G-1
     Result: `docs/DS-17-04B-DANGER-AND-XP-HOUR-RESULT.md`.
     **DS-17.4C — Retention/aggregation compatibility.** Done 2026-11-16.
     Result: `docs/DS-17-04C-RETENTION-MERGE-COMPATIBILITY-RESULT.md`.
-    **DS-17.4D — Account Knowledge derivation prototype.** Future.
+    **DS-17.4D — Account Knowledge derivation prototype.** **Done 2026-11-18.**
     `docs/tasks/DS-17-04D-ACCOUNT-KNOWLEDGE-PROTOTYPE.md`.
 15. **DS-15 — Lazy retrieval/cache.** Done 2026-11-16. Result:
     `docs/DS-15-LAZY-RETRIEVAL-CACHE-RESULT.md`.
@@ -261,7 +276,22 @@ Run after DS-2/DS-3 measurements:
     Result: `docs/G-1B-POSITION-REFRESH-RESULT.md`.
 11. ~~**HC-7 — Tracking-limit configurability decision.**~~ **Done 2026-11-18: keep internal limits.**
     Result: `docs/HC-7-LIMIT-CONFIGURABILITY-RESULT.md`.
-12. **UI-5 — Heatmap zone/instance selector.** **Next; non-live.**
+12. ~~**UI-5 — Heatmap zone/instance selector.**~~ **Done 2026-11-18.**
+    Result: `docs/UI-5-HEATMAP-ZONE-SELECTOR-RESULT.md`.
+13. ~~**DS-17.4D — Account Knowledge derivation prototype.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-04D-ACCOUNT-KNOWLEDGE-RESULT.md`.
+14. ~~**DS-17.6A — Current data-model validation.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-06A-DATA-MODEL-VALIDATION-RESULT.md`.
+15. ~~**DS-17.7 — Data-model reconciliation and migration plan.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-07-DATA-MODEL-RECONCILIATION-RESULT.md`.
+16. ~~**DS-17.8 — Data-model P0 safety fixes.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-08-DATA-MODEL-P0-SAFETY-RESULT.md`.
+17. ~~**DS-17.9 — S1 data-model scaffolding.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-09-DATA-MODEL-S1-SCAFFOLDING-RESULT.md`.
+18. ~~**DS-17.10 — S2A mob model migration.**~~ **Done 2026-11-18 (kill/backfill).**
+    Result: `docs/DS-17-10-S2A-MOB-MODEL-RESULT.md`.
+19. **DS-17.11 — S2A mutation parity.** **Next; implementation.**
+20. **DS-17.6B — ALT/account-feature validation.** Future.
 
 ### Phase 5 — proposed features
 
@@ -279,9 +309,9 @@ Only after DS-11:
    - HIST-1D account Knowledge integration later.
 2. **J-1..J-6 — Journey overlay.**
 3. **M-1..M-6 — Cell inspector.**
-4. **UI-5 — Heatmap zone/instance selector.** Alphabetical name/kills/level-range
-   list in addition to the existing arrows. Task:
-   `docs/tasks/UI-5-HEATMAP-ZONE-SELECTOR.md`.
+4. ~~**UI-5 — Heatmap zone/instance selector.**~~ **Done 2026-11-18.**
+   Alphabetical name/kills/level-range list in addition to the existing arrows.
+   Result: `docs/UI-5-HEATMAP-ZONE-SELECTOR-RESULT.md`.
 
 ### Phase 6 — final live validation
 
@@ -614,9 +644,9 @@ Live checks are consolidated in V-1. Carbonite work is deferred.
   `docs/UI-3-HISTORY-VIEW-RESULT.md`.
 - [x] **UI-4 — Quest XP ledger view.** Executed 2026-11-16. Result:
   `docs/UI-4-QUEST-LEDGER-RESULT.md`.
-- [ ] **UI-5 — Heatmap zone/instance selector.** **Next; non-live.** Alphabetical
-  name/kills/level-range list in addition to the arrows. Task:
-  `docs/tasks/UI-5-HEATMAP-ZONE-SELECTOR.md`.
+- [x] **UI-5 — Heatmap zone/instance selector.** Executed 2026-11-18.
+  Alphabetical name/kills/level-range list in addition to the arrows.
+  Result: `docs/UI-5-HEATMAP-ZONE-SELECTOR-RESULT.md`.
 
 ### Instance attribution and heatmap collection — implemented in 2.5.0
 
@@ -1356,19 +1386,35 @@ budget.
     context/rate/quest/death/respawn/level retention; 3/6/12-month and
     beyond-cap profiles. Result: `docs/DS-17-3-RETENTION-DECISION.md`.
   - [ ] **DS-17.4 — Cross-character knowledge and route recommendations.**
-    Define account-wide aggregate leveling knowledge, confidence, privacy, query
-    use, and an explainable efficient-route recommendation with data-sufficiency
-    gates and held-out backtesting. Depends DS-17.1/2/3; blocks DS-17.5.
+    Define account-wide aggregate leveling knowledge, confidence, query use, and
+    an explainable efficient-route recommendation with data-sufficiency gates
+    and held-out backtesting. Depends DS-17.1/2/3; blocks DS-17.5.
     `docs/tasks/DS-17-04-CROSS-CHARACTER-KNOWLEDGE.md`.
-  - [ ] **DS-17.5 — Schema and migration.** Finalize field-level ownership,
+  - [x] **DS-17.5 — Schema and migration.** Done 2026-11-16.
+    Finalize field-level ownership,
     versions, backup, downgrade, companion, and codec envelope. High-level
     account/per-character/static/memory/companion split is already in
     `docs/STORAGE-DIRECTION.md`; this task resolves the exact fields and
     migration. Depends DS-17.1..4, DS-4, DS-5, DS-9; blocks DS-11.
     `docs/tasks/DS-17-05-SCHEMA-AND-MIGRATION.md`.
-  - [ ] **DS-17.6 — Validation and decision.** Measure 1–60/1–max and alt
-    profiles; produce the DS-11 recommendation. Depends DS-17.1..5, SC-1/SC-2.
-    `docs/tasks/DS-17-06-VALIDATION-AND-DECISION.md`.
+  - [x] **DS-17.6A — Current data-model validation.** Executed 2026-11-18.
+    Found production is v1 legacy aggregates + additive Journey, not DS-17.5 v2.
+    Result: `docs/DS-17-06A-DATA-MODEL-VALIDATION-RESULT.md`.
+  - [x] **DS-17.7 — Data-model reconciliation and migration plan.** Executed
+    2026-11-18. v2 is the target; v1+additive Journey is transitional; staged
+    migration. Result: `docs/DS-17-07-DATA-MODEL-RECONCILIATION-RESULT.md`.
+  - [x] **DS-17.8 — Data-model P0 safety fixes.** Executed 2026-11-18.
+    Result: `docs/DS-17-08-DATA-MODEL-P0-SAFETY-RESULT.md`.
+  - [x] **DS-17.9 — S1 data-model scaffolding.** Executed 2026-11-18.
+    Result: `docs/DS-17-09-DATA-MODEL-S1-SCAFFOLDING-RESULT.md`.
+  - [x] **DS-17.10 — S2A mob model migration.** Executed 2026-11-18 (kill/
+    backfill; v2-only reads). Result: `docs/DS-17-10-S2A-MOB-MODEL-RESULT.md`.
+  - [ ] **DS-17.11 — S2A mutation parity.** **Next.** Sync v2 on merge/delete/
+    prune and prove parity. `docs/tasks/DS-17-11-S2A-MUTATION-PARITY.md`.
+  - [ ] **DS-17.6B — ALT/account-feature validation.** **Future only.** 1/3/5-alt
+    Knowledge, route advice, account persistence. Depends DS-17.11 + migration slices,
+    DS-17.4D, V-2, MEM-1, and ALT scheduling.
+    `docs/tasks/DS-17-06B-ALT-FEATURE-VALIDATION.md`.
 
 #### Review and revisions to the investigation
 

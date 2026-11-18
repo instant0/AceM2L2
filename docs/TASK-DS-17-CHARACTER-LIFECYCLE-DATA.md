@@ -140,7 +140,7 @@ The exact 1–60 estimate is a task deliverable. The planning expectation is:
 - Provide a cross-character **leveling knowledge** view that a level-1
   character can use for planning.
 - Keep raw per-character identity data separate from shared aggregates.
-- Preserve privacy, migration safety, downgrade behavior, and backups.
+- Preserve migration safety, downgrade behavior, and backups.
 - Make caps/quotas explicit and measurable.
 
 ## 5. Non-goals
@@ -275,12 +275,13 @@ explicit insufficient-data fallback. The detailed research is in
 - If the sample is insufficient, say so and fall back to the character's own
   history or generic guidance.
 
-### Scope and privacy
+### Scope and source fields
 
 - Account-wide, local only.
-- Aggregate only; no raw per-character kill timeline or player identity.
+- Aggregate only; raw per-character kill timelines are not part of the shared
+  view.
 - Separate `projectID` (Forever/Midnight) and max-level context.
-- Store a source-character count, not names.
+- Store a source count; source-character names are not used.
 - Rebuild from archives; if archives are deleted, derived knowledge can be
   recomputed from remaining sources or dropped.
 
