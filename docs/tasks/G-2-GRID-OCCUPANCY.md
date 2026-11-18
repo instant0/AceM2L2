@@ -1,6 +1,8 @@
 # G-2 — 64 vs 96/128 occupancy study
 
-**Status:** next; non-live study  
+**Status:** executed 2026-11-17; keep 64x64  
+**Result:** `docs/G-2-GRID-OCCUPANCY-RESULT.md`  
+**Harness:** `tests/grid_occupancy.lua`  
 **Depends on:** H64-9-F5, SC-1, SC-2, DS-17.4C  
 **Blocks:** G-3
 

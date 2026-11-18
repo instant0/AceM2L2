@@ -13,6 +13,7 @@ local ceil = math.ceil
 local CreateBackdropFrame = UI.CreateBackdropFrame
 local CreateTextButton = UI.CreateTextButton
 local FormatNumber = Util.FormatNumber
+local Lower = Util.Lower
 
 local GRID_SIZE = math.floor(tonumber(XPTooltip.HEATMAP_GRID_SIZE) or 64)
 if GRID_SIZE < 1 then
@@ -22,6 +23,9 @@ local GRID_CELLS = GRID_SIZE * GRID_SIZE
 local MAX_ART_LAYERS = 8
 local MAX_ART_TILES = 256
 local MAX_OVERLAY_TILES = 600
+local SELECTOR_VISIBLE_ROWS = 10
+local SELECTOR_ROW_HEIGHT = 22
+local SELECTOR_MENU_WIDTH = 640
 
 --[[--------------------------------------------------------------------------------
   Defensive readers

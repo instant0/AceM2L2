@@ -9,6 +9,7 @@ local XPTooltip = AceM2L2.KillHistory
 local Util = XPTooltip.Util
 
 local JOURNEY_SCHEMA = 1
+local MAX_QUEST_ANCHORS = 5000
 local ENGAGED_GAP_CAP = 60
 
 local function Epoch()
@@ -42,6 +43,20 @@ function XPTooltip:EnsureJourney()
   journey.mode = journey.mode or "leveling"
   journey.zones = type(journey.zones) == "table" and journey.zones or {}
   journey.levels = type(journey.levels) == "table" and journey.levels or {}
+  local anchors = type(journey.questAnchors) == "table" and journey.questAnchors or {}
+  if #anchors > MAX_QUEST_ANCHORS then
+    table.sort(anchors, function(a, b)
+      local aAt = type(a) == "table" and tonumber(a.at) or 0
+      local bAt = type(b) == "table" and tonumber(b.at) or 0
+      return aAt < bAt
+    end)
+    local trimmed = {}
+    for index = #anchors - MAX_QUEST_ANCHORS + 1, #anchors do
+      trimmed[#trimmed + 1] = anchors[index]
+    end
+    anchors = trimmed
+  end
+  journey.questAnchors = anchors
   local time = type(journey.time) == "table" and journey.time or {}
   time.cap = ENGAGED_GAP_CAP
   time.zone = time.zone
@@ -153,6 +168,14 @@ local function addXP(journey, zoneKey, level, field, amount)
   zoneLevel.xp = (zoneLevel.xp or 0) + value
 end
 
+local function addQuestAnchor(journey, anchor)
+  local anchors = journey.questAnchors
+  anchors[#anchors + 1] = anchor
+  while #anchors > MAX_QUEST_ANCHORS do
+    table.remove(anchors, 1)
+  end
+end
+
 local function addEvent(journey, key, count)
   local zone = ensureZone(journey, journey.time.zone or "0")
   local level = ensureLevel(journey, journey.time.level or 0)
@@ -254,6 +277,14 @@ function XPTooltip:OnJourneyQuestTurnIn(questID, questName, xpReward)
   end
   local now = Epoch()
   local mapID = tonumber(self:GetMapID()) or 0
+  local x, y
+  if type(self.GetPlayerMapPosition) == "function" then
+    local ok, positionMapID, px, py = pcall(self.GetPlayerMapPosition, self)
+    if ok and tonumber(positionMapID) then
+      mapID = tonumber(positionMapID) or mapID
+      x, y = tonumber(px), tonumber(py)
+    end
+  end
   local level = playerLevelFor(self, 0)
   local zone = zoneKeyFor(self, mapID)
   switchContext(journey, now, zone, level)
@@ -261,6 +292,18 @@ function XPTooltip:OnJourneyQuestTurnIn(questID, questName, xpReward)
   journey.time.lastEventAt = now
   addXP(journey, zone, level, "questXP", xpReward)
   addEvent(journey, "quests", 1)
+  local anchor = {
+    questID = tonumber(questID),
+    mapID = mapID,
+    at = now,
+    playerLevel = level,
+    xp = tonumber(xpReward) or 0,
+  }
+  if x and y then
+    anchor.x = x
+    anchor.y = y
+  end
+  addQuestAnchor(journey, anchor)
   if self.MarkJourneyDirty then
     self:MarkJourneyDirty({ mapID = mapID })
   end

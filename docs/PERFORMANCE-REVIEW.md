@@ -417,7 +417,26 @@ is no fixed MB target.
   expired/oldest pruning tested. Result: `docs/SC-4-CONTEXT-CAP-RESULT.md`.
 - **SC-5** is complete: cap-boundary and idempotence tests, reset/prune docs.
   Result: `docs/SC-5-MIGRATION-PRUNING-RESULT.md`.
-- **G-2** is next: 64 vs 96/128 occupancy study.
+- **HIST-1A/1B** are complete: historical tooltip/Detail relevance and Area
+  Detail overlays with persisted toggles. Result:
+  `docs/HIST-1A-HISTORICAL-RELEVANCE-RESULT.md`,
+  `docs/HIST-1B-HISTORICAL-ZONE-RESULT.md`.
+- **HIST-1C** is complete: bounded quest-anchor log with optional coordinates,
+  name resolution, and Area Detail fallback. Result:
+  `docs/HIST-1C-QUEST-ANCHOR-RESULT.md`.
+- **G-2/G-3** are complete: 64x64 remains the durable grid; 96/128,
+  rectangular durable grids, and occupied masks are rejected. Result:
+  `docs/G-2-GRID-OCCUPANCY-RESULT.md`,
+  `docs/G-3-GRID-DECISION-RESULT.md`.
+- **G-1A** is complete: coordinate source and policy review, locked to
+  kill-time, replace-only, same-map, no attribution change. Result:
+  `docs/G-1A-COORDINATE-REVIEW-RESULT.md`.
+- **G-1B** is complete: heatmap-only, replace-only commit-time position refresh.
+  Result: `docs/G-1B-POSITION-REFRESH-RESULT.md`.
+- **HC-7** is complete: keep internal adaptive limits; no player-facing cap
+  controls until MEM-1/live guardrails. Result:
+  `docs/HC-7-LIMIT-CONFIGURABILITY-RESULT.md`.
+- **UI-5** is next: heatmap zone/instance selector.
 - **V-2** is deferred to live-only residual checks.
 
-DS-1-F2, IMP-1A, IMP-1B query APIs, IMP-1B2 block storage, IMP-1B3 block retrieval, IMP-1B4 save guard, IMP-1B5 tooltip fallback, IMP-1B6 mob index, IMP-1B7 list/Overview switch, IMP-1B8 command switch, IMP-1B9 Areas/Levels parity, IMP-1B10 heatmap blocks, IMP-1B12 area/level summaries, H64-9-F1/F2 heatmap fixes, H64-9-F4 lazy normalization, R-4 overlay audit fixes, UI-3/UI-4 views, MEM-2 cache policy, and SC-6 capacity assessment are production-code changes; the other storage/design tasks remain documentation/prototype-only.
+DS-1-F2, IMP-1A, IMP-1B query APIs, IMP-1B2 block storage, IMP-1B3 block retrieval, IMP-1B4 save guard, IMP-1B5 tooltip fallback, IMP-1B6 mob index, IMP-1B7 list/Overview switch, IMP-1B8 command switch, IMP-1B9 Areas/Levels parity, IMP-1B10 heatmap blocks, IMP-1B12 area/level summaries, H64-9-F1/F2 heatmap fixes, H64-9-F4 lazy normalization, R-4 overlay audit fixes, UI-3/UI-4 views, MEM-2 cache policy, SC-6 capacity assessment, and HIST-1A/1B/1C historical views are production-code changes; the other storage/design tasks remain documentation/prototype-only.

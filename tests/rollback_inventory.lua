@@ -22,7 +22,7 @@ local expected = {
   ["KillHistory/JourneyIndex.lua"] = { indexViews = 2, useIndex = 1 },
   ["KillHistory/JourneyStorage.lua"] = { blockFallback = 2 },
   ["KillHistory/Tooltip.lua"] = { blockFallback = 1 },
-  ["KillHistory/UI/Detail.lua"] = { blockFallback = 1, useIndex = 1 },
+  ["KillHistory/UI/Detail.lua"] = { blockFallback = 1, useIndex = 2 },
   ["KillHistory/Commands.lua"] = { useIndex = 5 },
   ["KillHistory/Heatmap.lua"] = { useIndex = 2 },
   ["KillHistory/JourneyQueries.lua"] = { useIndex = 5 },

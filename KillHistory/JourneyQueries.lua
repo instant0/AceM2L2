@@ -357,6 +357,49 @@ function XPTooltip:GetMobJourneySummary(mobKey)
   return nil
 end
 
+function XPTooltip:GetQuestAnchors(mapID, count)
+  local db = self.char
+  local journey = db and db.journey
+  local anchors = journey and journey.questAnchors
+  if type(anchors) ~= "table" then return {} end
+  local wanted = mapID and tostring(mapID) or nil
+  local rows = {}
+  for index = 1, #anchors do
+    local anchor = anchors[index]
+    if type(anchor) == "table" and (not wanted or tostring(anchor.mapID) == wanted) then
+      local questID = tonumber(anchor.questID)
+      local key = questID and ("quest:" .. tostring(questID)) or "quest:unknown"
+      local quest = db.quests and db.quests[key]
+      local name = quest and Util.SafeString(quest.name) or nil
+      if not name or name == "" then
+        name = questID and ("Quest " .. tostring(questID)) or "Unknown quest"
+      end
+      rows[#rows + 1] = {
+        questID = questID,
+        key = key,
+        name = name,
+        mapID = tonumber(anchor.mapID) or 0,
+        x = tonumber(anchor.x),
+        y = tonumber(anchor.y),
+        at = finite(anchor.at),
+        playerLevel = finite(anchor.playerLevel),
+        xp = finite(anchor.xp),
+      }
+    end
+  end
+  table.sort(rows, function(a, b)
+    if a.at ~= b.at then return a.at > b.at end
+    if (a.questID or 0) ~= (b.questID or 0) then
+      return (a.questID or 0) > (b.questID or 0)
+    end
+    return a.name < b.name
+  end)
+  local limit = math.max(1, math.min(tonumber(count) or 10, #rows))
+  local result = {}
+  for index = 1, limit do result[index] = rows[index] end
+  return result
+end
+
 function XPTooltip:GetQuestAnchor(questID)
   local db = self.char
   local key = questID and ("quest:" .. tostring(questID)) or "quest:unknown"

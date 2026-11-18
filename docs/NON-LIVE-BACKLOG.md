@@ -36,18 +36,21 @@ client. Live-only residuals are in `docs/tasks/V-2-LIVE-VERIFICATION.md`.
 | **SC-4** context cap | Done 2026-11-17 | `docs/SC-4-CONTEXT-CAP-RESULT.md` |
 | **SC-6** capacity self-assessment | Done 2026-11-17 | `docs/SC-6-CAPACITY-SELF-ASSESSMENT-RESULT.md` |
 | **SC-5** migration/pruning/tests | Done 2026-11-17 | `docs/SC-5-MIGRATION-PRUNING-RESULT.md` |
-| **G-1** code review | Coordinate limits change | SC-3 |
-| **G-2** 64 vs 96/128 occupancy | Next | SC-2/H64-9-F5 |
-| **G-3** grid decision | Final grid | G-2 |
-| **HC-7** tracking-limit configurability | User-facing limits | SC-3 |
+| **G-1A** coordinate source/policy review | Done 2026-11-17 | `docs/G-1A-COORDINATE-REVIEW-RESULT.md` |
+| **G-1B** heatmap position refresh | Done 2026-11-18 | `docs/G-1B-POSITION-REFRESH-RESULT.md` |
+| **G-2** 64 vs 96/128 occupancy | Done 2026-11-17 | `docs/G-2-GRID-OCCUPANCY-RESULT.md` |
+| **G-3** grid decision | Done: keep 64x64 | `docs/G-3-GRID-DECISION-RESULT.md` |
+| **HC-7** tracking-limit configurability | Done: keep internal limits | `docs/HC-7-LIMIT-CONFIGURABILITY-RESULT.md` |
+| **UI-5** heatmap zone/instance selector | Next: alphabetical name/kills/level list | UI-3/UI-4 |
 
 ## 3. Feature work
 
 - **HIST-1A — historical/outleveled tooltip and Detail.** Done 2026-11-17.
   `docs/HIST-1A-HISTORICAL-RELEVANCE-RESULT.md`.
-- **HIST-1B — historical zone surfaces.** Next. Use heatmap, kill counts,
-  deaths, rares, and journey anchors; hide stale XP.
-- **HIST-1C** bounded quest-anchor log.
+- **HIST-1B — historical zone surfaces.** Done 2026-11-17.
+  `docs/HIST-1B-HISTORICAL-ZONE-RESULT.md`.
+- **HIST-1C — bounded quest-anchor log.** Done 2026-11-17.
+  `docs/HIST-1C-QUEST-ANCHOR-RESULT.md`.
 - **J-1..J-6** Journey overlay.
 - **M-1..M-6** cell inspector.
 - Tooltip danger, suggested zone, best heatmap part.
@@ -77,8 +80,13 @@ These are feature tasks, not verification gates.
 11. ~~**SC-6**~~ — done.
 12. ~~**SC-4**~~ — done.
 13. ~~**SC-5**~~ — done.
-14. **G-2** grid occupancy study. **Next.**
-15. **DS-17.4D / DS-17.6** as the next design block.
+14. ~~**G-2** grid occupancy study.~~ — done.
+15. ~~**G-3** grid decision.~~ — done: keep 64x64.
+16. ~~**G-1A** coordinate source/policy review.~~ — done.
+17. ~~**G-1B** heatmap commit-time position refresh.~~ — done.
+18. ~~**HC-7** tracking-limit configurability decision.~~ — done.
+19. **UI-5** heatmap zone/instance selector. **Next.**
+20. **DS-17.4D / DS-17.6** as the next design block.
 
 V-2 should not block these. Run it when a live client is available and keep it
 focused on the live-only table.

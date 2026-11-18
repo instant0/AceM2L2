@@ -130,6 +130,53 @@ function XPTooltip:AttachInstanceState(info)
   return state
 end
 
+local function ValidHeatmapCoordinate(value)
+  local number = SafeNumber(value)
+  if number == nil or number ~= number or number < 0 or number > 1 then
+    return nil
+  end
+  return number
+end
+
+-- Heatmap coordinates are replace-only: a kill must already have a usable
+-- snapshot. A fresh read is used only on the same map, so a zoning change can
+-- never produce a cell in the wrong zone. Attribution is never touched here.
+local function ResolveHeatmapPosition(owner, info, mapID, inInstance, state)
+  if mapID <= 0 then
+    return nil
+  end
+  local x = ValidHeatmapCoordinate(info.x)
+  local y = ValidHeatmapCoordinate(info.y)
+  if not x or not y then
+    return nil
+  end
+  -- Keep attributable instance maps (real dungeon UI maps) on their own map.
+  -- A stale open-world snapshot must not become a world-map cell after zoning.
+  if inInstance and (not state or (tonumber(state.mapID) or 0) ~= mapID) then
+    return nil
+  end
+  if type(owner.GetPlayerMapPosition) ~= "function" then
+    return x, y
+  end
+  local ok, positionMapID, freshX, freshY = pcall(owner.GetPlayerMapPosition, owner)
+  if not ok or positionMapID == nil then
+    return x, y
+  end
+  local freshMapID = SafeNumber(positionMapID)
+  if not freshMapID then
+    return x, y
+  end
+  if freshMapID ~= mapID then
+    return nil
+  end
+  freshX = ValidHeatmapCoordinate(freshX)
+  freshY = ValidHeatmapCoordinate(freshY)
+  if not freshX or not freshY then
+    return x, y
+  end
+  return freshX, freshY
+end
+
 function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObservation)
   if not info then
     return
@@ -279,11 +326,20 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
   end
 
   -- RecordKill is the sole heatmap accounting point: pending-death commits, late
-  -- chat XP, and nameplates do not write here.
+  -- chat XP, and nameplates do not write here. ResolveHeatmapPosition refreshes
+  -- the stale acquisition snapshot only when it already exists and the player
+  -- is still on the kill map.
   if type(self.RecordHeatmapKill) == "function" then
-    local ok, err = pcall(self.RecordHeatmapKill, self, mapID, info.x, info.y)
-    if not ok then
-      self:ReportError("RecordHeatmapKill", err, false)
+    local heatmapX, heatmapY = ResolveHeatmapPosition(
+      self, info, mapID, inInstance, state
+    )
+    if heatmapX and heatmapY then
+      local ok, err = pcall(
+        self.RecordHeatmapKill, self, mapID, heatmapX, heatmapY
+      )
+      if not ok then
+        self:ReportError("RecordHeatmapKill", err, false)
+      end
     end
   end
 

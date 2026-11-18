@@ -478,6 +478,28 @@ function XPTooltip:CreateUI()
   details:SetText("")
   frame.details = details
 
+  local historyBar = CreateFrame("Frame", nil, detailPanel)
+  historyBar:SetPoint("BOTTOMLEFT", 8, 8)
+  historyBar:SetPoint("BOTTOMRIGHT", -8, 8)
+  historyBar:SetHeight(22)
+  historyBar:Hide()
+  frame.historyBar = historyBar
+  frame.historyButtons = {}
+  local historyDefinitions = {
+    { key = "deaths", label = "Deaths" },
+    { key = "rares", label = "Rares" },
+    { key = "quests", label = "Quests" },
+    { key = "heatmap", label = "Heatmap" },
+  }
+  for index, definition in ipairs(historyDefinitions) do
+    local button = CreateTextButton(historyBar, definition.label, 66, 22)
+    button:SetPoint("TOPLEFT", (index - 1) * 70, 0)
+    button:SetScript("OnClick", function()
+      pcall(self.ToggleHistoryOverlay, self, definition.key)
+    end)
+    frame.historyButtons[definition.key] = button
+  end
+
   local deleteButton = CreateTextButton(detailPanel, "Remove", 96, 22)
   deleteButton:SetPoint("BOTTOMRIGHT", -8, 8)
   deleteButton:Hide()
@@ -658,6 +680,9 @@ function XPTooltip:SetTab(tab)
       self.ui.filterBar:Hide()
     end
   end
+  if self.ui and self.ui.historyBar and self.ui.historyBar.SetShown then
+    self.ui.historyBar:SetShown(self.tab == "areas")
+  end
   if self.ui and self.ui.heatmap and self.ui.heatmap.panel then
     if isHeatmap then
       self.ui.heatmap.panel:Show()
@@ -732,6 +757,12 @@ function XPTooltip:UpdateTabs()
     end
     if self.ui.filterBar and self.ui.filterBar.SetShown then
       self.ui.filterBar:SetShown(isMobs)
+    end
+    if self.ui.historyBar and self.ui.historyBar.SetShown then
+      self.ui.historyBar:SetShown(self.tab == "areas")
+    end
+    if type(self.UpdateHistoryOverlayButtons) == "function" then
+      self:UpdateHistoryOverlayButtons()
     end
   end
 end

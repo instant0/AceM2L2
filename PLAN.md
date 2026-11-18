@@ -16,7 +16,7 @@ Current release: **2.5.2**
 | README feature guide | Completed in 2.4.1 | HC-6 |
 | Documentation claim audit | Completed; README re-review added UI-3/UI-4 | README-CLAIM-REVIEW |
 | Instance attribution and heatmap collection | Implemented in 2.5.0 | G-4a/G-4b; V-1/V-2 |
-| UI responsiveness | UI-1..UI-4 done | V-6 visual/frame |
+| UI responsiveness | UI-1..UI-4 done; UI-5 next | V-6 visual/frame |
 | Client compatibility | 120107 interface added; 12.1.7 API/live audit pending | CL-1; V-6 |
 | Release hygiene | Released 2.5.2 | REL-1; V-6 |
 | Memory | 3.2–3.85MB real; policy done; guardrails open | MEM-1; V-2 |
@@ -116,9 +116,19 @@ Next:
    Result: `docs/SC-4-CONTEXT-CAP-RESULT.md`.
 14. ~~**SC-5 — Migration/pruning/cap tests.**~~ **Done 2026-11-17.**
    Result: `docs/SC-5-MIGRATION-PRUNING-RESULT.md`.
-15. **G-2 — Grid occupancy study.** **Next; non-live.**
-16. **MEM-1 — Real memory measurement.** Compare AceM2L2 with ATT/FLG and decide
-   whether H64-9-F3 is needed; do not optimize from the 20MB fixture figure.
+15. ~~**G-2 — Grid occupancy study.**~~ **Done 2026-11-17.**
+    Result: `docs/G-2-GRID-OCCUPANCY-RESULT.md`.
+16. ~~**G-3 — Grid decision.**~~ **Done 2026-11-17: keep 64x64.**
+    Result: `docs/G-3-GRID-DECISION-RESULT.md`.
+17. ~~**G-1A — Coordinate source and policy review.**~~ **Done 2026-11-17.**
+    Result: `docs/G-1A-COORDINATE-REVIEW-RESULT.md`.
+18. ~~**G-1B — Heatmap commit-time position refresh.**~~ **Done 2026-11-18.**
+    Result: `docs/G-1B-POSITION-REFRESH-RESULT.md`.
+19. ~~**HC-7 — Tracking-limit configurability decision.**~~ **Done 2026-11-18: keep internal limits.**
+    Result: `docs/HC-7-LIMIT-CONFIGURABILITY-RESULT.md`.
+20. **UI-5 — Heatmap zone/instance selector.** **Next; non-live.**
+21. **MEM-1 — Real memory measurement.** Compare AceM2L2 with ATT/FLG and decide
+    whether H64-9-F3 is needed; do not optimize from the 20MB fixture figure.
 
 ### Phase 2 — storage evidence
 
@@ -146,7 +156,7 @@ complete.** DS-1 is in
 DS-5 is in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`; DS-17.1 is in
 `docs/DS-17-1-AGGREGATION-DECISION.md`; DS-17.2, DS-17.3, DS-1-F2, DS-4P,
 DS-4P-F1, DS-4P-F2, DS-6, DS-7/DS-12, and DS-6-F1 are complete.
-Next non-live: HIST-1B (historical zone surfaces). G-2 remains queued. V-2 is deferred to live-only residual checks.
+Next non-live: UI-5 (heatmap zone/instance selector). HC-7 is complete; G-1A/G-1B, G-2/G-3 are complete and keep 64x64. V-2 is deferred to live-only residual checks.
 
 ### Phase 3 — storage design and prototypes
 
@@ -241,24 +251,37 @@ Run after DS-2/DS-3 measurements:
    Result: `docs/SC-4-CONTEXT-CAP-RESULT.md`.
 6. ~~**SC-5 — Migration/pruning/cap tests.**~~ **Done 2026-11-17.**
    Result: `docs/SC-5-MIGRATION-PRUNING-RESULT.md`.
-7. **G-2 — 64 vs 96/128 occupancy study.** **Next; non-live.**
-8. **G-1 — Coordinate code review.**
-9. **G-3 — Grid decision.**
-10. **HC-7 — Tracking-limit configurability decision.**
+7. ~~**G-2 — 64 vs 96/128 occupancy study.**~~ **Done 2026-11-17.**
+   Result: `docs/G-2-GRID-OCCUPANCY-RESULT.md`.
+8. ~~**G-3 — Grid decision.**~~ **Done 2026-11-17: keep 64x64.**
+   Result: `docs/G-3-GRID-DECISION-RESULT.md`.
+9. ~~**G-1A — Coordinate source and policy review.**~~ **Done 2026-11-17.**
+   Result: `docs/G-1A-COORDINATE-REVIEW-RESULT.md`.
+10. ~~**G-1B — Heatmap commit-time position refresh.**~~ **Done 2026-11-18.**
+    Result: `docs/G-1B-POSITION-REFRESH-RESULT.md`.
+11. ~~**HC-7 — Tracking-limit configurability decision.**~~ **Done 2026-11-18: keep internal limits.**
+    Result: `docs/HC-7-LIMIT-CONFIGURABILITY-RESULT.md`.
+12. **UI-5 — Heatmap zone/instance selector.** **Next; non-live.**
 
 ### Phase 5 — proposed features
 
 Only after DS-11:
 
-1. **HIST-1 — Historical/outleveled character value.** HIST-1A done; HIST-1B
-   next. See `docs/tasks/HIST-1-HISTORICAL-RELEVANCE.md`.
+1. **HIST-1 — Historical/outleveled character value.** HIST-1A/1B/1C done;
+   HIST-1D future. See `docs/tasks/HIST-1-HISTORICAL-RELEVANCE.md`.
    - HIST-1A relevance classifier + historical tooltip/Detail. Done
      2026-11-17. Result: `docs/HIST-1A-HISTORICAL-RELEVANCE-RESULT.md`;
-   - HIST-1B historical zone surfaces;
-   - HIST-1C bounded quest-anchor log;
+   - HIST-1B historical zone surfaces in selected Area Detail with persisted
+     overlay toggles. Done 2026-11-17. Result:
+     `docs/HIST-1B-HISTORICAL-ZONE-RESULT.md`;
+   - HIST-1C bounded quest-anchor log. Done 2026-11-17. Result:
+     `docs/HIST-1C-QUEST-ANCHOR-RESULT.md`;
    - HIST-1D account Knowledge integration later.
 2. **J-1..J-6 — Journey overlay.**
 3. **M-1..M-6 — Cell inspector.**
+4. **UI-5 — Heatmap zone/instance selector.** Alphabetical name/kills/level-range
+   list in addition to the existing arrows. Task:
+   `docs/tasks/UI-5-HEATMAP-ZONE-SELECTOR.md`.
 
 ### Phase 6 — final live validation
 
@@ -310,11 +333,11 @@ Use these groups to avoid duplicate harnesses and release churn:
 | Package | Tasks | Why grouped |
 |---|---|---|
 | **REL-1** 2.5.2 release hygiene | UI-2, CL-1 interface, HC-5 fix | **Released 2.5.2** |
-| **WP-1** heatmap measurement/fixes | H64-9 (done), H64-9-F1/F2/F3/F4, SC-2, DS-3, then G-2/G-3 | One synthetic harness; measured rescale/disabled/normalize follow-ups |
+| **WP-1** heatmap measurement/fixes | H64-9 (done), H64-9-F1/F2/F3/F4, SC-2, DS-3, G-2/G-3 (done) | One synthetic harness; measured rescale/disabled/normalize follow-ups |
 | **WP-2** research and targeted evidence | DS-1, DS-4, DS-3, SC-1, DS-2 | Use Lua/WoW docs and code first; test only unresolved behavior |
 | **WP-3** storage lifecycle | DS-17.1..DS-17.6, DS-4P/4P-F1/9/11/12/13/14/15/16 | Sequential design: aggregation → modes → compression → shared data → schema → decision |
 | **WP-4** overlay audit | R-4 done with R-5/R-9/R-10 | Live visual/frame remains V-5 |
-| **WP-5** limits and grid decision | SC-3/SC-4/SC-5, G-1/G-3, HC-7 | Depends on WP-1/WP-2 measurements |
+| **WP-5** limits and grid decision | SC-3/SC-4/SC-5, G-3 (done), G-1A/G-1B (done), HC-7 (done) | Depends on WP-1/WP-2 measurements |
 | **WP-6** memory | MEM-1, MEM-2, H64-9-F3 (gated) | Measure real memory and define load/unload/eviction |
 | **WP-7** future features | J-1..J-6, M-1..M-6 | Blocked by DS-11 |
 
@@ -439,7 +462,9 @@ cap changes.
 42. **SC-6 — capacity self-assessment.** **Done 2026-11-17.**
 43. **SC-4 — context cap.** **Done 2026-11-17.**
 44. **SC-5 — migration/pruning/cap tests.** **Done 2026-11-17.**
-45. **G-2 — 64 vs 96/128 occupancy study.** **Next; non-live.**
+45. **G-2 — 64 vs 96/128 occupancy study.** **Done 2026-11-17.**
+46. **G-3 — grid decision.** **Done 2026-11-17: keep 64x64.**
+47. **G-1 — coordinate capture code review.** **Next; non-live.**
 
 Do not start global-cap removal, schema migration, the LoadOnDemand companion,
 or a production cold tier before step 5 is proven.
@@ -589,6 +614,9 @@ Live checks are consolidated in V-1. Carbonite work is deferred.
   `docs/UI-3-HISTORY-VIEW-RESULT.md`.
 - [x] **UI-4 — Quest XP ledger view.** Executed 2026-11-16. Result:
   `docs/UI-4-QUEST-LEDGER-RESULT.md`.
+- [ ] **UI-5 — Heatmap zone/instance selector.** **Next; non-live.** Alphabetical
+  name/kills/level-range list in addition to the arrows. Task:
+  `docs/tasks/UI-5-HEATMAP-ZONE-SELECTOR.md`.
 
 ### Instance attribution and heatmap collection — implemented in 2.5.0
 
@@ -751,21 +779,21 @@ size. `MAX_PENDING_DEATHS`, visible rows, grinding thresholds, and
       cold top-8+other policy. Result: `docs/SC-4-CONTEXT-CAP-RESULT.md`.
 - [x] **SC-5 — Migration/pruning/cap tests.** Executed 2026-11-17. Result:
       `docs/SC-5-MIGRATION-PRUNING-RESULT.md`.
-- [ ] **G-2 — 64 vs 96/128 occupancy study.** **Next; non-live.**
-- [ ] **G-1 — Coordinate capture code review.** Read `CaptureUnit`,
-      `GetPlayerMapPosition`, death commits, and target/mouseover paths; evaluate
-      `UnitPosition`/`C_Map.GetMapPosFromWorldPos` from API docs. Live position
-      comparison is deferred to V-3.
-- [ ] **G-2 — 64 vs 96/128 occupancy study.** Export real heatmap data and compare
-      cell occupancy, trail noise, visual readability, and **map shape**. Include
-      wide/tall/irregular zones, land-versus-empty-cell ratios, and effective
-      east-west versus north-south resolution. Compare square 64 with 96/128
-      and with an aspect-aware/rectangular or occupied-mask option.
-- [ ] **G-3 — Decide grid.** Keep 64, or implement 96/128 only if the occupancy,
-      aspect-ratio, and frame-cost studies pass. Empty cells should not be
-      counted as stored data. An aspect-aware/rectangular or occupied-mask grid
-      may be considered only with a concrete product benefit; a 128 data grid
-      with 64 display fallback remains allowed only with evidence.
+- [x] **G-1A — Coordinate source and policy review.** Executed 2026-11-17.
+      Result: `docs/G-1A-COORDINATE-REVIEW-RESULT.md`. Decided kill-time,
+      replace-only, local-player group policy, same-map guard, no attribution
+      change, and deferred unit/world-position APIs.
+- [x] **G-1B — Heatmap commit-time position refresh.** Executed 2026-11-18.
+      Result: `docs/G-1B-POSITION-REFRESH-RESULT.md`. Heatmap-only refresh at
+      the `RecordHeatmapKill` call; replace-only; same-map guard; no
+      attribution change.
+- [x] **G-2 — 64 vs 96/128 occupancy study.** Executed 2026-11-17; keep 64.
+      Compared occupancy, trail noise, aspect, hotspot stability, and offline
+      storage/render envelopes for 64/96/128 plus rectangular and mask options.
+      Result: `docs/G-2-GRID-OCCUPANCY-RESULT.md`.
+- [x] **G-3 — Decide grid.** Decided 2026-11-17: keep the durable 64x64 grid;
+      reject 96/128, rectangular durable, and occupied mask.
+      Result: `docs/G-3-GRID-DECISION-RESULT.md`.
 - [x] **G-4a — Instance identity and attribution.** Implemented in 2.5.0. Detect inside/outside
       dungeon state with `IsInInstance`, cache it from zoning events, store
       instance kills in `db.instances`/`mob.killsByInstance`, stop attributing
@@ -861,9 +889,10 @@ checks in V-1/V-2.
       guide with a short performance/data note.
 - [x] **HC-8 — Heatmap Settings subpage.** Heatmap tab/reveal/intensity/warm
       controls moved out of Tooltip into Settings > Heatmap.
-- [ ] **HC-7 — Decide whether tracking limits become player-configurable.**
-      This depends on the SC-1/SC-2 measurements above; do not expose raw 6x
-      caps yet.
+- [x] **HC-7 — Decide whether tracking limits become player-configurable.**
+      Decided 2026-11-18: keep internal adaptive limits; no player-facing cap
+      controls. Result: `docs/HC-7-LIMIT-CONFIGURABILITY-RESULT.md`. Revisit
+      after MEM-1/live memory guardrails.
 
 ### Data storage architecture investigation — plan only
 
@@ -1579,7 +1608,7 @@ in-game tasks to each feature section.
       Forever/Midnight. Any online verification
       requires explicit permission; use Wowhead/official client data, never an
       emulator database as authority.
-- [ ] **V-3 — Coordinate/grid confirmation.** Only if G-1/G-2 propose changes:
+- [ ] **V-3 — Coordinate confirmation.** Only if G-1 proposes a change:
       compare death-time position capture and 64 vs 96/128 occupancy/noise and
       latency.
 - [ ] **V-4 — Journey/inspector runtime.** Only if implemented: route/death

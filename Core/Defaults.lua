@@ -18,6 +18,12 @@ local XPTOOLTIP_UI_DEFAULTS = {
   width = 1150,
   height = 780,
   sort = "kills",
+  historyOverlays = {
+    deaths = true,
+    rares = true,
+    quests = true,
+    heatmap = true,
+  },
 }
 
 local XPTOOLTIP_MINIMAP_DEFAULTS = {

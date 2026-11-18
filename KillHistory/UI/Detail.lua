@@ -455,6 +455,171 @@ function XPTooltip:UpdateInstanceDetail(instanceKey)
   self.ui.details:SetText(table.concat(lines, "\n"))
 end
 
+local HISTORY_OVERLAY_KEYS = {
+  deaths = true,
+  rares = true,
+  quests = true,
+  heatmap = true,
+}
+
+function XPTooltip:GetHistoryOverlaySettings()
+  local settings = self:GetSettings()
+  local ui = settings and settings.ui
+  if type(ui) ~= "table" then
+    return { deaths = true, rares = true, quests = true, heatmap = true }
+  end
+  local overlays = ui.historyOverlays
+  if type(overlays) ~= "table" then
+    overlays = {}
+    ui.historyOverlays = overlays
+  end
+  for key in pairs(HISTORY_OVERLAY_KEYS) do
+    if overlays[key] == nil then overlays[key] = true end
+  end
+  return overlays
+end
+
+function XPTooltip:UpdateHistoryOverlayButtons()
+  if not self.ui or not self.ui.historyButtons then return end
+  local overlays = self:GetHistoryOverlaySettings()
+  for key, button in pairs(self.ui.historyButtons) do
+    if button.SetButtonState then
+      button:SetButtonState("PUSHED", overlays[key] ~= false)
+    end
+  end
+end
+
+function XPTooltip:ToggleHistoryOverlay(key)
+  if not HISTORY_OVERLAY_KEYS[key] then return end
+  local overlays = self:GetHistoryOverlaySettings()
+  overlays[key] = not (overlays[key] ~= false)
+  self:UpdateHistoryOverlayButtons()
+  if type(self.UpdateDetail) == "function" then
+    self:UpdateDetail()
+  end
+end
+
+local function AppendAreaDeaths(module, lines, mapKey)
+  local deaths = module:NormalizeDeaths()
+  local matches = {}
+  for index = #deaths, 1, -1 do
+    local entry = deaths[index]
+    if tostring(entry.mapID) == tostring(mapKey) then
+      matches[#matches + 1] = entry
+    end
+  end
+  if #matches == 0 then return end
+  lines[#lines + 1] = "Notable deaths:"
+  for index = 1, min(#matches, 3) do
+    local entry = matches[index]
+    lines[#lines + 1] = "  " .. FormatAgo(entry.at) .. "  "
+      .. string.format("%.1f, %.1f", (entry.x or 0) * 100, (entry.y or 0) * 100)
+  end
+end
+
+local function AppendAreaRares(module, lines, mapKey)
+  local matches = {}
+  if module:UseJourneyIndexViews() then
+    local rows = module:GetJourneyMobRows()
+    for index = 1, #rows do
+      local row = rows[index]
+      local mob = row.mob
+      local kills = type(mob) == "table" and type(mob.killsByMap) == "table"
+        and tonumber(mob.killsByMap[tostring(mapKey)]) or 0
+      local classification = tostring(row.classification or "")
+      if kills > 0 and (classification == "elite" or classification == "rare"
+        or classification == "rareelite" or classification == "worldboss") then
+        matches[#matches + 1] = {
+          name = tostring(row.name or "Unknown"), kills = kills,
+        }
+      end
+    end
+  else
+    for _, mob in pairs(module.char.mobs or {}) do
+      local kills = type(mob) == "table" and type(mob.killsByMap) == "table"
+        and tonumber(mob.killsByMap[tostring(mapKey)]) or 0
+      local classification = tostring(type(mob) == "table" and mob.classification or "")
+      if kills > 0 and (classification == "elite" or classification == "rare"
+        or classification == "rareelite" or classification == "worldboss") then
+        matches[#matches + 1] = {
+          name = tostring(mob.name or "Unknown"), kills = kills,
+        }
+      end
+    end
+  end
+  if #matches == 0 then return end
+  table.sort(matches, function(a, b)
+    if a.kills == b.kills then return a.name < b.name end
+    return a.kills > b.kills
+  end)
+  lines[#lines + 1] = "Rare/elite mobs:"
+  for index = 1, min(#matches, 3) do
+    local entry = matches[index]
+    lines[#lines + 1] = "  " .. entry.name .. " - " .. FormatNumber(entry.kills) .. " kills"
+  end
+end
+
+local function AppendAreaQuests(module, lines, mapKey)
+  if type(module.GetQuestAnchors) == "function" then
+    local anchors = module:GetQuestAnchors(mapKey, 3)
+    if #anchors > 0 then
+      lines[#lines + 1] = "Latest quest anchors:"
+      for index = 1, #anchors do
+        local anchor = anchors[index]
+        local text = "  " .. tostring(anchor.name) .. " - " .. FormatAgo(anchor.at)
+        if anchor.x and anchor.y then
+          text = text .. string.format("  (%.1f, %.1f)",
+            anchor.x * 100, anchor.y * 100)
+        end
+        lines[#lines + 1] = text
+      end
+      return
+    end
+  end
+  local matches = {}
+  for _, quest in pairs(module.char.quests or {}) do
+    if type(quest) == "table" and tostring(quest.mapID or "") == tostring(mapKey)
+      and (tonumber(quest.count) or 0) > 0 then
+      matches[#matches + 1] = quest
+    end
+  end
+  if #matches == 0 then return end
+  table.sort(matches, function(a, b)
+    return (tonumber(a.lastTurnInAt) or 0) > (tonumber(b.lastTurnInAt) or 0)
+  end)
+  lines[#lines + 1] = "Latest quest anchors:"
+  for index = 1, min(#matches, 3) do
+    local quest = matches[index]
+    lines[#lines + 1] = "  " .. tostring(quest.name or "Unknown stake")
+      .. " - " .. FormatAgo(quest.lastTurnInAt or 0)
+  end
+end
+
+local function AppendAreaHeatmap(module, lines, mapKey)
+  local total, cells
+  if type(module.GetJourneyHeatmapZones) == "function" then
+    local zones = module:GetJourneyHeatmapZones()
+    for index = 1, #zones do
+      local zone = zones[index]
+      if tostring(zone.mapID) == tostring(mapKey) then
+        total, cells = tonumber(zone.total) or 0, tonumber(zone.cellCount) or 0
+        break
+      end
+    end
+  end
+  if not total then
+    local heatmap = module.char.heatmaps and module.char.heatmaps[tostring(mapKey)]
+    if type(heatmap) == "table" and type(heatmap.cells) == "table" then
+      total = tonumber(heatmap.total) or 0
+      cells = 0
+      for _ in pairs(heatmap.cells) do cells = cells + 1 end
+    end
+  end
+  if not total or total <= 0 then return end
+  lines[#lines + 1] = "Heatmap: " .. FormatNumber(cells or 0) .. " cells, "
+    .. FormatNumber(total) .. " kills"
+end
+
 function XPTooltip:UpdateAreaDetail(mapKey)
   self:SetDetailMode(false)
   local db = self.char
@@ -478,6 +643,14 @@ function XPTooltip:UpdateAreaDetail(mapKey)
   if minLevel then
     lines[#lines + 1] = "Level range: " .. tostring(minLevel) .. "-" .. tostring(maxLevel)
   end
+
+  self:UpdateHistoryOverlayButtons()
+  local overlays = self:GetHistoryOverlaySettings()
+  if overlays.deaths then AppendAreaDeaths(self, lines, mapKey) end
+  if overlays.rares then AppendAreaRares(self, lines, mapKey) end
+  if overlays.quests then AppendAreaQuests(self, lines, mapKey) end
+  if overlays.heatmap then AppendAreaHeatmap(self, lines, mapKey) end
+
   self.ui.details:SetText(table.concat(lines, "\n"))
 end
 

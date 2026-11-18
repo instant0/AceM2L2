@@ -77,6 +77,12 @@ echo "== Heatmap render ops =="
 echo "== Heatmap lazy zone =="
 "$LUA_BIN" tests/heatmap_lazy_zone.lua forever
 
+echo "== Heatmap commit position =="
+"$LUA_BIN" tests/heatmap_commit_position.lua forever
+
+echo "== Grid occupancy =="
+"$LUA_BIN" tests/grid_occupancy.lua verify
+
 echo "== Map overlay audit =="
 "$LUA_BIN" tests/map_overlay_audit.lua forever
 
@@ -109,6 +115,12 @@ echo "== Cap boundaries =="
 
 echo "== Historical relevance =="
 "$LUA_BIN" tests/historical_relevance.lua forever
+
+echo "== Historical zone =="
+"$LUA_BIN" tests/historical_zone.lua forever
+
+echo "== Quest anchors =="
+"$LUA_BIN" tests/quest_anchors.lua forever
 
 echo "== Embedded library smoke test =="
 "$LUA_BIN" tests/libs_smoke.lua
