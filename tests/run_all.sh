@@ -95,6 +95,9 @@ echo "== S10C retirement readiness =="
 echo "== V-2A probe harness =="
 "$LUA_BIN" tests/v2_probe_harness.lua
 
+echo "== V-2 synthetic verification =="
+"$LUA_BIN" tests/v2_synthetic_verification.lua
+
 echo "== Journey save guard =="
 "$LUA_BIN" tests/journey_save_guard.lua forever
 

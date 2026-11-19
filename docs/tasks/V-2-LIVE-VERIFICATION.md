@@ -44,6 +44,15 @@ Do **not** repeat these as live acceptance items:
 | Real-store size/shape | `docs/DS-2`, `docs/HC-5-DIAGNOSTICS-BASELINE.md` |
 | Block codec/performance envelopes | `docs/DS-7-12-PACKED-BLOCK-CODEC-RESULT.md` |
 
+## Synthetic pre-verification
+
+`tests/v2_synthetic_verification.lua` now simulates the implemented V-2 logic:
+timing, XP split, death position, heatmap kills, context shape, block
+round-trip, save guard, backup/restore, and heat ramp. Result:
+`docs/V-2-SYNTHETIC-VERIFICATION-RESULT.md`.
+
+This does not create live evidence and does not unlock retirement.
+
 ## Live-only residual
 
 Only verify facts that depend on the actual game environment:

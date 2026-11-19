@@ -90,6 +90,17 @@ and keeps the non-XP history; nameplate levels are Midnight-only.
 
 ## Changelog
 
+### 2.6.0
+
+- Completed the Journey v2 read ownership migration for mobs, zones, levels,
+  instances, deaths, quests, respawns, and heatmaps.
+- Blocks now carry schema 3 payloads with zone/instance summaries, mob levels,
+  contexts, and heatmap coverage; schema 1/2 blocks still decode.
+- Added retention profiles, 32x32/16x16 heatmap summaries, cold context
+  collapse, block compaction, and retention diagnostics.
+- Added `/acem2l2 xpt v2probe` for live V-2A API/field evidence capture.
+- Legacy writes and rollback insurance remain until live V-2 validation.
+
 ### 2.5.2
 
 - Removed the Ctrl+Shift+X toggle keybinding; the minimap icon, addon

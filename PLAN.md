@@ -1,7 +1,7 @@
 # AceM2L2 plan
 
 Updated: 2026-11-14  
-Current release: **2.5.2**
+Current release: **2.6.0**
 
 ## Plan map
 
@@ -18,7 +18,7 @@ Current release: **2.5.2**
 | Instance attribution and heatmap collection | Implemented in 2.5.0 | G-4a/G-4b; V-1/V-2 |
 | UI responsiveness | UI-1..UI-5 done | V-6 visual/frame |
 | Client compatibility | 120107 interface added; 12.1.7 API/live audit pending | CL-1; V-6 |
-| Release hygiene | Released 2.5.2 | REL-1; V-6 |
+| Release hygiene | Released 2.6.0 | REL-1; V-6 |
 | Memory | 3.2–3.85MB real; policy done; guardrails open | MEM-1; V-2 |
 | Scope/grid/limit review | Static/offline analysis first | SC-1..SC-5, G-1..G-3, A-1, HC-7; V-3 |
 | Data storage architecture | S10C-1 + V-2A harness done; S10C-2 live-gated | DS-17.23; V-2 |
