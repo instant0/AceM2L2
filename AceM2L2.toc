@@ -37,6 +37,9 @@ KillHistory/Calibration.lua
 KillHistory/Tracking.lua
 KillHistory/World.lua
 KillHistory/Heatmap.lua
+KillHistory/Archive.lua
+KillHistory/Retirement.lua
+KillHistory/V2Evidence.lua
 KillHistory/MapOverlayData.lua
 KillHistory/Tooltip.lua
 KillHistory/UI/Theme.lua

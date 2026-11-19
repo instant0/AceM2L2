@@ -26,15 +26,9 @@ local function TopMobsByField(module, db, field, key, limit)
       end
     end
   end
-  if module:UseJourneyIndexViews() then
-    local rows = module:GetJourneyAllMobRows()
-    for index = 1, #rows do
-      add(rows[index].mob)
-    end
-  else
-    for _, mob in pairs(db.mobs or {}) do
-      add(mob)
-    end
+  local rows = module:GetJourneyAllMobRows()
+  for index = 1, #rows do
+    add(rows[index].mob)
   end
   table.sort(top, function(a, b)
     if a.kills == b.kills then
@@ -50,7 +44,8 @@ local function LevelRange(areaLevels)
   if type(areaLevels) == "table" then
     for levelKey, count in pairs(areaLevels) do
       local level = tonumber(levelKey)
-      if level and (tonumber(count) or 0) > 0 then
+      local amount = type(count) == "table" and count.kills or count
+      if level and (tonumber(amount) or 0) > 0 then
         if not minLevel or level < minLevel then
           minLevel = level
         end
@@ -297,8 +292,9 @@ end
 
 function XPTooltip:UpdateMobDetail(mobKey)
   self:SetDetailMode(true)
-  local legacy = self.char and self.char.mobs and self.char.mobs[mobKey]
-  local mob = legacy
+  local row = type(self.GetJourneyMobRow) == "function"
+    and self:GetJourneyMobRow(mobKey) or nil
+  local mob = row and row.mob or nil
   local blockFallback = false
   if type(mob) ~= "table" then
     local journey = self.char and self.char.journey
@@ -422,7 +418,8 @@ end
 function XPTooltip:UpdateInstanceDetail(instanceKey)
   self:SetDetailMode(false)
   local db = self.char
-  local instance = db.instances and db.instances[instanceKey]
+  local instance = type(self.GetModelInstance) == "function"
+    and self:GetModelInstance(instanceKey) or nil
   if type(instance) ~= "table" then
     return
   end
@@ -447,7 +444,7 @@ function XPTooltip:UpdateInstanceDetail(instanceKey)
       .. FormatNumber(top[index].kills) .. " kills"
   end
 
-  local minLevel, maxLevel = LevelRange(instance.killsAtLevel)
+  local minLevel, maxLevel = LevelRange(instance.playerLevels or instance.levels)
   if minLevel then
     lines[#lines + 1] = "Level range: " .. tostring(minLevel) .. "-" .. tostring(maxLevel)
   end
@@ -500,7 +497,8 @@ function XPTooltip:ToggleHistoryOverlay(key)
 end
 
 local function AppendAreaDeaths(module, lines, mapKey)
-  local deaths = module:NormalizeDeaths()
+  local deaths = type(module.GetModelDeathList) == "function"
+    and module:GetModelDeathList() or {}
   local matches = {}
   for index = #deaths, 1, -1 do
     local entry = deaths[index]
@@ -519,32 +517,18 @@ end
 
 local function AppendAreaRares(module, lines, mapKey)
   local matches = {}
-  if module:UseJourneyIndexViews() then
-    local rows = module:GetJourneyMobRows()
-    for index = 1, #rows do
-      local row = rows[index]
-      local mob = row.mob
-      local kills = type(mob) == "table" and type(mob.killsByMap) == "table"
-        and tonumber(mob.killsByMap[tostring(mapKey)]) or 0
-      local classification = tostring(row.classification or "")
-      if kills > 0 and (classification == "elite" or classification == "rare"
-        or classification == "rareelite" or classification == "worldboss") then
-        matches[#matches + 1] = {
-          name = tostring(row.name or "Unknown"), kills = kills,
-        }
-      end
-    end
-  else
-    for _, mob in pairs(module.char.mobs or {}) do
-      local kills = type(mob) == "table" and type(mob.killsByMap) == "table"
-        and tonumber(mob.killsByMap[tostring(mapKey)]) or 0
-      local classification = tostring(type(mob) == "table" and mob.classification or "")
-      if kills > 0 and (classification == "elite" or classification == "rare"
-        or classification == "rareelite" or classification == "worldboss") then
-        matches[#matches + 1] = {
-          name = tostring(mob.name or "Unknown"), kills = kills,
-        }
-      end
+  local rows = module:GetJourneyMobRows()
+  for index = 1, #rows do
+    local row = rows[index]
+    local mob = row.mob
+    local kills = type(mob) == "table" and type(mob.killsByMap) == "table"
+      and tonumber(mob.killsByMap[tostring(mapKey)]) or 0
+    local classification = tostring(row.classification or "")
+    if kills > 0 and (classification == "elite" or classification == "rare"
+      or classification == "rareelite" or classification == "worldboss") then
+      matches[#matches + 1] = {
+        name = tostring(row.name or "Unknown"), kills = kills,
+      }
     end
   end
   if #matches == 0 then return end
@@ -577,10 +561,14 @@ local function AppendAreaQuests(module, lines, mapKey)
     end
   end
   local matches = {}
-  for _, quest in pairs(module.char.quests or {}) do
+  local quests = module:EnsureModelQuests() or {}
+  for key, quest in pairs(quests) do
     if type(quest) == "table" and tostring(quest.mapID or "") == tostring(mapKey)
       and (tonumber(quest.count) or 0) > 0 then
-      matches[#matches + 1] = quest
+      matches[#matches + 1] = {
+        key = key,
+        lastTurnInAt = quest.lastTurnInAt or quest.lastSeen,
+      }
     end
   end
   if #matches == 0 then return end
@@ -589,9 +577,10 @@ local function AppendAreaQuests(module, lines, mapKey)
   end)
   lines[#lines + 1] = "Latest quest anchors:"
   for index = 1, min(#matches, 3) do
-    local quest = matches[index]
-    lines[#lines + 1] = "  " .. tostring(quest.name or "Unknown stake")
-      .. " - " .. FormatAgo(quest.lastTurnInAt or 0)
+    local match = matches[index]
+    local record = module:GetModelQuest(match.key)
+    lines[#lines + 1] = "  " .. tostring(record and record.name or "Unknown stake")
+      .. " - " .. FormatAgo(match.lastTurnInAt or 0)
   end
 end
 
@@ -608,7 +597,8 @@ local function AppendAreaHeatmap(module, lines, mapKey)
     end
   end
   if not total then
-    local heatmap = module.char.heatmaps and module.char.heatmaps[tostring(mapKey)]
+    local heatmap = type(module.GetModelHeatmap) == "function"
+      and module:GetModelHeatmap(mapKey) or nil
     if type(heatmap) == "table" and type(heatmap.cells) == "table" then
       total = tonumber(heatmap.total) or 0
       cells = 0
@@ -638,7 +628,9 @@ function XPTooltip:UpdateAreaDetail(mapKey)
     lines[#lines + 1] = "  " .. tostring(top[index].name) .. " - " .. FormatNumber(top[index].kills) .. " kills"
   end
 
-  local areaLevels = db.areaLevels and db.areaLevels[mapKey]
+  local modelZone = type(self.GetModelZone) == "function"
+    and self:GetModelZone(mapKey) or nil
+  local areaLevels = modelZone and (modelZone.playerLevels or modelZone.levels) or nil
   local minLevel, maxLevel = LevelRange(areaLevels)
   if minLevel then
     lines[#lines + 1] = "Level range: " .. tostring(minLevel) .. "-" .. tostring(maxLevel)

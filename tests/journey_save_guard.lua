@@ -22,8 +22,9 @@ local before = assert(module:GetJourneyBlock("map:12"))
 assert(before["npc:2001"].kills == 3, "initial block")
 
 -- Backup before a dirty rewrite.
-db.mobs["npc:2001"].kills = 7
-db.mobs["npc:2001"].killsByMap["12"] = 7
+local modelMob = db.journey.mobs["npc:2001"]
+modelMob.kills = 7
+modelMob.byZone["12"].kills = 7
 module:MarkJourneyDirty({ mapID = 12 })
 assert(module:FlushJourneyBlocks())
 local saveState = module:GetJourneySaveState()
@@ -46,7 +47,8 @@ assert(module:GetJourneySaveState().saveBlocked == false, "foreign oversize igno
 -- Oversize event for AceM2L2 blocks further block writes.
 module:OnSavedVariablesTooLarge("SAVED_VARIABLES_TOO_LARGE", "AceM2L2")
 assert(module:GetJourneySaveState().saveBlocked == true, "save should block")
-db.mobs["npc:2001"].killsByMap["12"] = 9
+modelMob.kills = 9
+modelMob.byZone["12"].kills = 9
 module:MarkJourneyDirty({ mapID = 12 })
 local ok, reason = module:FlushJourneyBlocks()
 assert(ok == false and reason == "save_blocked", "blocked flush should refuse")

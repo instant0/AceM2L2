@@ -101,7 +101,8 @@ local function SelectorLevelRange(levels)
   if type(levels) == "table" then
     for levelKey, count in pairs(levels) do
       local level = tonumber(levelKey)
-      if level and (tonumber(count) or 0) > 0 then
+      local amount = type(count) == "table" and count.kills or count
+      if level and (tonumber(amount) or 0) > 0 then
         if not minLevel or level < minLevel then minLevel = level end
         if not maxLevel or level > maxLevel then maxLevel = level end
       end
@@ -123,7 +124,8 @@ end
 local function MergeSelectorLevels(target, source)
   if type(source) ~= "table" then return end
   for levelKey, count in pairs(source) do
-    local amount = tonumber(count) or 0
+    local amount = type(count) == "table" and tonumber(count.kills) or tonumber(count)
+    amount = amount or 0
     if amount > 0 then
       target[levelKey] = (target[levelKey] or 0) + amount
     end
@@ -134,9 +136,9 @@ end
 -- difficulty variants cannot produce duplicate selector rows.
 local function BuildHeatmapSelectorRows(owner, zones)
   local db = owner.char or {}
-  local areas = type(db.areas) == "table" and db.areas or {}
-  local areaLevels = type(db.areaLevels) == "table" and db.areaLevels or {}
-  local instances = type(db.instances) == "table" and db.instances or {}
+  local journey = type(db.journey) == "table" and db.journey or {}
+  local zoneRecords = type(journey.zones) == "table" and journey.zones or {}
+  local instances = type(journey.instances) == "table" and journey.instances or {}
 
   local byMap = {}
   for _, entry in pairs(instances) do
@@ -150,7 +152,8 @@ local function BuildHeatmapSelectorRows(owner, zones)
         end
         info.kills = info.kills + (tonumber(entry.kills) or 0)
         MergeSelectorLevels(info.levels,
-          type(entry.killsAtLevel) == "table" and entry.killsAtLevel or nil)
+          type(entry.playerLevels) == "table" and entry.playerLevels
+            or (type(entry.levels) == "table" and entry.levels or nil))
         local seen = tonumber(entry.lastSeen) or 0
         local name = type(entry.name) == "string" and entry.name or ""
         if name ~= "" and (seen > info.lastSeen
@@ -172,11 +175,14 @@ local function BuildHeatmapSelectorRows(owner, zones)
       if not name or name == "" or name == "Unknown instance" then
         name = ReadMapName(owner, mapID)
       end
+      local zoneRecord = zoneRecords[mapKey]
       local kills = tonumber(zone.total) or 0
       if kills <= 0 then
-        kills = tonumber(areas[mapKey]) or (instance and instance.kills) or 0
+        kills = tonumber(zoneRecord and zoneRecord.kills)
+          or (instance and instance.kills) or 0
       end
-      local levels = instance and instance.levels or areaLevels[mapKey]
+      local levels = instance and (instance.playerLevels or instance.levels)
+        or (zoneRecord and (zoneRecord.playerLevels or zoneRecord.levels))
       local minLevel, maxLevel = SelectorLevelRange(levels)
       rows[#rows + 1] = {
         mapID = mapID,

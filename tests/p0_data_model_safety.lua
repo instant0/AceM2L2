@@ -36,9 +36,12 @@ db.mobs = {}
 db.heatmaps = {}
 module:MarkJourneyDirty({ mapID = 12 })
 assert(module:FlushJourneyBlocks(), "legacy-empty flush")
-assert(journey.blocks["map:12"] == original, "legacy-empty flush deleted block")
-assert(journey.blockIndex["map:12"] == originalIndex,
-  "legacy-empty flush changed block index")
+assert(journey.blocks["map:12"], "legacy-empty flush deleted block")
+assert(journey.blockIndex["map:12"], "legacy-empty flush deleted block index")
+module:ClearJourneyBlockCache()
+local retained = assert(module:GetJourneyBlock("map:12"))
+assert(retained["npc:5001"] and retained["npc:5001"].kills == 3,
+  "legacy-empty flush lost v2 block content")
 
 -- P0-3: clear/cap must not expose stale Journey zones; heatmap-only blocks go.
 reset()
@@ -111,6 +114,6 @@ db.journey.schema = 1
 local ensured = module:EnsureJourney()
 local storage = module:EnsureJourneyStorage()
 assert(ensured.schema == 2, "journey data schema not aligned")
-assert(storage.storageSchema == 2, "storage schema changed")
+assert(storage.storageSchema == 3, "storage schema changed")
 
 print("P0 data-model safety passed")

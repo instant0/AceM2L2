@@ -25,6 +25,7 @@ db.quests = {
     firstSeen = now, lastSeen = now,
   },
 }
+module:SyncModelQuestsFromLegacy()
 
 local originalPrint = AceM2L2.Print
 local function capture(fn)
@@ -86,6 +87,7 @@ assert(commandOutput:find("Beta Quest", 1, true)
 
 -- Empty state.
 db.quests = {}
+module:SyncModelQuestsFromLegacy()
 module:SetTab("quests")
 module:UpdateDetail()
 assert(module.ui.heroName.text == "Quest XP ledger", "quest empty title")
@@ -113,6 +115,7 @@ for index = 1, 150 do
     totalXP = index * 10, firstSeen = now - index, lastSeen = now - index,
   }
 end
+module:SyncModelQuestsFromLegacy()
 module:SetTab("quests")
 module:BuildList()
 assert(#module.currentList == 100, "quest displayed row cap")

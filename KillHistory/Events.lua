@@ -224,6 +224,9 @@ function XPTooltip:StartSession()
       mob.sessionXPKnown = false
     end
   end
+  for _, mob in pairs(type(db.journey) == "table" and db.journey.mobs or {}) do
+    if type(mob) == "table" then mob.sessionKills = 0 end
+  end
   self:ResetRates()
 end
 
@@ -387,6 +390,12 @@ function XPTooltip:Prune()
   end
   if type(self.NormalizeHeatmaps) == "function" then
     self:NormalizeHeatmaps()
+  end
+  if type(self.SyncModelHeatmapsFromLegacy) == "function" then
+    pcall(self.SyncModelHeatmapsFromLegacy, self)
+  end
+  if type(self.ApplyJourneyRetention) == "function" then
+    pcall(self.ApplyJourneyRetention, self)
   end
 
   -- Respawn watches are transient GetTime() sightings; anything older than an

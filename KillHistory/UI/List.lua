@@ -38,7 +38,8 @@ local function BuildHistoryRows(self, list, sortMode, search)
   local deathsAvailable, respawnsAvailable = self:GetHistoryAvailability()
 
   if deathsAvailable then
-    local deaths = self:NormalizeDeaths()
+    local deaths = type(self.GetModelDeathList) == "function"
+      and self:GetModelDeathList() or {}
     local first = max(1, #deaths - HISTORY_DEATH_LIMIT + 1)
     for index = first, #deaths do
       local entry = deaths[index]
@@ -64,7 +65,8 @@ local function BuildHistoryRows(self, list, sortMode, search)
 
   if respawnsAvailable then
     local entries = {}
-    for key, entry in pairs(db.respawns or {}) do
+    local respawns = self:EnsureModelRespawns() or {}
+    for key, entry in pairs(respawns) do
       if type(entry) == "table" then
         local npcID = tonumber(key)
         if npcID and npcID > 0 then
@@ -154,11 +156,13 @@ local function BuildQuestRows(self, list, sortMode, search)
     return
   end
   local entries = {}
-  for key, quest in pairs(db.quests or {}) do
+  local quests = self:EnsureModelQuests() or {}
+  for key, quest in pairs(quests) do
     if type(quest) == "table" then
-      local count = tonumber(quest.count) or 0
+      local record = self:GetModelQuest(key)
+      local count = record and tonumber(record.count) or 0
       if count > 0 then
-        local name = SafeString(quest.name)
+        local name = record and SafeString(record.name)
         if not name or name == "" then
           name = tostring(key)
         end
@@ -171,10 +175,10 @@ local function BuildQuestRows(self, list, sortMode, search)
             name = name,
             haystack = haystack,
             count = count,
-            totalXP = tonumber(quest.totalXP) or 0,
-            lastSeen = tonumber(quest.lastSeen) or 0,
-            firstSeen = tonumber(quest.firstSeen) or 0,
-            questID = tonumber(quest.id),
+            totalXP = record and tonumber(record.xp) or 0,
+            lastSeen = record and tonumber(record.lastSeen) or 0,
+            firstSeen = record and tonumber(record.firstSeen) or 0,
+            questID = record and tonumber(record.id) or nil,
           }
         end
       end
@@ -234,48 +238,17 @@ function XPTooltip:BuildList()
   elseif self.tab == "deaths" then
     BuildHistoryRows(self, list, historySort, Lower(self.searchText) or "")
   elseif self.tab == "areas" then
-    if self:UseJourneyIndexViews() then
-      local rows = self:GetAreaRows()
-      for index = 1, #rows do
-        local row = rows[index]
-        list[#list + 1] = {
-          kind = row.kind,
-          key = row.key,
-          label = row.label,
-          value = FormatNumber(row.kills) .. " kills",
-          sortValue = row.kills,
-          kills = row.kills,
-        }
-      end
-    else
-      for mapKey, kills in pairs(db.areas or {}) do
-        local value = tonumber(kills) or 0
-        if value > 0 and (not IsAttributableMapID or IsAttributableMapID(mapKey)) then
-          list[#list + 1] = {
-            kind = "area",
-            key = mapKey,
-            label = self:GetMapName(mapKey),
-            value = FormatNumber(value) .. " kills",
-            sortValue = value,
-            kills = value,
-          }
-        end
-      end
-      for instanceKey, instance in pairs(db.instances or {}) do
-        if type(instance) == "table" then
-          local value = tonumber(instance.kills) or 0
-          if value > 0 then
-            list[#list + 1] = {
-              kind = "instance",
-              key = instanceKey,
-              label = instance.name or "Unknown instance",
-              value = FormatNumber(value) .. " kills",
-              sortValue = value,
-              kills = value,
-            }
-          end
-        end
-      end
+    local rows = self:GetAreaRows()
+    for index = 1, #rows do
+      local row = rows[index]
+      list[#list + 1] = {
+        kind = row.kind,
+        key = row.key,
+        label = row.label,
+        value = FormatNumber(row.kills) .. " kills",
+        sortValue = row.kills,
+        kills = row.kills,
+      }
     end
     table.sort(list, function(a, b)
       if a.sortValue == b.sortValue then
@@ -288,34 +261,17 @@ function XPTooltip:BuildList()
       item.bar = totalKills > 0 and (item.kills / totalKills) or 0
     end
   elseif self.tab == "levels" then
-    if self:UseJourneyIndexViews() then
-      local rows = self:GetLevelRows()
-      for index = 1, #rows do
-        local row = rows[index]
-        list[#list + 1] = {
-          kind = row.kind,
-          key = row.key,
-          label = row.label,
-          value = FormatNumber(row.kills) .. " kills",
-          sortValue = row.level,
-          kills = row.kills,
-        }
-      end
-    else
-      for levelKey, kills in pairs(db.levels or {}) do
-        local level = tonumber(levelKey) or 0
-        local value = tonumber(kills) or 0
-        if level > 0 and value > 0 then
-          list[#list + 1] = {
-            kind = "level",
-            key = levelKey,
-            label = "Level " .. tostring(level),
-            value = FormatNumber(value) .. " kills",
-            sortValue = level,
-            kills = value,
-          }
-        end
-      end
+    local rows = self:GetLevelRows()
+    for index = 1, #rows do
+      local row = rows[index]
+      list[#list + 1] = {
+        kind = row.kind,
+        key = row.key,
+        label = row.label,
+        value = FormatNumber(row.kills) .. " kills",
+        sortValue = row.level,
+        kills = row.kills,
+      }
     end
     table.sort(list, function(a, b) return a.sortValue < b.sortValue end)
     local maxKills = 0
@@ -329,7 +285,6 @@ function XPTooltip:BuildList()
     end
   else
     local search = Lower(self.searchText) or ""
-    local playerLevel = self:GetPlayerLevel()
     local function appendMob(mobKey, mob)
       if type(mob) ~= "table" or (tonumber(mob.kills) or 0) <= 0 then
         return
@@ -353,33 +308,10 @@ function XPTooltip:BuildList()
       }
     end
 
-    if self:UseJourneyIndexViews() then
-      local rows = self:GetJourneyMobsForFilter(self.filter, search)
-      for index = 1, #rows do
-        local row = rows[index]
-        appendMob(row.key, row.mob)
-      end
-    else
-      for mobKey, mob in pairs(db.mobs or {}) do
-        if type(mob) == "table" and (tonumber(mob.kills) or 0) > 0 then
-          local name = Lower(mob.name) or ""
-          local include = true
-          if self.filter == "level" then
-            include = playerLevel
-              and type(mob.killsAtLevel) == "table"
-              and (tonumber(mob.killsAtLevel[tostring(playerLevel)]) or 0) > 0
-          elseif self.filter == "session" then
-            include = (tonumber(mob.sessionKills) or 0) > 0
-          elseif self.filter == "elite" then
-            include = mob.classification == "elite"
-              or mob.classification == "rareelite"
-              or mob.classification == "worldboss"
-          end
-          if include and (search == "" or name:find(search, 1, true)) then
-            appendMob(mobKey, mob)
-          end
-        end
-      end
+    local rows = self:GetJourneyMobsForFilter(self.filter, search)
+    for index = 1, #rows do
+      local row = rows[index]
+      appendMob(row.key, row.mob)
     end
     local maxKills = 0
     for _, item in ipairs(list) do

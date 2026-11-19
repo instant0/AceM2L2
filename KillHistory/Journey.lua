@@ -25,6 +25,15 @@ local function zoneKeyFor(self, mapID)
   return id > 0 and tostring(id) or "0"
 end
 
+local function currentInstanceKey(self)
+  if type(self.GetInstanceState) ~= "function" then return nil end
+  local ok, state = pcall(self.GetInstanceState, self)
+  if ok and type(state) == "table" and state.inInstance and state.key then
+    return state.key
+  end
+  return nil
+end
+
 local function playerLevelFor(self, level)
   local value = tonumber(level)
   if value and value > 0 then
@@ -107,11 +116,36 @@ local function ensureLevel(journey, level)
   return record
 end
 
+local function ensureInstance(journey, key)
+  local instanceKey = tostring(key or "")
+  local record = journey.instances and journey.instances[instanceKey]
+  if type(record) ~= "table" then
+    if type(journey.instances) ~= "table" then journey.instances = {} end
+    record = {
+      kills = 0, killXP = 0, questXP = 0, otherXP = 0, xp = 0,
+      presenceSeconds = 0, engagedSeconds = 0, deaths = 0, sessions = 0,
+      playerLevels = {},
+      timeCoverage = "post-instrumentation",
+      deathCoverage = "post-instrumentation",
+      sessionCoverage = "post-instrumentation",
+    }
+    journey.instances[instanceKey] = record
+  end
+  if type(record.playerLevels) ~= "table" then record.playerLevels = {} end
+  return record
+end
+
 local function addPresence(journey, seconds)
   if seconds <= 0 then
     return
   end
   local time = journey.time
+  if time.instanceKey then
+    local instance = ensureInstance(journey, time.instanceKey)
+    instance.presenceSeconds = (instance.presenceSeconds or 0) + seconds
+    instance.timeCoverage = "post-instrumentation"
+    return
+  end
   local zone = ensureZone(journey, time.zone or "0")
   local level = ensureLevel(journey, time.level or 0)
   zone.presenceSeconds = zone.presenceSeconds + seconds
@@ -126,6 +160,12 @@ local function addEngaged(journey, seconds)
   end
   local time = journey.time
   local capped = math.min(seconds, time.cap or ENGAGED_GAP_CAP)
+  if time.instanceKey then
+    local instance = ensureInstance(journey, time.instanceKey)
+    instance.engagedSeconds = (instance.engagedSeconds or 0) + capped
+    instance.timeCoverage = "post-instrumentation"
+    return
+  end
   local zone = ensureZone(journey, time.zone or "0")
   local level = ensureLevel(journey, time.level or 0)
   zone.engagedSeconds = zone.engagedSeconds + capped
@@ -142,20 +182,33 @@ local function closePresence(journey, now)
   time.lastEventAt = now
 end
 
-local function switchContext(journey, now, zone, level)
+local function switchContext(journey, now, zone, level, instanceKey)
   local time = journey.time
   local changed = time.zone ~= zone or time.level ~= level
+    or time.instanceKey ~= instanceKey
   closePresence(journey, now)
   if changed then
     time.zone = zone
     time.level = level
+    time.instanceKey = instanceKey
     time.lastKillAt = now
+    if instanceKey then
+      local instance = ensureInstance(journey, instanceKey)
+      instance.sessions = (instance.sessions or 0) + 1
+      instance.sessionCoverage = "post-instrumentation"
+    end
   end
 end
 
-local function addXP(journey, zoneKey, level, field, amount)
+local function addXP(journey, zoneKey, level, field, amount, instanceKey)
   local value = tonumber(amount) or 0
   if value <= 0 then
+    return
+  end
+  if instanceKey then
+    local instance = ensureInstance(journey, instanceKey)
+    instance[field] = (instance[field] or 0) + value
+    instance.xp = (instance.xp or 0) + value
     return
   end
   local zone = ensureZone(journey, zoneKey)
@@ -178,6 +231,20 @@ local function addQuestAnchor(journey, anchor)
 end
 
 local function addEvent(journey, key, count)
+  if journey.time.instanceKey then
+    local instance = ensureInstance(journey, journey.time.instanceKey)
+    instance[key] = (instance[key] or 0) + (count or 1)
+    local level = tostring(journey.time.level or 0)
+    if key == "kills" then
+      local byLevel = instance.playerLevels[level]
+      if type(byLevel) ~= "table" then
+        byLevel = { kills = 0 }
+        instance.playerLevels[level] = byLevel
+      end
+      byLevel.kills = (tonumber(byLevel.kills) or 0) + (count or 1)
+    end
+    return
+  end
   local zone = ensureZone(journey, journey.time.zone or "0")
   local level = ensureLevel(journey, journey.time.level or 0)
   zone[key] = (zone[key] or 0) + (count or 1)
@@ -195,8 +262,8 @@ function XPTooltip:OnJourneyEnterWorld()
     return
   end
   local now = Epoch()
-  journey.time.zone = zoneKeyFor(self, 0)
-  journey.time.level = playerLevelFor(self, 0)
+  switchContext(journey, now, zoneKeyFor(self, 0),
+    playerLevelFor(self, 0), currentInstanceKey(self))
   journey.time.lastEventAt = now
   journey.time.lastKillAt = now
 end
@@ -210,7 +277,8 @@ function XPTooltip:OnJourneyZoneChanged()
     return
   end
   local now = Epoch()
-  switchContext(journey, now, zoneKeyFor(self, 0), journey.time.level)
+  switchContext(journey, now, zoneKeyFor(self, 0), journey.time.level,
+    currentInstanceKey(self))
   journey.time.lastEventAt = now
 end
 
@@ -224,7 +292,7 @@ function XPTooltip:OnJourneyLevelUp(level)
   end
   local now = Epoch()
   switchContext(journey, now, journey.time.zone or zoneKeyFor(self, 0),
-    playerLevelFor(self, level))
+    playerLevelFor(self, level), journey.time.instanceKey or currentInstanceKey(self))
   journey.time.lastEventAt = now
 end
 
@@ -239,15 +307,17 @@ function XPTooltip:OnJourneyKill(info, totalXP)
   local now = Epoch()
   local zone = zoneKeyFor(self, info and info.mapID or 0)
   local level = playerLevelFor(self, info and info.playerLevel or 0)
+  local instanceKey = info and info.instanceKey
   local changed = journey.time.zone ~= zone or journey.time.level ~= level
-  switchContext(journey, now, zone, level)
+    or journey.time.instanceKey ~= instanceKey
+  switchContext(journey, now, zone, level, instanceKey)
   if not changed and journey.time.lastKillAt and journey.time.lastKillAt > 0 then
     addEngaged(journey, now - journey.time.lastKillAt)
   end
   journey.time.lastKillAt = now
   journey.time.lastEventAt = now
   addEvent(journey, "kills", 1)
-  addXP(journey, zone, level, "killXP", totalXP)
+  addXP(journey, zone, level, "killXP", totalXP, instanceKey)
   if self.MarkJourneyDirty then
     self:MarkJourneyDirty(info)
   end
@@ -265,7 +335,8 @@ function XPTooltip:OnJourneyKillXP(totalXP, info)
     return
   end
   addXP(journey, zoneKeyFor(self, info and info.mapID or 0),
-    playerLevelFor(self, info and info.playerLevel or 0), "killXP", totalXP)
+    playerLevelFor(self, info and info.playerLevel or 0), "killXP", totalXP,
+    info and info.instanceKey)
 end
 
 function XPTooltip:OnJourneyQuestTurnIn(questID, questName, xpReward)
@@ -288,10 +359,11 @@ function XPTooltip:OnJourneyQuestTurnIn(questID, questName, xpReward)
   end
   local level = playerLevelFor(self, 0)
   local zone = zoneKeyFor(self, mapID)
-  switchContext(journey, now, zone, level)
+  local instanceKey = currentInstanceKey(self)
+  switchContext(journey, now, zone, level, instanceKey)
   journey.time.lastKillAt = now
   journey.time.lastEventAt = now
-  addXP(journey, zone, level, "questXP", xpReward)
+  addXP(journey, zone, level, "questXP", xpReward, instanceKey)
   addEvent(journey, "quests", 1)
   local anchor = {
     questID = tonumber(questID),
@@ -318,6 +390,17 @@ function XPTooltip:OnJourneyQuestTurnIn(questID, questName, xpReward)
     quest.mapID = mapID
     quest.playerLevel = level
   end
+end
+
+function XPTooltip:OnJourneyInstanceDeath()
+  if not self:IsActive() then return end
+  local journey = self:EnsureJourney()
+  if not journey then return end
+  local key = currentInstanceKey(self)
+  if not key then return end
+  local instance = ensureInstance(journey, key)
+  instance.deaths = (instance.deaths or 0) + 1
+  instance.deathCoverage = "post-instrumentation"
 end
 
 function XPTooltip:ResetJourneyData()

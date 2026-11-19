@@ -138,13 +138,14 @@ end
 
 function XPTooltip:GetDataStats()
   local db = type(self.char) == "table" and self.char or {}
-  local mobs = type(db.mobs) == "table" and db.mobs or {}
-  local quests = type(db.quests) == "table" and db.quests or {}
-  local deaths = type(db.deaths) == "table" and db.deaths or {}
-  local levelRecords = type(db.levelHistory) == "table" and db.levelHistory or {}
+  local journey = type(db.journey) == "table" and db.journey or {}
+  local mobs = type(journey.mobs) == "table" and journey.mobs or {}
+  local quests = type(journey.quests) == "table" and journey.quests or {}
+  local deaths = type(journey.deaths) == "table" and journey.deaths or {}
+  local levelRecords = type(journey.levels) == "table" and journey.levels or {}
   local rates = type(db.rates) == "table" and db.rates or {}
-  local respawnNpcs, respawnSamples = CountRespawns(db.respawns)
-  local heatmapZones, heatmapCells = CountHeatmaps(db.heatmaps)
+  local respawnNpcs, respawnSamples = CountRespawns(journey.respawns)
+  local heatmapZones, heatmapCells = CountHeatmaps(journey.heatmaps)
   local heatmapEnabled = true
   if type(self.GetSettings) == "function" then
     local ok, settings = pcall(self.GetSettings, self)
@@ -153,11 +154,11 @@ function XPTooltip:GetDataStats()
     end
   end
   local heatmapEstimate = EstimateSize(
-    type(db.heatmaps) == "table" and db.heatmaps or {},
+    type(journey.heatmaps) == "table" and journey.heatmaps or {},
     { entries = 0, seen = {}, truncated = false }
   )
   local instanceCount, instanceKills = 0, 0
-  for _, instance in pairs(type(db.instances) == "table" and db.instances or {}) do
+  for _, instance in pairs(type(journey.instances) == "table" and journey.instances or {}) do
     if type(instance) == "table" then
       instanceCount = instanceCount + 1
       instanceKills = instanceKills + (tonumber(instance.kills) or 0)
@@ -207,6 +208,10 @@ function XPTooltip:GetDataStats()
 
   stats.cache = type(self.GetCacheStats) == "function"
     and self:GetCacheStats() or {}
+  stats.retention = type(self.GetRetentionStats) == "function"
+    and self:GetRetentionStats() or {}
+  stats.retirement = type(self.GetRetirementReadiness) == "function"
+    and self:GetRetirementReadiness() or {}
   stats.capacity = type(self.GetCapacityAssessment) == "function"
     and self:GetCapacityAssessment(stats) or {}
   local estimate = { entries = 0, seen = {}, truncated = false }
@@ -369,7 +374,18 @@ function XPTooltip:RefreshDiagnosticsUI()
       "Lua heap",
       stats.capacity.luaHeapKB and FormatBytes(stats.capacity.luaHeapKB * 1024) or "unavailable",
     },
-    { "Cold blocks", FormatBytes(stats.capacity.blockBytes or 0) },
+    {
+      "Blocks H/W/C",
+      string.format("%d/%d/%d · %s",
+        tonumber(stats.retention and stats.retention.blocks
+          and stats.retention.blocks.hot) or 0,
+        tonumber(stats.retention and stats.retention.blocks
+          and stats.retention.blocks.warm) or 0,
+        tonumber(stats.retention and stats.retention.blocks
+          and stats.retention.blocks.cold) or 0,
+        FormatBytes(stats.retention and stats.retention.blockBytes
+          or stats.capacity.blockBytes or 0)),
+    },
     { "Instances", LimitText(stats.instances, stats.maxInstances) },
     { "Instance kills", FormatNumber(stats.instanceKills) },
     { "Level records", LimitText(stats.levelRecords, stats.maxLevelRecords) },

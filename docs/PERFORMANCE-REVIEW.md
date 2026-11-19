@@ -455,7 +455,38 @@ is no fixed MB target.
   `docs/DS-17-09-DATA-MODEL-S1-SCAFFOLDING-RESULT.md`.
 - **DS-17.10** is complete: v2 mob kill/backfill path and v2-only reads. Result:
   `docs/DS-17-10-S2A-MOB-MODEL-RESULT.md`.
-- **DS-17.11** is next: mutation parity for merge/delete/prune.
+- **DS-17.11** is complete: v2 mutation parity for merge/delete/prune and load
+  consolidation. Result: `docs/DS-17-11-S2A-MUTATION-PARITY-RESULT.md`.
+- **DS-17.12** is complete: v2 context arrays, combat/XP views, top-8+other.
+  Result: `docs/DS-17-12-S2B-CONTEXT-SHAPE-RESULT.md`.
+- **DS-17.13** is complete: v2 zone/level ownership with exact kills and explicit
+  XP/time coverage. Result: `docs/DS-17-13-S3-ZONE-LEVEL-OWNERSHIP-RESULT.md`.
+- **DS-17.14** is complete: exact instance identity/totals/XP/player levels.
+  Result: `docs/DS-17-14-S4-INSTANCE-OWNERSHIP-RESULT.md`.
+- **DS-17.15** is complete: per-instance time/deaths/sessions and
+  non-attributable routing. Result:
+  `docs/DS-17-15-S4B-INSTANCE-TIME-RESULT.md`.
+- **DS-17.16** is complete: exact death position/time with V-2 fields marked
+  unavailable. Result: `docs/DS-17-16-S5-DEATH-OWNERSHIP-RESULT.md`.
+- **DS-17.17** is complete: canonical quest/respawn records with names resolved
+  from the ledger. Result: `docs/DS-17-17-S6-QUEST-RESPAWN-OWNERSHIP-RESULT.md`.
+- **DS-17.18** is complete: canonical heatmap cells/total/lastSeen/top-10 with
+  cell XP/time marked unavailable. Result:
+  `docs/DS-17-18-S7-HEATMAP-OWNERSHIP-RESULT.md`.
+- **DS-17.19** is complete: schema 3 blocks carry v2 zone/instance summaries,
+  mob levels/contexts, and heatmap coverage. Result:
+  `docs/DS-17-19-S8-BLOCK-PAYLOAD-RESULT.md`.
+- **DS-17.20** is complete: retention profiles, block tiers, 32/16 heatmap
+  summaries, cold context collapse, compaction, and diagnostics. Result:
+  `docs/DS-17-20-S9-CAPS-ARCHIVE-RESULT.md`.
+- **DS-17.21 S10A** is complete: query reads are v2-owned. Result:
+  `docs/DS-17-21-S10A-QUERY-RETIREMENT-RESULT.md`.
+- **DS-17.22** is complete: UI list/detail/tooltip reads are v2-owned. Result:
+  `docs/DS-17-22-S10B-UI-READS-RESULT.md`.
+- **DS-17.23 S10C-1** is complete: retirement readiness, blockers, and v2-only
+  replay are exposed. Result:
+  `docs/DS-17-23-S10C1-RETIREMENT-READINESS-RESULT.md`.
+- **DS-17.23 S10C-2** remains blocked on live V-2.
 - Live gates remain MEM-1/V-1/V-2.
 - **V-2** is deferred to live-only residual checks.
 

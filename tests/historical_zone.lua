@@ -43,6 +43,12 @@ db.quests = {
 db.heatmaps = {
   ["12"] = { gridSize = 64, total = 10, cells = { [1] = 5, [2] = 5 }, lastSeen = now },
 }
+module:SyncModelZonesFromLegacy()
+module:SyncModelInstancesFromLegacy()
+module:SyncModelDeathsFromLegacy()
+module:SyncModelMobsFromLegacy()
+module:SyncModelQuestsFromLegacy()
+module:SyncModelHeatmapsFromLegacy()
 module:InvalidateMobIndex()
 module:InvalidateHeatmapCache()
 

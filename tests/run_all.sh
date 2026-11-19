@@ -50,8 +50,50 @@ echo "== S1 model helpers =="
 echo "== S2A migration simulation =="
 "$LUA_BIN" tests/s2a_migration_sim.lua
 
+echo "== S2A mutation parity =="
+"$LUA_BIN" tests/s2a_mutation_parity.lua
+
+echo "== S2B context shape =="
+"$LUA_BIN" tests/s2b_context_shape.lua
+
+echo "== S3 zone/level ownership =="
+"$LUA_BIN" tests/s3_zone_level_ownership.lua
+
+echo "== S4 instance ownership =="
+"$LUA_BIN" tests/s4_instance_ownership.lua
+
+echo "== S4B instance time =="
+"$LUA_BIN" tests/s4b_instance_time.lua
+
+echo "== S5 death ownership =="
+"$LUA_BIN" tests/s5_death_ownership.lua
+
+echo "== S6 quest/respawn ownership =="
+"$LUA_BIN" tests/s6_quest_respawn_ownership.lua
+
+echo "== S7 heatmap ownership =="
+"$LUA_BIN" tests/s7_heatmap_ownership.lua
+
 echo "== Journey block storage =="
 "$LUA_BIN" tests/journey_storage.lua forever
+
+echo "== S8 block payload =="
+"$LUA_BIN" tests/s8_block_payload.lua
+
+echo "== S9 caps/archive =="
+"$LUA_BIN" tests/s9_caps_archive.lua
+
+echo "== S10 query retirement =="
+"$LUA_BIN" tests/s10_query_retirement.lua
+
+echo "== S10 UI read retirement =="
+"$LUA_BIN" tests/s10_ui_read_retirement.lua
+
+echo "== S10C retirement readiness =="
+"$LUA_BIN" tests/s10c_retirement_readiness.lua
+
+echo "== V-2A probe harness =="
+"$LUA_BIN" tests/v2_probe_harness.lua
 
 echo "== Journey save guard =="
 "$LUA_BIN" tests/journey_save_guard.lua forever

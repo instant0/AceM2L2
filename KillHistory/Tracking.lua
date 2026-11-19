@@ -389,6 +389,12 @@ function XPTooltip:RecordKill(info, totalXP, rawBase, buffedXP, source, skipObse
       self:ReportError("RecordModelMobKill", err, false)
     end
   end
+  if instanceKey and type(self.SyncModelInstanceFromLegacy) == "function" then
+    local ok, err = pcall(self.SyncModelInstanceFromLegacy, self, instanceKey)
+    if not ok then
+      self:ReportError("SyncModelInstanceFromLegacy", err, false)
+    end
+  end
 
   if self.ui and self.ui:IsShown() then
     self:RequestUIUpdate()

@@ -1649,6 +1649,7 @@ module.char.heatmaps["21"] = {
   total = 26,
   lastSeen = 1,
 }
+module:SyncModelHeatmapsFromLegacy()
 module:InvalidateHeatmapCache()
 module.heatmapZoneKey = "21"
 module:SetTab("heatmap")
@@ -2006,6 +2007,8 @@ for index = 1, 40 do
     contexts = {},
   }
 end
+module:SyncModelMobsFromLegacy()
+module:InvalidateJourneyMobIndex()
 module.tab = "mobs"
 module:OpenUI()
 local responsiveUI = module.ui

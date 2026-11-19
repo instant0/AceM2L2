@@ -21,8 +21,8 @@ Current release: **2.5.2**
 | Release hygiene | Released 2.5.2 | REL-1; V-6 |
 | Memory | 3.2–3.85MB real; policy done; guardrails open | MEM-1; V-2 |
 | Scope/grid/limit review | Static/offline analysis first | SC-1..SC-5, G-1..G-3, A-1, HC-7; V-3 |
-| Data storage architecture | S2A kill/backfill done; mutation parity next | DS-17.11; S2B+; V-2 |
-| Character lifecycle and cross-character data | S2A mutation parity next; ALT future | DS-17.11 now; DS-17.6B later; V-2 |
+| Data storage architecture | S10C-1 + V-2A harness done; S10C-2 live-gated | DS-17.23; V-2 |
+| Character lifecycle and cross-character data | S10C-1 + V-2A harness done; S10C-2 blocked; ALT future | DS-17.23; DS-17.6B later; V-2 |
 | Journey overlay | Proposed, after DS | J-1..J-6; V-4 |
 | Cell inspector | Proposed, after DS | M-1..M-6; V-4 |
 | Carbonite | Deferred | CB-0..CB-6 when reopened |
@@ -140,8 +140,34 @@ Next:
     Result: `docs/DS-17-09-DATA-MODEL-S1-SCAFFOLDING-RESULT.md`.
 26. ~~**DS-17.10 — S2A mob model migration.**~~ **Done 2026-11-18 (kill/backfill).**
     Result: `docs/DS-17-10-S2A-MOB-MODEL-RESULT.md`.
-27. **DS-17.11 — S2A mutation parity.** **Next; implementation.**
-28. **DS-17.6B — ALT/account-feature validation.** Future; only after migration and ALT scheduling.
+27. ~~**DS-17.11 — S2A mutation parity.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-11-S2A-MUTATION-PARITY-RESULT.md`.
+28. ~~**DS-17.12 — S2B context shape migration.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-12-S2B-CONTEXT-SHAPE-RESULT.md`.
+29. ~~**DS-17.13 — S3 zone/level ownership migration.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-13-S3-ZONE-LEVEL-OWNERSHIP-RESULT.md`.
+30. ~~**DS-17.14 — S4A instance ownership migration.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-14-S4-INSTANCE-OWNERSHIP-RESULT.md`.
+31. ~~**DS-17.15 — S4B instance time/death/session coverage.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-15-S4B-INSTANCE-TIME-RESULT.md`.
+32. ~~**DS-17.16 — S5 death ownership.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-16-S5-DEATH-OWNERSHIP-RESULT.md`.
+33. ~~**DS-17.17 — S6 quest/respawn ownership.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-17-S6-QUEST-RESPAWN-OWNERSHIP-RESULT.md`.
+34. ~~**DS-17.18 — S7 heatmap ownership and top-N.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-18-S7-HEATMAP-OWNERSHIP-RESULT.md`.
+35. ~~**DS-17.19 — S8 block payload v2 completeness.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-19-S8-BLOCK-PAYLOAD-RESULT.md`.
+36. ~~**DS-17.20 — S9 adaptive caps, retention, and archive policy.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-20-S9-CAPS-ARCHIVE-RESULT.md`.
+37. **DS-17.21 — S10 legacy retirement.** **S10A/S10B done; S10C pending.**
+    Result: `docs/DS-17-21-S10A-QUERY-RETIREMENT-RESULT.md`.
+38. ~~**DS-17.22 — S10B UI read retirement.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-22-S10B-UI-READS-RESULT.md`.
+39. **DS-17.23 — S10C live-gated retirement.** **S10C-1 + V-2A harness done; S10C-2 blocked.**
+    Results: `docs/DS-17-23-S10C1-RETIREMENT-READINESS-RESULT.md`,
+    `docs/V-2A-PROBE-HARNESS-RESULT.md`.
+40. **DS-17.6B — ALT/account-feature validation.** Future; only after migration and ALT scheduling.
 21. **MEM-1 — Real memory measurement.** Compare AceM2L2 with ATT/FLG and decide
     whether H64-9-F3 is needed; do not optimize from the 20MB fixture figure.
 
@@ -171,7 +197,7 @@ complete.** DS-1 is in
 DS-5 is in `docs/DS-5-SAVEDVARIABLES-LOADING-MATRIX.md`; DS-17.1 is in
 `docs/DS-17-1-AGGREGATION-DECISION.md`; DS-17.2, DS-17.3, DS-1-F2, DS-4P,
 DS-4P-F1, DS-4P-F2, DS-6, DS-7/DS-12, and DS-6-F1 are complete.
-Next non-live: DS-17.11 (S2A mutation parity). UI-5, HC-7, G-1A/G-1B, and G-2/G-3 are complete; keep 64x64. V-2 is deferred to live-only residual checks.
+Next live-gated: run `/acem2l2 xpt v2probe` on a live client, then V-2B/C/D and DS-17.23 S10C-2. All non-live migration work is done. UI-5, HC-7, G-1A/G-1B, and G-2/G-3 are complete; keep 64x64. V-2 is deferred to live-only residual checks.
 
 ### Phase 3 — storage design and prototypes
 
@@ -290,8 +316,34 @@ Run after DS-2/DS-3 measurements:
     Result: `docs/DS-17-09-DATA-MODEL-S1-SCAFFOLDING-RESULT.md`.
 18. ~~**DS-17.10 — S2A mob model migration.**~~ **Done 2026-11-18 (kill/backfill).**
     Result: `docs/DS-17-10-S2A-MOB-MODEL-RESULT.md`.
-19. **DS-17.11 — S2A mutation parity.** **Next; implementation.**
-20. **DS-17.6B — ALT/account-feature validation.** Future.
+19. ~~**DS-17.11 — S2A mutation parity.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-11-S2A-MUTATION-PARITY-RESULT.md`.
+20. ~~**DS-17.12 — S2B context shape migration.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-12-S2B-CONTEXT-SHAPE-RESULT.md`.
+21. ~~**DS-17.13 — S3 zone/level ownership migration.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-13-S3-ZONE-LEVEL-OWNERSHIP-RESULT.md`.
+22. ~~**DS-17.14 — S4A instance ownership migration.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-14-S4-INSTANCE-OWNERSHIP-RESULT.md`.
+23. ~~**DS-17.15 — S4B instance time/death/session coverage.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-15-S4B-INSTANCE-TIME-RESULT.md`.
+24. ~~**DS-17.16 — S5 death ownership.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-16-S5-DEATH-OWNERSHIP-RESULT.md`.
+25. ~~**DS-17.17 — S6 quest/respawn ownership.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-17-S6-QUEST-RESPAWN-OWNERSHIP-RESULT.md`.
+26. ~~**DS-17.18 — S7 heatmap ownership and top-N.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-18-S7-HEATMAP-OWNERSHIP-RESULT.md`.
+27. ~~**DS-17.19 — S8 block payload v2 completeness.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-19-S8-BLOCK-PAYLOAD-RESULT.md`.
+28. ~~**DS-17.20 — S9 adaptive caps, retention, and archive policy.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-20-S9-CAPS-ARCHIVE-RESULT.md`.
+29. **DS-17.21 — S10 legacy retirement.** **S10A/S10B done; S10C pending.**
+    Result: `docs/DS-17-21-S10A-QUERY-RETIREMENT-RESULT.md`.
+30. ~~**DS-17.22 — S10B UI read retirement.**~~ **Done 2026-11-18.**
+    Result: `docs/DS-17-22-S10B-UI-READS-RESULT.md`.
+31. **DS-17.23 — S10C live-gated retirement.** **S10C-1 + V-2A harness done; S10C-2 blocked.**
+    Results: `docs/DS-17-23-S10C1-RETIREMENT-READINESS-RESULT.md`,
+    `docs/V-2A-PROBE-HARNESS-RESULT.md`.
+32. **DS-17.6B — ALT/account-feature validation.** Future.
 
 ### Phase 5 — proposed features
 
@@ -1409,10 +1461,38 @@ budget.
     Result: `docs/DS-17-09-DATA-MODEL-S1-SCAFFOLDING-RESULT.md`.
   - [x] **DS-17.10 — S2A mob model migration.** Executed 2026-11-18 (kill/
     backfill; v2-only reads). Result: `docs/DS-17-10-S2A-MOB-MODEL-RESULT.md`.
-  - [ ] **DS-17.11 — S2A mutation parity.** **Next.** Sync v2 on merge/delete/
-    prune and prove parity. `docs/tasks/DS-17-11-S2A-MUTATION-PARITY.md`.
+  - [x] **DS-17.11 — S2A mutation parity.** Executed 2026-11-18.
+    Result: `docs/DS-17-11-S2A-MUTATION-PARITY-RESULT.md`.
+  - [x] **DS-17.12 — S2B context shape migration.** Executed 2026-11-18.
+    Result: `docs/DS-17-12-S2B-CONTEXT-SHAPE-RESULT.md`.
+  - [x] **DS-17.13 — S3 zone/level ownership migration.** Executed 2026-11-18.
+    Result: `docs/DS-17-13-S3-ZONE-LEVEL-OWNERSHIP-RESULT.md`.
+  - [x] **DS-17.14 — S4A instance ownership migration.** Executed 2026-11-18.
+    Result: `docs/DS-17-14-S4-INSTANCE-OWNERSHIP-RESULT.md`.
+  - [x] **DS-17.15 — S4B instance time/death/session coverage.** Executed
+    2026-11-18. Result: `docs/DS-17-15-S4B-INSTANCE-TIME-RESULT.md`.
+  - [x] **DS-17.16 — S5 death ownership.** Executed 2026-11-18.
+    Result: `docs/DS-17-16-S5-DEATH-OWNERSHIP-RESULT.md`.
+  - [x] **DS-17.17 — S6 quest/respawn ownership.** Executed 2026-11-18.
+    Result: `docs/DS-17-17-S6-QUEST-RESPAWN-OWNERSHIP-RESULT.md`.
+  - [x] **DS-17.18 — S7 heatmap ownership and top-N.** Executed 2026-11-18.
+    Result: `docs/DS-17-18-S7-HEATMAP-OWNERSHIP-RESULT.md`.
+  - [x] **DS-17.19 — S8 block payload v2 completeness.** Executed 2026-11-18.
+    Result: `docs/DS-17-19-S8-BLOCK-PAYLOAD-RESULT.md`.
+  - [x] **DS-17.20 — S9 adaptive caps, retention, and archive policy.** Executed
+    2026-11-18. Result: `docs/DS-17-20-S9-CAPS-ARCHIVE-RESULT.md`.
+  - [x] **DS-17.21 — S10A query read retirement.** Executed 2026-11-18.
+    Result: `docs/DS-17-21-S10A-QUERY-RETIREMENT-RESULT.md`.
+  - [x] **DS-17.22 — S10B UI read retirement.** Executed 2026-11-18.
+    Result: `docs/DS-17-22-S10B-UI-READS-RESULT.md`.
+  - [x] **DS-17.23 — S10C-1 retirement readiness.** Executed 2026-11-18.
+    Result: `docs/DS-17-23-S10C1-RETIREMENT-READINESS-RESULT.md`.
+  - [x] **V-2A — live probe harness.** Executed 2026-11-18.
+    Result: `docs/V-2A-PROBE-HARNESS-RESULT.md`.
+  - [ ] **DS-17.23 — S10C-2 live removal.** **Blocked on V-2.**
+    `docs/tasks/DS-17-23-S10C-LIVE-RETIREMENT.md`.
   - [ ] **DS-17.6B — ALT/account-feature validation.** **Future only.** 1/3/5-alt
-    Knowledge, route advice, account persistence. Depends DS-17.11 + migration slices,
+    Knowledge, route advice, account persistence. Depends DS-17.17 + migration slices,
     DS-17.4D, V-2, MEM-1, and ALT scheduling.
     `docs/tasks/DS-17-06B-ALT-FEATURE-VALIDATION.md`.
 

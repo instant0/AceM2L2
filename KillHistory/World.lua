@@ -234,6 +234,9 @@ function XPTooltip:RecordDeath(mapID, x, y, at)
     y = py,
   }
   db.deaths = NormalizeDeaths(deaths)
+  if type(self.SyncModelDeathsFromLegacy) == "function" then
+    pcall(self.SyncModelDeathsFromLegacy, self)
+  end
   return true
 end
 
@@ -245,7 +248,11 @@ function XPTooltip:HandlePlayerDeath()
   if not mapID or not x or not y then
     return false
   end
-  return self:RecordDeath(mapID, x, y, Epoch())
+  local recorded = self:RecordDeath(mapID, x, y, Epoch())
+  if type(self.OnJourneyInstanceDeath) == "function" then
+    pcall(self.OnJourneyInstanceDeath, self)
+  end
+  return recorded
 end
 
 function XPTooltip:GetHistoryAvailability()
@@ -487,16 +494,17 @@ function XPTooltip:RecordRespawnInterval(npcID, name, seconds)
   entry.lastSeen = now
   entry.lastDeath = max(0, now - interval)
   self:NormalizeRespawns()
+  if type(self.SyncModelRespawnFromLegacy) == "function" then
+    pcall(self.SyncModelRespawnFromLegacy, self, id)
+  end
   return true
 end
 
 function XPTooltip:GetRespawnStats(npcID)
   local id = PositiveNumber(npcID)
-  local db = self.char
-  if not id or type(db) ~= "table" or type(db.respawns) ~= "table" then
-    return nil, 0, 0, 0, 0
-  end
-  local entry = db.respawns[id]
+  if not id then return nil, 0, 0, 0, 0 end
+  local respawns = self:EnsureModelRespawns() or {}
+  local entry = respawns[tostring(id)] or respawns[id]
   if type(entry) ~= "table" or type(entry.intervals) ~= "table" then
     return nil, 0, 0, 0, 0
   end
@@ -534,9 +542,8 @@ function XPTooltip:PrintRespawns(rest)
     return
   end
   local db = self.char
-  if type(db) ~= "table" or type(db.respawns) ~= "table" then
-    return
-  end
+  if type(db) ~= "table" then return end
+  local respawns = self:EnsureModelRespawns() or {}
 
   local filter = Lower(Trim(rest))
   if filter == "" then
@@ -544,7 +551,7 @@ function XPTooltip:PrintRespawns(rest)
   end
 
   local list = {}
-  for key, entry in pairs(db.respawns) do
+  for key, entry in pairs(respawns) do
     if type(entry) == "table" then
       local npcID = tonumber(key)
       if npcID and npcID > 0 then

@@ -1,36 +1,26 @@
 # Next task
 
-## DS-17.11 — S2A mutation parity and cleanup
+## V-2 live evidence run
 
-**Status:** next; implementation  
-**Task document:** `docs/tasks/DS-17-11-S2A-MUTATION-PARITY.md`  
-**Depends on:** DS-17.10  
-**Blocks:** S2B contexts
+**Status:** live-only; required before S10C-2  
+**Task document:** `docs/tasks/V-2-LIVE-VERIFICATION.md`  
+**Depends on:** a live client and `/acem2l2 xpt v2probe`
 
-### Why this is next
+### Run
 
-- DS-17.10 writes and reads `journey.mobs` canonical for kills and migration.
-- Legacy merge/delete/prune paths can still change mob data without syncing v2.
-- That drift must be closed before contexts or further owner migration.
+1. `/acem2l2 xpt v2probe` and capture the output/evidence.
+2. V-2B: verify implemented capture under real combat.
+3. V-2C: verify save/load, oversize, and companion behavior.
+4. V-2D: verify heatmap/window visuals.
+5. Record results in `docs/V-2-LIVE-VERIFICATION-RESULT.md`.
 
-### Work
+### Then
 
-1. Add v2 mob merge/delete/prune helpers.
-2. Hook `MergeMobEntries`, delete/unknown cleanup, and cap/prune paths.
-3. Preserve NPC-ID-first identity and the existing name-only rule.
-4. Keep `db.mobs` as a compatibility projection until S3.
-5. Add mutation parity tests.
-
-### Output
-
-- non-drifting v2 mob owner;
-- `tests/s2a_mutation_parity.lua`;
-- result document.
+**DS-17.23 S10C-2** removes dual writes, normalizers, fallbacks, quest-ledger
+dependency, and rollback insurance.
 
 ### Not required
 
-- S2B contexts;
-- zone/level/instance migration;
-- block payload v2 completeness;
-- legacy retirement;
-- live client test.
+- account Knowledge/ALT production writes;
+- route recommendations;
+- new storage-format study.

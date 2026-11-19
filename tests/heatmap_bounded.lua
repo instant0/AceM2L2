@@ -42,9 +42,9 @@ module:ClearJourneyBlockCache()
 module.journeyDecodedBlocks = 0
 local top = module:GetHeatmapTopCells(12, 2)
 assert(#top == 2 and top[1].cell == 2 and top[1].kills == 6, "top cells")
-assert(module.journeyDecodedBlocks == 1, "top cells should decode once")
+assert(module.journeyDecodedBlocks == 0, "top cells should use v2 model")
 module:GetHeatmapTopCells(12, 2)
-assert(module.journeyDecodedBlocks == 1, "top cells should cache")
+assert(module.journeyDecodedBlocks == 0, "top cells should not decode")
 
 -- The UI selects the current zone and reads its cells from the block.
 module:OpenUI()

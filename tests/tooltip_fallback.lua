@@ -34,8 +34,10 @@ assert(legacyText:find("Killed:", 1, true), "legacy tooltip missing kills")
 assert(legacyText:find("this level:", 1, true), "legacy tooltip missing level kills")
 assert(module.journeyDecodedBlocks == 0, "legacy tooltip should not decode blocks")
 
--- Remove legacy mob; tooltip should use one cold block decode.
+-- Remove the v2 mob; tooltip should use one cold block decode.
+db.journey.mobs = {}
 db.mobs = {}
+module:InvalidateJourneyMobIndex()
 module:ClearJourneyBlockCache()
 module.journeyDecodedBlocks = 0
 GameTooltip.lines = {}

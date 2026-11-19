@@ -237,7 +237,11 @@ function XPTooltip:RecordObservation(mob, info, rawBase, buffedXP, totalXP)
   end
   self:UpdateRatio(calibration.levels, tostring(playerLevel), ratio)
   self:UpdateRatio(calibration.classes, classification, ratio)
-  self:UpdateRatio(calibration.mobs, info.mobKey or self:GetMobKey(info.name, info.npcID), ratio)
+  local modelKey = info.mobKey or self:GetMobKey(info.name, info.npcID)
+  self:UpdateRatio(calibration.mobs, modelKey, ratio)
+  if modelKey and type(self.SyncModelMobContextsFromLegacy) == "function" then
+    pcall(self.SyncModelMobContextsFromLegacy, self, modelKey)
+  end
 end
 
 function XPTooltip:ResetObservations()
@@ -254,6 +258,9 @@ function XPTooltip:ResetObservations()
   end
   db.calibration = { zones = {}, levels = {}, groups = {}, classes = {}, mobs = {} }
   db.calibrationVersion = CALIBRATION_VERSION
+  if type(self.SyncModelMobsFromLegacy) == "function" then
+    pcall(self.SyncModelMobsFromLegacy, self)
+  end
   AceM2L2:SafePrint("Kill Story observations reset.")
   self:RefreshUI()
 end

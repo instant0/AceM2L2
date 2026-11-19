@@ -51,11 +51,8 @@ assert(total[1].xpPerHour == 300000, "total XP/hour value")
 assert(kill[1].killXPPerHour == 250000, "kill-only XP/hour value")
 assert(total[1].confidence == "medium", "confidence from engaged time")
 
-db.areas = db.areas or {}
-db.areas["12"] = 10
 local zone = module:GetJourneyZoneStats("12")
-assert(zone.kills == 5, "journey zone kills must not be added to legacy kills")
-assert(zone.legacyKills == 10, "legacy zone kills not reported")
+assert(zone.kills == 5, "journey zone kills")
 assert(zone.questXP == 200000, "zone quest XP")
 db.journey.levels = {
   ["20"] = {
@@ -63,37 +60,53 @@ db.journey.levels = {
     presenceSeconds = 600, engagedSeconds = 600, deaths = 0,
   },
 }
-db.levels = db.levels or {}
-db.levels["20"] = 20
 local level = module:GetJourneyLevelStats(20)
 assert(level.kills == 9, "journey level kills")
-assert(level.legacyKills == 20, "legacy level kills not reported")
 
-db.heatmaps = db.heatmaps or {}
-db.heatmaps["12"] = { cells = { [1] = 10, [2] = 30, [3] = 20 } }
+db.journey.heatmaps = db.journey.heatmaps or {}
+db.journey.heatmaps["12"] = {
+  mapID = 12, gridSize = 64,
+  cells = { [1] = { kills = 10 }, [2] = { kills = 30 }, [3] = { kills = 20 } },
+  total = 60, lastSeen = 100,
+}
 local cells = module:GetHeatmapTopCells("12", 2)
 assert(#cells == 2, "heatmap top count")
 assert(cells[1].cell == 2 and cells[1].kills == 30, "heatmap top cell")
 assert(cells[1].share > 0.4, "heatmap share")
 
-db.mobs = db.mobs or {}
-db.mobs["npc:123"] = {
+db.journey.mobs = db.journey.mobs or {}
+db.journey.mobs["npc:123"] = {
   npcID = 123, name = "Test Mob", classification = "normal",
-  kills = 5, totalXP = 500, lastSeen = 100,
-  killsByMap = { ["12"] = 5 },
+  kills = 5, xp = 500, lastSeen = 100,
+  byZone = { ["12"] = { kills = 5, playerLevels = {} } },
+  byInstance = {},
 }
 local mob = module:GetMobJourneySummary("npc:123")
 assert(mob and mob.name == "Test Mob" and mob.kills == 5, "mob summary")
 assert(mob.zones[1] == "map:12", "mob zone ref")
 
-db.quests = db.quests or {}
-db.quests["quest:55"] = {
-  id = 55, name = "Query Quest", count = 1, totalXP = 500,
-  lastSeen = 100, lastTurnInAt = 100, mapID = 12, playerLevel = 20,
+db.journey.quests = db.journey.quests or {}
+db.journey.quests["quest:55"] = {
+  id = 55, count = 1, xp = 500, lastSeen = 100,
+  lastTurnInAt = 100, mapID = 12, playerLevel = 20,
 }
+db.quests = db.quests or {}
+db.quests["quest:55"] = { id = 55, name = "Query Quest" }
 local quest = module:GetQuestAnchor(55)
 assert(quest and quest.name == "Query Quest" and quest.lastTurnInAt == 100,
   "quest anchor")
+
+-- Query reads do not depend on legacy aggregate roots.
+db.mobs, db.areas, db.levels, db.instances, db.heatmaps = nil, nil, nil, nil, nil
+assert(module:GetJourneyZoneStats("12").kills == 5, "v2 zone stats")
+assert(module:GetJourneyLevelStats(20).kills == 9, "v2 level stats")
+assert(module:GetAreaRows()[1].kills > 0, "v2 area rows")
+assert(module:GetLevelRows()[1].kills > 0, "v2 level rows")
+assert(#module:GetHeatmapTopCells("12", 2) == 2, "v2 heatmap")
+assert(module:GetMobJourneySummary("npc:123").kills == 5, "v2 mob summary")
+assert(module:GetQuestAnchor(55).lastTurnInAt == 100, "v2 quest anchor")
+db.quests = nil
+assert(module:GetQuestAnchor(55).name == nil, "quest name read legacy ledger")
 
 state.mapID = 12
 state.playerLevel = 20

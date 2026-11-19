@@ -147,28 +147,12 @@ function XPTooltip:RefreshOverview()
   overview.cards[4].value:SetText(topAreaLabel or "None")
 
   local lines = {}
-  if self:UseJourneyIndexViews() then
-    local entries = self:GetJourneyTopMobs(8)
-    for index = 1, #entries do
-      local entry = entries[index]
-      lines[#lines + 1] = string.format(
-        "%d. %s  -  %s kills", index, tostring(entry.name or "Unknown"), FormatNumber(entry.kills)
-      )
-    end
-  else
-    local mobs = {}
-    for mobKey, mob in pairs(db.mobs or {}) do
-      if type(mob) == "table" and (tonumber(mob.kills) or 0) > 0 then
-        mobs[#mobs + 1] = { key = mobKey, mob = mob, kills = tonumber(mob.kills) or 0 }
-      end
-    end
-    table.sort(mobs, function(a, b) return a.kills > b.kills end)
-    for index = 1, min(#mobs, 8) do
-      local entry = mobs[index]
-      lines[#lines + 1] = string.format(
-        "%d. %s  -  %s kills", index, tostring(entry.mob.name or "Unknown"), FormatNumber(entry.kills)
-      )
-    end
+  local entries = self:GetJourneyTopMobs(8)
+  for index = 1, #entries do
+    local entry = entries[index]
+    lines[#lines + 1] = string.format(
+      "%d. %s  -  %s kills", index, tostring(entry.name or "Unknown"), FormatNumber(entry.kills)
+    )
   end
   if #lines == 0 then
     local profile = self:GetClientProfile()

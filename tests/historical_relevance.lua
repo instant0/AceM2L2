@@ -26,6 +26,8 @@ db.mobs = {
     xp = { samples = 10, sumBase = 200, sumTotal = 200 },
   },
 }
+module:SyncModelMobsFromLegacy()
+module:InvalidateJourneyMobIndex()
 F.SetTarget("Defias Pillager", "Creature-0-1-2-3-1234-00000001")
 state.mapID = 12
 state.targetLevel = 10

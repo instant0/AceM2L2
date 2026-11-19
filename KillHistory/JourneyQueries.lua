@@ -36,15 +36,9 @@ function XPTooltip:GetJourneyZoneStats(zoneKey)
   if not record then
     return nil
   end
-  local db = self.char or {}
-  local legacyKills = tonumber((db.areas or {})[tostring(zoneKey)]) or 0
   return {
     zoneKey = tostring(zoneKey),
-    -- Journey zone kills are a post-instrumentation subset of the legacy
-    -- world-area count. They are reported separately, never added, so callers
-    -- cannot double count the same kill.
     kills = finite(record.kills),
-    legacyKills = legacyKills,
     killXP = finite(record.killXP),
     questXP = finite(record.questXP),
     otherXP = finite(record.otherXP),
@@ -63,11 +57,9 @@ function XPTooltip:GetJourneyLevelStats(level)
   if type(record) ~= "table" then
     return nil
   end
-  local legacyKills = tonumber((db.levels or {})[tostring(level)]) or 0
   return {
     level = tonumber(level) or 0,
     kills = finite(record.kills),
-    legacyKills = legacyKills,
     killXP = finite(record.killXP),
     questXP = finite(record.questXP),
     otherXP = finite(record.otherXP),
@@ -77,17 +69,17 @@ function XPTooltip:GetJourneyLevelStats(level)
   }
 end
 
--- Overlap-safe Area rows. Legacy area/instance counts remain canonical for
--- world and instance identity; Journey data adds context but is not summed into
--- the same kill total.
+-- Area rows read the v2 zone and instance records. They never read legacy
+-- area/instance aggregates.
 function XPTooltip:GetAreaRows()
   local db = self.char
   if type(db) ~= "table" then
     return {}
   end
+  local journey = db.journey or {}
   local rows = {}
-  for mapKey, kills in pairs(db.areas or {}) do
-    local value = finite(kills)
+  for mapKey, zone in pairs(journey.zones or {}) do
+    local value = type(zone) == "table" and finite(zone.kills) or 0
     if value > 0
       and (not IsAttributableMapID or IsAttributableMapID(mapKey)) then
       rows[#rows + 1] = {
@@ -99,7 +91,7 @@ function XPTooltip:GetAreaRows()
       }
     end
   end
-  for instanceKey, instance in pairs(db.instances or {}) do
+  for instanceKey, instance in pairs(journey.instances or {}) do
     if type(instance) == "table" then
       local value = finite(instance.kills)
       if value > 0 then
@@ -116,17 +108,17 @@ function XPTooltip:GetAreaRows()
   return rows
 end
 
--- Overlap-safe Level rows. Legacy level kills remain canonical; Journey level
--- data is available separately through GetJourneyLevelStats.
+-- Level rows read v2 level records only.
 function XPTooltip:GetLevelRows()
   local db = self.char
   if type(db) ~= "table" then
     return {}
   end
+  local journey = db.journey or {}
   local rows = {}
-  for levelKey, kills in pairs(db.levels or {}) do
+  for levelKey, record in pairs(journey.levels or {}) do
     local level = tonumber(levelKey) or 0
-    local value = finite(kills)
+    local value = type(record) == "table" and finite(record.kills) or 0
     if level > 0 and value > 0 then
       rows[#rows + 1] = {
         kind = "level",
@@ -140,30 +132,15 @@ function XPTooltip:GetLevelRows()
   return rows
 end
 
--- Area/level summaries honor the same legacy rollback as the list tabs.
 function XPTooltip:GetTopAreaSummary()
-  local db = self.char
-  if type(db) ~= "table" then return nil end
   local topKey, topKills, topLabel
-  if self:UseJourneyIndexViews() then
-    local rows = self:GetAreaRows()
-    for index = 1, #rows do
-      local row = rows[index]
-      if row.kind == "area"
-        and (not topKills or row.kills > topKills
-          or (row.kills == topKills and tostring(row.key) < tostring(topKey))) then
-        topKey, topKills, topLabel = row.key, row.kills, row.label
-      end
-    end
-  else
-    for mapKey, kills in pairs(db.areas or {}) do
-      local value = tonumber(kills) or 0
-      if value > 0
-        and (not IsAttributableMapID or IsAttributableMapID(mapKey))
-        and (not topKills or value > topKills
-          or (value == topKills and tostring(mapKey) < tostring(topKey))) then
-        topKey, topKills, topLabel = mapKey, value, self:GetMapName(mapKey)
-      end
+  local rows = self:GetAreaRows()
+  for index = 1, #rows do
+    local row = rows[index]
+    if row.kind == "area"
+      and (not topKills or row.kills > topKills
+        or (row.kills == topKills and tostring(row.key) < tostring(topKey))) then
+      topKey, topKills, topLabel = row.key, row.kills, row.label
     end
   end
   if topKills then
@@ -173,8 +150,6 @@ function XPTooltip:GetTopAreaSummary()
 end
 
 function XPTooltip:GetLevelSummary()
-  local db = self.char
-  if type(db) ~= "table" then return nil end
   local minLevel, maxLevel, topLevel, topKills
   local function add(level, value)
     if level and value > 0 then
@@ -186,48 +161,32 @@ function XPTooltip:GetLevelSummary()
       end
     end
   end
-  if self:UseJourneyIndexViews() then
-    local rows = self:GetLevelRows()
-    for index = 1, #rows do
-      local row = rows[index]
-      add(row.level, row.kills)
-    end
-  else
-    for levelKey, kills in pairs(db.levels or {}) do
-      add(tonumber(levelKey), tonumber(kills) or 0)
-    end
+  local rows = self:GetLevelRows()
+  for index = 1, #rows do
+    local row = rows[index]
+    add(row.level, row.kills)
   end
   return minLevel, maxLevel, topLevel, topKills
 end
 
 function XPTooltip:GetAreaKillCount(areaKey)
   local key = tostring(areaKey or "")
-  if self:UseJourneyIndexViews() then
-    local rows = self:GetAreaRows()
-    for index = 1, #rows do
-      local row = rows[index]
-      if row.kind == "area" and row.key == key then return row.kills end
-    end
-    return 0
+  local rows = self:GetAreaRows()
+  for index = 1, #rows do
+    local row = rows[index]
+    if row.kind == "area" and row.key == key then return row.kills end
   end
-  local db = self.char
-  local areas = db and db.areas
-  return tonumber(areas and (areas[key] or areas[tonumber(key)])) or 0
+  return 0
 end
 
 function XPTooltip:GetLevelKillCount(levelKey)
   local key = tostring(levelKey or "")
-  if self:UseJourneyIndexViews() then
-    local rows = self:GetLevelRows()
-    for index = 1, #rows do
-      local row = rows[index]
-      if row.key == key or tostring(row.level) == key then return row.kills end
-    end
-    return 0
+  local rows = self:GetLevelRows()
+  for index = 1, #rows do
+    local row = rows[index]
+    if row.key == key or tostring(row.level) == key then return row.kills end
   end
-  local db = self.char
-  local levels = db and db.levels
-  return tonumber(levels and (levels[key] or levels[tonumber(key)])) or 0
+  return 0
 end
 
 -- mode = "total" (default) or "kill".
@@ -304,57 +263,37 @@ local function TopHeatmapCells(cells, count)
 end
 
 function XPTooltip:GetHeatmapTopCells(mapID, count)
-  if self:UseJourneyIndexViews()
-    and type(self.GetJourneyHeatmapCells) == "function" then
-    local cells = self:GetJourneyHeatmapCells(mapID)
-    if type(cells) == "table" and next(cells) ~= nil then
-      return TopHeatmapCells(cells, count)
-    end
+  local heatmap = type(self.GetModelHeatmap) == "function"
+    and self:GetModelHeatmap(mapID) or nil
+  if type(heatmap) == "table" and type(heatmap.cells) == "table" then
+    return TopHeatmapCells(heatmap.cells, count)
   end
-  local db = self.char
-  local heatmaps = db and db.heatmaps
-  local heatmap = heatmaps and heatmaps[tostring(mapID)]
-  if type(heatmap) ~= "table" or type(heatmap.cells) ~= "table" then
-    return {}
-  end
-  return TopHeatmapCells(heatmap.cells, count)
+  return {}
 end
 
 function XPTooltip:GetMobJourneySummary(mobKey)
-  local db = self.char
-  local mob = db and db.mobs and db.mobs[mobKey]
-  if type(mob) == "table" then
-    local zones = {}
-    for mapKey in pairs(mob.killsByMap or {}) do zones[#zones + 1] = "map:" .. tostring(mapKey) end
-    for instanceKey in pairs(mob.killsByInstance or {}) do zones[#zones + 1] = "instance:" .. tostring(instanceKey) end
-    return {
-      key = tostring(mobKey),
-      npcID = mob.npcID,
-      name = mob.name,
-      classification = mob.classification,
-      kills = finite(mob.kills),
-      xp = finite(mob.totalXP),
-      zones = zones,
-      lastSeen = finite(mob.lastSeen),
-    }
+  local mob = type(self.GetModelMob) == "function"
+    and self:GetModelMob(mobKey) or nil
+  if type(mob) ~= "table" then return nil end
+  local zones = {}
+  for mapKey in pairs(mob.byZone or {}) do
+    zones[#zones + 1] = "map:" .. tostring(mapKey)
   end
-  if self.GetJourneyMob then
-    local blockMob = self:GetJourneyMob(mobKey)
-    if blockMob then
-      return {
-        key = tostring(mobKey),
-        npcID = blockMob.npcID,
-        name = blockMob.name,
-        classification = blockMob.classification,
-        kills = finite(blockMob.kills),
-        xp = finite(blockMob.xp),
-        zones = self.GetJourneyMobZones and self:GetJourneyMobZones(mobKey) or {},
-        lastSeen = 0,
-        source = "block",
-      }
-    end
+  for instanceKey in pairs(mob.byInstance or {}) do
+    zones[#zones + 1] = "instance:" .. tostring(instanceKey)
   end
-  return nil
+  table.sort(zones)
+  return {
+    key = tostring(mobKey),
+    npcID = mob.npcID,
+    name = mob.name,
+    classification = mob.classification,
+    kills = finite(mob.kills),
+    xp = finite(mob.xp),
+    zones = zones,
+    lastSeen = finite(mob.lastSeen),
+    source = "v2",
+  }
 end
 
 function XPTooltip:GetQuestAnchors(mapID, count)
@@ -369,7 +308,8 @@ function XPTooltip:GetQuestAnchors(mapID, count)
     if type(anchor) == "table" and (not wanted or tostring(anchor.mapID) == wanted) then
       local questID = tonumber(anchor.questID)
       local key = questID and ("quest:" .. tostring(questID)) or "quest:unknown"
-      local quest = db.quests and db.quests[key]
+      local quest = questID and type(self.GetModelQuest) == "function"
+        and self:GetModelQuest(questID) or nil
       local name = quest and Util.SafeString(quest.name) or nil
       if not name or name == "" then
         name = questID and ("Quest " .. tostring(questID)) or "Unknown quest"
@@ -401,18 +341,16 @@ function XPTooltip:GetQuestAnchors(mapID, count)
 end
 
 function XPTooltip:GetQuestAnchor(questID)
-  local db = self.char
   local key = questID and ("quest:" .. tostring(questID)) or "quest:unknown"
-  local quest = db and db.quests and db.quests[key]
-  if type(quest) ~= "table" then
-    return nil
-  end
+  local quest = type(self.GetModelQuest) == "function"
+    and self:GetModelQuest(questID) or nil
+  if type(quest) ~= "table" then return nil end
   return {
     key = key,
     id = quest.id,
     name = quest.name,
     count = finite(quest.count),
-    xp = finite(quest.totalXP),
+    xp = finite(quest.xp),
     lastTurnInAt = finite(quest.lastTurnInAt or quest.lastSeen),
     mapID = finite(quest.mapID),
     playerLevel = finite(quest.playerLevel),

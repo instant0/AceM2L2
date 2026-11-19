@@ -12,7 +12,10 @@ db.mobs = {
     npcID = 101, name = "Alpha", classification = "normal",
     kills = 20, sessionKills = 5, firstSeen = 0, lastSeen = 0,
     xp = { samples = 2, sumBase = 100, sumTotal = 120 },
-    contexts = { a = true, b = true },
+    contexts = {
+      a = { samples = 1, playerLevel = 10, mobLevel = 10 },
+      b = { samples = 1, playerLevel = 10, mobLevel = 11 },
+    },
   },
   ["npc:102"] = {
     npcID = 102, name = "Beta", classification = "elite",
@@ -30,6 +33,7 @@ db.mobs = {
     xp = { samples = 0 }, contexts = {},
   },
 }
+module:SyncModelMobsFromLegacy()
 module:InvalidateMobIndex()
 
 local originalPrint = AceM2L2.Print
@@ -74,6 +78,7 @@ assert(module.journeyMobIndexBuilds == 1, "repeated commands rebuilt the index")
 
 -- A mutation invalidates and the next command rebuilds once.
 db.mobs["npc:101"].kills = 40
+module:SyncModelMobsFromLegacy()
 module:InvalidateMobIndex()
 local updated = capture(function() module:PrintKills(nil) end)
 assert(module.journeyMobIndexBuilds == 2, "mutation did not rebuild once")

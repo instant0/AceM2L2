@@ -46,6 +46,9 @@ db.instances = {
     killsAtLevel = { ["30"] = 4 }, lastSeen = 80,
   },
 }
+module:SyncModelZonesFromLegacy()
+module:SyncModelInstancesFromLegacy()
+module:SyncModelHeatmapsFromLegacy()
 module:InvalidateHeatmapCache()
 module:InvalidateHeatmapZoneCache()
 

@@ -25,20 +25,58 @@ function XPTooltip:UseJourneyIndexViews()
   return journey.indexViews ~= false
 end
 
+local function legacyShape(mob)
+  local kills = tonumber(mob.kills) or 0
+  local totalXP = tonumber(mob.xp) or 0
+  local killsAtLevel, killsByMap, killsByInstance = {}, {}, {}
+  for level, record in pairs(mob.byPlayerLevel or {}) do
+    killsAtLevel[tostring(level)] = tonumber(record.kills) or 0
+  end
+  for mapKey, zone in pairs(mob.byZone or {}) do
+    killsByMap[tostring(mapKey)] = tonumber(zone.kills) or 0
+  end
+  for instanceKey, zone in pairs(mob.byInstance or {}) do
+    killsByInstance[tostring(instanceKey)] = tonumber(zone.kills) or 0
+  end
+  return {
+    npcID = mob.npcID,
+    name = mob.name,
+    classification = mob.classification or "normal",
+    kills = kills,
+    totalXP = totalXP,
+    sessionKills = tonumber(mob.sessionKills) or 0,
+    killsAtLevel = killsAtLevel,
+    killsByMap = killsByMap,
+    killsByInstance = killsByInstance,
+    xp = mob.xpStats or {
+      samples = kills,
+      sumBase = totalXP,
+      sumBuffed = 0,
+      sumTotal = totalXP,
+    },
+    firstSeen = tonumber(mob.firstSeen) or 0,
+    lastSeen = tonumber(mob.lastSeen) or 0,
+    mobLevelMin = mob.mobLevelMin,
+    mobLevelMax = mob.mobLevelMax,
+    contexts = mob.contexts,
+  }
+end
+
 local function makeRow(key, mob)
+  local compat = legacyShape(mob)
   return {
     key = key,
-    mob = mob,
-    npcID = mob.npcID,
-    name = mob.name or "Unknown",
-    classification = mob.classification or "normal",
-    kills = tonumber(mob.kills) or 0,
-    sessionKills = tonumber(mob.sessionKills) or 0,
-    killsAtLevel = mob.killsAtLevel,
-    xp = mob.xp,
-    lastSeen = tonumber(mob.lastSeen) or 0,
-    killsByMap = mob.killsByMap,
-    killsByInstance = mob.killsByInstance,
+    mob = compat,
+    npcID = compat.npcID,
+    name = compat.name or "Unknown",
+    classification = compat.classification,
+    kills = compat.kills,
+    sessionKills = compat.sessionKills,
+    killsAtLevel = compat.killsAtLevel,
+    xp = compat.xp,
+    lastSeen = compat.lastSeen,
+    killsByMap = compat.killsByMap,
+    killsByInstance = compat.killsByInstance,
   }
 end
 
@@ -51,7 +89,8 @@ function XPTooltip:EnsureJourneyMobIndex()
     return self.journeyMobIndex
   end
   local allRows, rows, byKey = {}, {}, {}
-  for key, mob in pairs(db.mobs or {}) do
+  local journey = db.journey
+  for key, mob in pairs(journey and journey.mobs or {}) do
     if type(mob) == "table" then
       local row = makeRow(key, mob)
       allRows[#allRows + 1] = row

@@ -34,7 +34,7 @@ module:OnJourneyEnterWorld()
 
 assert(module:FlushJourneyBlocks(), "journey flush failed")
 local journey = db.journey
-assert(journey.storageSchema == 2, "storage schema")
+assert(journey.storageSchema == 3, "storage schema")
 assert(type(journey.blocks["map:12"]) == "table", "map 12 block missing")
 assert(type(journey.blocks["map:13"]) == "table", "map 13 block missing")
 assert(type(journey.blocks["instance:id:33:1"]) == "table", "instance block missing")
@@ -69,8 +69,9 @@ assert(cachedCells and cachedCells[4096].kills == 2, "heatmap cache")
 assert(module.journeyDecodedBlocks == 1, "heatmap cache should not decode again")
 
 -- Dirty block rebuild.
-db.mobs["npc:1001"].kills = 9
-db.mobs["npc:1001"].killsByMap["12"] = 9
+local modelMob = db.journey.mobs["npc:1001"]
+modelMob.kills = 9
+modelMob.byZone["12"].kills = 9
 module:MarkJourneyDirty({ mapID = 12 })
 module:ClearJourneyBlockCache()
 assert(module:FlushJourneyBlocks(), "dirty flush")
@@ -96,7 +97,7 @@ assert(blockMob and blockMob.name == "Block Mob A", "block-backed mob lookup")
 local blockZones = module:GetJourneyMobZones("npc:1001")
 assert(#blockZones >= 1 and blockZones[1] == "map:12", "mob zone index")
 local blockSummary = module:GetMobJourneySummary("npc:1001")
-assert(blockSummary and blockSummary.source == "block", "summary block fallback")
+assert(blockSummary and blockSummary.source == "v2", "summary v2 source")
 assert(blockSummary.kills == 9, "summary block kills")
 db.mobs = legacyMobs
 

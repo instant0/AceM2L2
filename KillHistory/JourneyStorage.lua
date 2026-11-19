@@ -8,7 +8,7 @@ local AceM2L2 = AceM2L2
 local XPTooltip = AceM2L2.KillHistory
 local Util = XPTooltip.Util
 
-local STORAGE_SCHEMA = 2
+local STORAGE_SCHEMA = 3
 local CACHE_CAPACITY = 8
 local MAX_MOB_ZONE_REFS = 4
 local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -100,81 +100,582 @@ local function readString(text, position)
   return text:sub(position, position + length - 1), position + length
 end
 
-local function mobLevelRange(mob)
-  local minLevel, maxLevel
-  for _, context in pairs(mob.contexts or {}) do
-    local level = tonumber(context.mobLevel)
-    if level and level > 0 then
-      if not minLevel or level < minLevel then minLevel = level end
-      if not maxLevel or level > maxLevel then maxLevel = level end
+local function numberOrZero(value)
+  local number = tonumber(value)
+  if not number or number ~= number
+    or number == math.huge or number == -math.huge then
+    return 0
+  end
+  return number
+end
+
+local function readCount(text, position, label)
+  local count
+  count, position = readVarint(text, position)
+  if count > #text - position + 1 then
+    error((label or "item") .. " count too large")
+  end
+  return count, position
+end
+
+local function levelSort(a, b)
+  local left, right = tonumber(a), tonumber(b)
+  if left and right and left ~= right then return left < right end
+  return tostring(a) < tostring(b)
+end
+
+local function encodeLevelRecords(parts, records)
+  local keys = {}
+  for key, value in pairs(records or {}) do
+    local record = type(value) == "table" and value or { kills = value }
+    if numberOrZero(record.kills) > 0 or numberOrZero(record.xp) > 0
+      or numberOrZero(record.samples) > 0
+      or numberOrZero(record.presenceSeconds) > 0
+      or numberOrZero(record.engagedSeconds) > 0 then
+      keys[#keys + 1] = key
     end
   end
-  return minLevel or 0, maxLevel or 0
+  table.sort(keys, levelSort)
+  parts[#parts + 1] = varint(#keys)
+  for _, key in ipairs(keys) do
+    local value = records[key]
+    local record = type(value) == "table" and value or { kills = value }
+    writeString(parts, tostring(key))
+    parts[#parts + 1] = varint(record.kills)
+    parts[#parts + 1] = varint(record.xp)
+    parts[#parts + 1] = varint(record.samples or record.kills)
+    parts[#parts + 1] = varint(record.presenceSeconds)
+    parts[#parts + 1] = varint(record.engagedSeconds)
+  end
 end
 
-local function encodeMob(parts, record)
-  local mob = record.mob
-  writeString(parts, record.key)
-  parts[#parts + 1] = varint(tonumber(mob.npcID) or 0)
-  writeString(parts, mob.name or "")
-  writeString(parts, mob.classification or "normal")
-  parts[#parts + 1] = varint(tonumber(record.kills) or tonumber(mob.kills) or 0)
-  parts[#parts + 1] = varint(tonumber(record.xp) or tonumber(mob.totalXP) or 0)
-  local minLevel, maxLevel = mobLevelRange(mob)
-  parts[#parts + 1] = varint(minLevel)
-  parts[#parts + 1] = varint(maxLevel)
+local function decodeLevelRecords(text, position)
+  local count
+  count, position = readCount(text, position, "level")
+  local records = {}
+  for _ = 1, count do
+    local key, kills, xp, samples, presenceSeconds, engagedSeconds
+    key, position = readString(text, position)
+    kills, position = readVarint(text, position)
+    xp, position = readVarint(text, position)
+    samples, position = readVarint(text, position)
+    presenceSeconds, position = readVarint(text, position)
+    engagedSeconds, position = readVarint(text, position)
+    records[key] = {
+      kills = kills, xp = xp, samples = samples,
+      presenceSeconds = presenceSeconds,
+      engagedSeconds = engagedSeconds,
+    }
+  end
+  return records, position
 end
 
-local function buildMobZoneIndex(db)
-  local index = {}
-  for key, mob in pairs(db.mobs or {}) do
-    if type(mob) == "table" then
-      local totalKills = tonumber(mob.kills) or 0
-      local totalXP = tonumber(mob.totalXP) or 0
-      for mapKey, mapKills in pairs(mob.killsByMap or {}) do
-        local zoneKey = "map:" .. tostring(mapKey)
-        index[zoneKey] = index[zoneKey] or {}
-        local kills = tonumber(mapKills) or 0
-        local xp = totalKills > 0 and totalXP * kills / totalKills or 0
-        index[zoneKey][#index[zoneKey] + 1] = { key = key, mob = mob, kills = kills, xp = xp }
+local function writeOptionalNumber(parts, value)
+  local number = tonumber(value)
+  if not number or number ~= number
+    or number == math.huge or number == -math.huge then
+    parts[#parts + 1] = varint(0)
+    return
+  end
+  parts[#parts + 1] = varint(1)
+  parts[#parts + 1] = varint(number)
+end
+
+local function readOptionalNumber(text, position)
+  local present
+  present, position = readVarint(text, position)
+  if present ~= 1 then return nil, position end
+  local number
+  number, position = readVarint(text, position)
+  return number, position
+end
+
+local function encodeContext(parts, context)
+  writeString(parts, context.key)
+  parts[#parts + 1] = varint(context.playerLevel)
+  parts[#parts + 1] = varint(context.mobLevel)
+  parts[#parts + 1] = varint(context.groupSize)
+  parts[#parts + 1] = varint(context.mapID)
+  writeString(parts, context.instanceKey)
+  writeString(parts, context.classification or "normal")
+  writeString(parts, context.buffSig or "none")
+  parts[#parts + 1] = varint(context.samples)
+  parts[#parts + 1] = varint(context.sumBase)
+  parts[#parts + 1] = varint(context.sumBuffed)
+  parts[#parts + 1] = varint(context.sumTotal)
+  writeOptionalNumber(parts, context.minBase)
+  writeOptionalNumber(parts, context.maxBase)
+  writeOptionalNumber(parts, context.deaths)
+  parts[#parts + 1] = varint(context.lastSeen)
+end
+
+local function decodeContext(text, position)
+  local key, instanceKey, classification, buffSig
+  local playerLevel, mobLevel, groupSize, mapID
+  local samples, sumBase, sumBuffed, sumTotal, lastSeen
+  key, position = readString(text, position)
+  playerLevel, position = readVarint(text, position)
+  mobLevel, position = readVarint(text, position)
+  groupSize, position = readVarint(text, position)
+  mapID, position = readVarint(text, position)
+  instanceKey, position = readString(text, position)
+  classification, position = readString(text, position)
+  buffSig, position = readString(text, position)
+  samples, position = readVarint(text, position)
+  sumBase, position = readVarint(text, position)
+  sumBuffed, position = readVarint(text, position)
+  sumTotal, position = readVarint(text, position)
+  local minBase, maxBase, deaths
+  minBase, position = readOptionalNumber(text, position)
+  maxBase, position = readOptionalNumber(text, position)
+  deaths, position = readOptionalNumber(text, position)
+  lastSeen, position = readVarint(text, position)
+  return {
+    key = key,
+    playerLevel = playerLevel,
+    mobLevel = mobLevel,
+    groupSize = groupSize,
+    mapID = mapID,
+    instanceKey = instanceKey ~= "" and instanceKey or nil,
+    classification = classification ~= "" and classification or nil,
+    buffSig = buffSig ~= "" and buffSig or nil,
+    samples = samples,
+    sumBase = sumBase,
+    sumBuffed = sumBuffed,
+    sumTotal = sumTotal,
+    minBase = minBase,
+    maxBase = maxBase,
+    deaths = deaths,
+    lastSeen = lastSeen,
+  }, position
+end
+
+local function encodeContexts(parts, contexts)
+  local list = {}
+  for _, context in ipairs(contexts or {}) do
+    if type(context) == "table" then list[#list + 1] = context end
+  end
+  parts[#parts + 1] = varint(#list)
+  for _, context in ipairs(list) do encodeContext(parts, context) end
+end
+
+local function decodeContexts(text, position)
+  local count
+  count, position = readCount(text, position, "context")
+  local contexts = {}
+  for index = 1, count do
+    local context
+    context, position = decodeContext(text, position)
+    contexts[index] = context
+  end
+  return contexts, position
+end
+
+local function deriveContextViews(contexts)
+  local top8, other = {}, {
+    key = "other", classification = "other", buffSig = "other",
+    samples = 0, sumBase = 0, sumBuffed = 0, sumTotal = 0,
+    minBase = nil, maxBase = nil, lastSeen = 0,
+  }
+  for index, record in ipairs(contexts or {}) do
+    if index <= 8 then
+      top8[#top8 + 1] = record
+    else
+      other.samples = other.samples + numberOrZero(record.samples)
+      other.sumBase = other.sumBase + numberOrZero(record.sumBase)
+      other.sumBuffed = other.sumBuffed + numberOrZero(record.sumBuffed)
+      other.sumTotal = other.sumTotal + numberOrZero(record.sumTotal)
+      other.lastSeen = math.max(other.lastSeen, numberOrZero(record.lastSeen))
+      if record.minBase and (not other.minBase or record.minBase < other.minBase) then
+        other.minBase = record.minBase
       end
-      for instanceKey, instanceKills in pairs(mob.killsByInstance or {}) do
-        local zoneKey = "instance:" .. tostring(instanceKey)
-        index[zoneKey] = index[zoneKey] or {}
-        local kills = tonumber(instanceKills) or 0
-        local xp = totalKills > 0 and totalXP * kills / totalKills or 0
-        index[zoneKey][#index[zoneKey] + 1] = { key = key, mob = mob, kills = kills, xp = xp }
+      if record.maxBase and (not other.maxBase or record.maxBase > other.maxBase) then
+        other.maxBase = record.maxBase
+      end
+    end
+  end
+  local combat, xpContexts = {}, {}
+  for index, record in ipairs(contexts or {}) do
+    combat[index] = {
+      key = record.key, playerLevel = record.playerLevel,
+      mobLevel = record.mobLevel, groupSize = record.groupSize,
+      mapID = record.mapID, instanceKey = record.instanceKey,
+      classification = record.classification, buffSig = record.buffSig,
+      samples = record.samples, healthKnown = false,
+      deaths = record.deaths, lastSeen = record.lastSeen,
+    }
+    xpContexts[index] = {
+      key = record.key, playerLevel = record.playerLevel,
+      mobLevel = record.mobLevel, groupSize = record.groupSize,
+      mapID = record.mapID, instanceKey = record.instanceKey,
+      classification = record.classification, buffSig = record.buffSig,
+      samples = record.samples, sumBase = record.sumBase,
+      sumBuffed = record.sumBuffed, sumTotal = record.sumTotal,
+      minBase = record.minBase, maxBase = record.maxBase,
+      lastSeen = record.lastSeen,
+    }
+  end
+  return combat, xpContexts, top8, other
+end
+
+local function deriveZoneXP(mob, kills)
+  local totalKills = numberOrZero(mob.kills)
+  local totalXP = numberOrZero(mob.xp)
+  if totalKills <= 0 then return 0 end
+  return math.floor(totalXP * kills / totalKills + 0.5)
+end
+
+local function mobContextsForMode(mob, contextMode)
+  if contextMode ~= "collapsed" then return mob.contexts end
+  local contexts = {}
+  local top = type(mob.contextsTop8) == "table" and mob.contextsTop8 or {}
+  for _, context in ipairs(top) do
+    if type(context) == "table" then contexts[#contexts + 1] = context end
+  end
+  local other = mob.contextsOther
+  if type(other) == "table" and numberOrZero(other.samples) > 0 then
+    contexts[#contexts + 1] = other
+  end
+  if #contexts == 0 then return mob.contexts end
+  return contexts
+end
+
+local function encodeMob(parts, record, contextMode)
+  local mob = record.mob or {}
+  writeString(parts, record.key)
+  parts[#parts + 1] = varint(mob.npcID)
+  writeString(parts, mob.name)
+  writeString(parts, mob.classification or "normal")
+  parts[#parts + 1] = varint(mob.kills)
+  parts[#parts + 1] = varint(mob.xp)
+  parts[#parts + 1] = varint(mob.mobLevelMin)
+  parts[#parts + 1] = varint(mob.mobLevelMax)
+  parts[#parts + 1] = varint(mob.mobLevelSamples)
+  parts[#parts + 1] = varint(mob.firstSeen)
+  parts[#parts + 1] = varint(mob.lastSeen)
+  encodeLevelRecords(parts, mob.byPlayerLevel)
+  parts[#parts + 1] = varint(record.kills)
+  parts[#parts + 1] = varint(record.xp)
+  encodeLevelRecords(parts, record.playerLevels)
+  encodeContexts(parts, mobContextsForMode(mob, contextMode))
+end
+
+local function decodeMob(text, position)
+  local key, npcID, name, classification
+  local kills, xp, minLevel, maxLevel, levelSamples
+  local firstSeen, lastSeen, zoneKills, zoneXP
+  key, position = readString(text, position)
+  npcID, position = readVarint(text, position)
+  name, position = readString(text, position)
+  classification, position = readString(text, position)
+  kills, position = readVarint(text, position)
+  xp, position = readVarint(text, position)
+  minLevel, position = readVarint(text, position)
+  maxLevel, position = readVarint(text, position)
+  levelSamples, position = readVarint(text, position)
+  firstSeen, position = readVarint(text, position)
+  lastSeen, position = readVarint(text, position)
+  local byPlayerLevel
+  byPlayerLevel, position = decodeLevelRecords(text, position)
+  zoneKills, position = readVarint(text, position)
+  zoneXP, position = readVarint(text, position)
+  local playerLevels
+  playerLevels, position = decodeLevelRecords(text, position)
+  local contexts
+  contexts, position = decodeContexts(text, position)
+  local combat, xpContexts, top8, other = deriveContextViews(contexts)
+  return {
+    key = key,
+    npcID = npcID > 0 and npcID or nil,
+    name = name ~= "" and name or nil,
+    classification = classification ~= "" and classification or nil,
+    kills = zoneKills,
+    xp = zoneXP,
+    totalKills = kills,
+    totalXP = xp,
+    mobLevelMin = minLevel,
+    mobLevelMax = maxLevel,
+    mobLevelSamples = levelSamples,
+    firstSeen = firstSeen,
+    lastSeen = lastSeen,
+    byPlayerLevel = byPlayerLevel,
+    playerLevels = playerLevels,
+    contexts = contexts,
+    combat = combat,
+    xpContexts = xpContexts,
+    contextsTop8 = top8,
+    contextsOther = other,
+  }, position
+end
+
+local function encodeHeatmap(parts, cellEntry)
+  local cells = cellEntry and cellEntry.cells or {}
+  local keys = {}
+  for cell in pairs(cells) do keys[#keys + 1] = cell end
+  table.sort(keys)
+  parts[#parts + 1] = varint(#keys)
+  for _, cell in ipairs(keys) do
+    local value = cells[cell]
+    local kills = type(value) == "table" and value.kills or value
+    parts[#parts + 1] = varint(cell)
+    parts[#parts + 1] = varint(kills)
+  end
+  parts[#parts + 1] = varint(cellEntry and cellEntry.total or 0)
+  parts[#parts + 1] = varint(cellEntry and cellEntry.lastSeen or 0)
+  parts[#parts + 1] = varint(cellEntry and cellEntry.gridSize or 0)
+  writeString(parts, cellEntry and cellEntry.killsCoverage)
+  writeString(parts, cellEntry and cellEntry.cellXpCoverage)
+  writeString(parts, cellEntry and cellEntry.cellTimeCoverage)
+end
+
+local function decodeHeatmap(text, position)
+  local cellCount
+  cellCount, position = readCount(text, position, "cell")
+  local cells = {}
+  for _ = 1, cellCount do
+    local cell, kills
+    cell, position = readVarint(text, position)
+    kills, position = readVarint(text, position)
+    cells[cell] = { kills = kills }
+  end
+  local total, lastSeen, gridSize
+  total, position = readVarint(text, position)
+  lastSeen, position = readVarint(text, position)
+  gridSize, position = readVarint(text, position)
+  local killsCoverage, cellXpCoverage, cellTimeCoverage
+  killsCoverage, position = readString(text, position)
+  cellXpCoverage, position = readString(text, position)
+  cellTimeCoverage, position = readString(text, position)
+  return {
+    cells = cells,
+    total = total,
+    lastSeen = lastSeen,
+    gridSize = gridSize,
+    killsCoverage = killsCoverage ~= "" and killsCoverage or nil,
+    cellXpCoverage = cellXpCoverage ~= "" and cellXpCoverage or nil,
+    cellTimeCoverage = cellTimeCoverage ~= "" and cellTimeCoverage or nil,
+  }, position
+end
+
+local function mergeLevelMaps(primary, secondary)
+  local merged = {}
+  for key, value in pairs(primary or {}) do
+    if type(value) == "table" then
+      merged[key] = {
+        kills = value.kills, xp = value.xp, samples = value.samples,
+        presenceSeconds = value.presenceSeconds,
+        engagedSeconds = value.engagedSeconds,
+      }
+    end
+  end
+  for key, value in pairs(secondary or {}) do
+    if type(value) == "table" then
+      local record = merged[key] or {}
+      if numberOrZero(value.kills) > numberOrZero(record.kills) then
+        record.kills = value.kills
+      end
+      if numberOrZero(value.xp) > numberOrZero(record.xp) then
+        record.xp = value.xp
+      end
+      if numberOrZero(value.samples) > numberOrZero(record.samples) then
+        record.samples = value.samples
+      end
+      if numberOrZero(value.presenceSeconds)
+        > numberOrZero(record.presenceSeconds) then
+        record.presenceSeconds = value.presenceSeconds
+      end
+      if numberOrZero(value.engagedSeconds)
+        > numberOrZero(record.engagedSeconds) then
+        record.engagedSeconds = value.engagedSeconds
+      end
+      merged[key] = record
+    end
+  end
+  return merged
+end
+
+local function encodeZoneSummary(parts, zoneKey, zoneEntry)
+  local record = zoneEntry and zoneEntry.record
+  if type(record) ~= "table" then
+    parts[#parts + 1] = varint(0)
+    return
+  end
+  local kind = zoneEntry.kind or ""
+  local mapID = numberOrZero(record.mapID)
+  if mapID <= 0 and kind == "map" then
+    mapID = numberOrZero(zoneKey:match("^map:(%d+)$"))
+  end
+  parts[#parts + 1] = varint(1)
+  writeString(parts, kind)
+  writeString(parts, record.name)
+  writeString(parts, record.instanceType)
+  parts[#parts + 1] = varint(record.instanceID)
+  parts[#parts + 1] = varint(record.difficultyID)
+  parts[#parts + 1] = varint(mapID)
+  parts[#parts + 1] = varint(record.kills)
+  parts[#parts + 1] = varint(record.killXP)
+  parts[#parts + 1] = varint(record.questXP)
+  parts[#parts + 1] = varint(record.otherXP)
+  parts[#parts + 1] = varint(record.xp)
+  parts[#parts + 1] = varint(record.presenceSeconds)
+  parts[#parts + 1] = varint(record.engagedSeconds)
+  parts[#parts + 1] = varint(record.deaths)
+  parts[#parts + 1] = varint(record.sessions)
+  parts[#parts + 1] = varint(record.uniqueMobs)
+  parts[#parts + 1] = varint(record.firstSeen)
+  parts[#parts + 1] = varint(record.lastSeen)
+  parts[#parts + 1] = varint(record.killsExact == true and 1 or 0)
+  writeString(parts, record.killXPCoverage)
+  writeString(parts, record.questXPCoverage)
+  writeString(parts, record.otherXPCoverage)
+  writeString(parts, record.xpCoverage)
+  writeString(parts, record.timeCoverage)
+  writeString(parts, record.deathCoverage)
+  writeString(parts, record.sessionCoverage)
+  encodeLevelRecords(parts, mergeLevelMaps(record.playerLevels, record.levels))
+end
+
+local function decodeZoneSummary(text, position)
+  local present
+  present, position = readVarint(text, position)
+  if present ~= 1 then return nil, position end
+  local kind, name, instanceType
+  local instanceID, difficultyID, mapID
+  local kills, killXP, questXP, otherXP, xp
+  local presenceSeconds, engagedSeconds, deaths, sessions, uniqueMobs
+  local firstSeen, lastSeen, killsExact
+  kind, position = readString(text, position)
+  name, position = readString(text, position)
+  instanceType, position = readString(text, position)
+  instanceID, position = readVarint(text, position)
+  difficultyID, position = readVarint(text, position)
+  mapID, position = readVarint(text, position)
+  kills, position = readVarint(text, position)
+  killXP, position = readVarint(text, position)
+  questXP, position = readVarint(text, position)
+  otherXP, position = readVarint(text, position)
+  xp, position = readVarint(text, position)
+  presenceSeconds, position = readVarint(text, position)
+  engagedSeconds, position = readVarint(text, position)
+  deaths, position = readVarint(text, position)
+  sessions, position = readVarint(text, position)
+  uniqueMobs, position = readVarint(text, position)
+  firstSeen, position = readVarint(text, position)
+  lastSeen, position = readVarint(text, position)
+  killsExact, position = readVarint(text, position)
+  local killXPCoverage, questXPCoverage, otherXPCoverage
+  local xpCoverage, timeCoverage, deathCoverage, sessionCoverage
+  killXPCoverage, position = readString(text, position)
+  questXPCoverage, position = readString(text, position)
+  otherXPCoverage, position = readString(text, position)
+  xpCoverage, position = readString(text, position)
+  timeCoverage, position = readString(text, position)
+  deathCoverage, position = readString(text, position)
+  sessionCoverage, position = readString(text, position)
+  local playerLevels
+  playerLevels, position = decodeLevelRecords(text, position)
+  return {
+    kind = kind ~= "" and kind or nil,
+    record = {
+      name = name ~= "" and name or nil,
+      instanceType = instanceType ~= "" and instanceType or nil,
+      instanceID = instanceID > 0 and instanceID or nil,
+      difficultyID = difficultyID,
+      mapID = mapID,
+      kills = kills,
+      killXP = killXP,
+      questXP = questXP,
+      otherXP = otherXP,
+      xp = xp,
+      presenceSeconds = presenceSeconds,
+      engagedSeconds = engagedSeconds,
+      deaths = deaths,
+      sessions = sessions,
+      uniqueMobs = uniqueMobs,
+      firstSeen = firstSeen,
+      lastSeen = lastSeen,
+      killsExact = killsExact == 1,
+      killXPCoverage = killXPCoverage ~= "" and killXPCoverage or nil,
+      questXPCoverage = questXPCoverage ~= "" and questXPCoverage or nil,
+      otherXPCoverage = otherXPCoverage ~= "" and otherXPCoverage or nil,
+      xpCoverage = xpCoverage ~= "" and xpCoverage or nil,
+      timeCoverage = timeCoverage ~= "" and timeCoverage or nil,
+      deathCoverage = deathCoverage ~= "" and deathCoverage or nil,
+      sessionCoverage = sessionCoverage ~= "" and sessionCoverage or nil,
+      playerLevels = playerLevels,
+    },
+  }, position
+end
+
+local function encodeZone(zoneKey, records, cellEntry, zoneEntry, contextMode)
+  local parts = { varint(STORAGE_SCHEMA), varint(1) }
+  writeString(parts, zoneKey)
+  parts[#parts + 1] = varint(#records)
+  for _, record in ipairs(records) do
+    encodeMob(parts, record, contextMode)
+  end
+  encodeHeatmap(parts, cellEntry)
+  encodeZoneSummary(parts, zoneKey, zoneEntry)
+  return table.concat(parts)
+end
+
+local function buildModelMobZoneIndex(journey)
+  local index = {}
+  local function add(zoneKey, key, mob, zone)
+    local kills = numberOrZero(zone.kills)
+    if kills <= 0 then return end
+    local list = index[zoneKey]
+    if not list then list = {}; index[zoneKey] = list end
+    list[#list + 1] = {
+      key = key,
+      mob = mob,
+      kills = kills,
+      xp = deriveZoneXP(mob, kills),
+      playerLevels = type(zone.playerLevels) == "table"
+        and zone.playerLevels or {},
+    }
+  end
+  for key, mob in pairs(journey.mobs or {}) do
+    if type(mob) == "table" then
+      for mapKey, zone in pairs(mob.byZone or {}) do
+        if type(zone) == "table" then
+          add("map:" .. tostring(mapKey), key, mob, zone)
+        end
+      end
+      for instanceKey, zone in pairs(mob.byInstance or {}) do
+        if type(zone) == "table" then
+          add("instance:" .. tostring(instanceKey), key, mob, zone)
+        end
       end
     end
   end
   return index
 end
 
-local function buildHeatmapZoneIndex(db)
+local function buildModelHeatmapZoneIndex(journey)
   local index = {}
-  for mapKey, entry in pairs(db.heatmaps or {}) do
+  for mapKey, entry in pairs(journey.heatmaps or {}) do
     if type(entry) == "table" and type(entry.cells) == "table" then
-      local zoneKey = "map:" .. tostring(mapKey)
       local cells = {}
       local total = 0
       for cell, value in pairs(entry.cells) do
         local cellIndex = tonumber(cell) or 0
-        local kills = type(value) == "table" and tonumber(value.kills) or tonumber(value)
-        if cellIndex > 0 and kills and kills > 0 then
-          cells[cellIndex] = {
-            kills = kills,
-            xp = type(value) == "table" and tonumber(value.xp) or 0,
-            presenceSeconds = type(value) == "table" and tonumber(value.presenceSeconds) or 0,
-            engagedSeconds = type(value) == "table" and tonumber(value.engagedSeconds) or 0,
-          }
+        local kills = type(value) == "table" and value.kills or value
+        kills = numberOrZero(kills)
+        if cellIndex > 0 and kills > 0 then
+          cells[cellIndex] = { kills = kills }
           total = total + kills
         end
       end
       if total > 0 then
-        index[zoneKey] = {
+        index["map:" .. tostring(mapKey)] = {
           cells = cells,
           total = total,
-          lastSeen = tonumber(entry.lastSeen) or 0,
+          lastSeen = numberOrZero(entry.lastSeen),
+          gridSize = numberOrZero(entry.gridSize),
+          killsCoverage = entry.killsCoverage,
+          cellXpCoverage = entry.cellXpCoverage,
+          cellTimeCoverage = entry.cellTimeCoverage,
         }
       end
     end
@@ -182,27 +683,53 @@ local function buildHeatmapZoneIndex(db)
   return index
 end
 
-local function encodeZone(zoneKey, records, cellEntry)
-  local parts = { varint(STORAGE_SCHEMA), varint(1) }
-  writeString(parts, zoneKey)
-  parts[#parts + 1] = varint(#records)
-  for _, record in ipairs(records) do
-    encodeMob(parts, record)
+local function zoneHasData(record)
+  if type(record) ~= "table" then return false end
+  for _, field in ipairs({ "kills", "killXP", "questXP", "otherXP", "xp",
+    "presenceSeconds", "engagedSeconds", "deaths", "sessions", "lastSeen" }) do
+    if numberOrZero(record[field]) > 0 then return true end
   end
-  local cells = cellEntry and cellEntry.cells or {}
-  local cellKeys = {}
-  for cell in pairs(cells) do cellKeys[#cellKeys + 1] = cell end
-  table.sort(cellKeys)
-  parts[#parts + 1] = varint(#cellKeys)
-  for _, cell in ipairs(cellKeys) do
-    local value = cells[cell]
-    parts[#parts + 1] = varint(cell)
-    parts[#parts + 1] = varint(value.kills)
-    parts[#parts + 1] = varint(value.xp)
-    parts[#parts + 1] = varint(value.presenceSeconds)
-    parts[#parts + 1] = varint(value.engagedSeconds)
+  return next(record.playerLevels or record.levels or {}) ~= nil
+end
+
+local function buildModelZoneIndex(journey)
+  local index = {}
+  for mapKey, zone in pairs(journey.zones or {}) do
+    if zoneHasData(zone) then
+      index["map:" .. tostring(mapKey)] = { kind = "map", record = zone }
+    end
   end
-  return table.concat(parts)
+  for instanceKey, instance in pairs(journey.instances or {}) do
+    if zoneHasData(instance) then
+      index["instance:" .. tostring(instanceKey)] = {
+        kind = "instance", record = instance,
+      }
+    end
+  end
+  return index
+end
+
+local function ensureBlockModel(self, journey)
+  if type(journey.mobs) ~= "table" or next(journey.mobs) == nil then
+    if type(self.SyncModelMobsFromLegacy) == "function" then
+      pcall(self.SyncModelMobsFromLegacy, self)
+    end
+  end
+  if type(journey.zones) ~= "table" or next(journey.zones) == nil then
+    if type(self.SyncModelZonesFromLegacy) == "function" then
+      pcall(self.SyncModelZonesFromLegacy, self)
+    end
+  end
+  if type(journey.instances) ~= "table" or next(journey.instances) == nil then
+    if type(self.SyncModelInstancesFromLegacy) == "function" then
+      pcall(self.SyncModelInstancesFromLegacy, self)
+    end
+  end
+  if type(journey.heatmaps) ~= "table" or next(journey.heatmaps) == nil then
+    if type(self.SyncModelHeatmapsFromLegacy) == "function" then
+      pcall(self.SyncModelHeatmapsFromLegacy, self)
+    end
+  end
 end
 
 function XPTooltip:EnsureJourneyStorage()
@@ -269,13 +796,25 @@ local function decodeZone(text)
   local schema, kind
   schema, position = readVarint(text, position)
   kind, position = readVarint(text, position)
-  if (schema ~= 1 and schema ~= 2) or kind ~= 1 then
+  if (schema ~= 1 and schema ~= 2 and schema ~= 3) or kind ~= 1 then
     error("unsupported block")
   end
   local zoneKey, count
   zoneKey, position = readString(text, position)
-  count, position = readVarint(text, position)
+  count, position = readCount(text, position, "mob")
   local records = {}
+  if schema >= 3 then
+    for _ = 1, count do
+      local record
+      record, position = decodeMob(text, position)
+      records[record.key] = record
+    end
+    local heatmap
+    heatmap, position = decodeHeatmap(text, position)
+    local zone
+    zone, position = decodeZoneSummary(text, position)
+    return schema, zoneKey, records, heatmap.cells, zone, heatmap
+  end
   for _ = 1, count do
     local key, npcID, name, classification, kills, xp, minLevel, maxLevel
     key, position = readString(text, position)
@@ -296,7 +835,7 @@ local function decodeZone(text)
   local cells = {}
   if schema >= 2 then
     local cellCount
-    cellCount, position = readVarint(text, position)
+    cellCount, position = readCount(text, position, "cell")
     for _ = 1, cellCount do
       local cell, kills, xp, presenceSeconds, engagedSeconds
       cell, position = readVarint(text, position)
@@ -312,7 +851,7 @@ local function decodeZone(text)
       }
     end
   end
-  return zoneKey, records, cells
+  return schema, zoneKey, records, cells, nil, nil
 end
 
 function XPTooltip:FlushJourneyBlocks()
@@ -322,10 +861,12 @@ function XPTooltip:FlushJourneyBlocks()
   if journey.saveBlocked then
     return false, "save_blocked"
   end
-  local index = buildMobZoneIndex(db)
-  local heatmapIndex = buildHeatmapZoneIndex(db)
-  -- Rebuild the compact mob -> zone-key index from the current source data.
-  -- It is small (1-4 refs/mob) and avoids stale block references.
+  ensureBlockModel(self, journey)
+  local index = buildModelMobZoneIndex(journey)
+  local heatmapIndex = buildModelHeatmapZoneIndex(journey)
+  local zoneIndex = buildModelZoneIndex(journey)
+  -- Rebuild the compact mob -> zone-key index from the v2 model. It is small
+  -- (1-4 refs/mob) and avoids stale block references.
   journey.mobZones = {}
   for zoneKey, records in pairs(index) do
     for _, record in ipairs(records) do
@@ -345,21 +886,20 @@ function XPTooltip:FlushJourneyBlocks()
   local dirty = journey.dirtyZones
   local buildAll = next(journey.blocks) == nil
   local keys, seen = {}, {}
+  local function addKey(zoneKey)
+    if not seen[zoneKey] then seen[zoneKey] = true; keys[#keys + 1] = zoneKey end
+  end
   if buildAll then
-    for zoneKey in pairs(index) do
-      if not seen[zoneKey] then seen[zoneKey] = true; keys[#keys + 1] = zoneKey end
-    end
-    for zoneKey in pairs(heatmapIndex) do
-      if not seen[zoneKey] then seen[zoneKey] = true; keys[#keys + 1] = zoneKey end
-    end
+    for zoneKey in pairs(index) do addKey(zoneKey) end
+    for zoneKey in pairs(heatmapIndex) do addKey(zoneKey) end
+    for zoneKey in pairs(zoneIndex) do addKey(zoneKey) end
   else
-    for zoneKey in pairs(dirty) do
-      if not seen[zoneKey] then seen[zoneKey] = true; keys[#keys + 1] = zoneKey end
-    end
+    for zoneKey in pairs(dirty) do addKey(zoneKey) end
   end
   for _, zoneKey in ipairs(keys) do
     local records = index[zoneKey] or {}
     local cellEntry = heatmapIndex[zoneKey]
+    local zoneEntry = zoneIndex[zoneKey]
     local cellCount = 0
     if cellEntry then
       for _ in pairs(cellEntry.cells) do cellCount = cellCount + 1 end
@@ -372,23 +912,48 @@ function XPTooltip:FlushJourneyBlocks()
         at = Epoch(),
       }
     end
-    if #records > 0 or cellCount > 0 then
-      local raw = encodeZone(zoneKey, records, cellEntry)
+    if #records > 0 or cellCount > 0 or zoneEntry then
+      local now = Epoch()
+      local zoneRecord = zoneEntry and zoneEntry.record
+      local lastSeen = cellEntry and cellEntry.lastSeen or 0
+      if zoneRecord and numberOrZero(zoneRecord.lastSeen) > lastSeen then
+        lastSeen = numberOrZero(zoneRecord.lastSeen)
+      end
+      local tier, contextMode = "hot", "full"
+      if type(self.GetBlockRetentionTier) == "function" then
+        local ok, value = pcall(self.GetBlockRetentionTier, self, zoneKey, {
+          lastSeen = lastSeen,
+          updatedAt = now,
+        })
+        if ok and value then tier = value end
+      end
+      if tier ~= "hot" then contextMode = "collapsed" end
+      local raw = encodeZone(zoneKey, records, cellEntry, zoneEntry, contextMode)
       local sum = checksum(raw)
       journey.blocks[zoneKey] = {
         data = base64Encode(raw),
         checksum = sum,
+        schema = STORAGE_SCHEMA,
         count = #records,
         cellCount = cellCount,
-        updatedAt = Epoch(),
+        tier = tier,
+        contextMode = contextMode,
+        updatedAt = now,
       }
       journey.blockIndex[zoneKey] = {
         checksum = sum,
         count = #records,
         cellCount = cellCount,
         heatmapKills = cellEntry and cellEntry.total or 0,
-        lastSeen = cellEntry and cellEntry.lastSeen or 0,
-        updatedAt = Epoch(),
+        lastSeen = lastSeen,
+        gridSize = cellEntry and cellEntry.gridSize or 0,
+        zoneKind = zoneEntry and zoneEntry.kind or nil,
+        zoneKills = zoneRecord and numberOrZero(zoneRecord.kills) or 0,
+        zoneXP = zoneRecord and numberOrZero(zoneRecord.xp) or 0,
+        hasZone = zoneEntry ~= nil,
+        tier = tier,
+        contextMode = contextMode,
+        updatedAt = now,
       }
     elseif journey.blocks[zoneKey] then
       -- Do not delete a block merely because the legacy source is empty.
@@ -399,6 +964,9 @@ function XPTooltip:FlushJourneyBlocks()
     dirty[zoneKey] = nil
   end
   journey.storageUpdatedAt = Epoch()
+  if type(self.UpdateJourneyHeatmapSummaries) == "function" then
+    pcall(self.UpdateJourneyHeatmapSummaries, self)
+  end
   return true
 end
 
@@ -460,12 +1028,16 @@ function XPTooltip:GetJourneyBlockData(zoneKey)
   if checksum(raw) ~= tonumber(block.checksum) then
     return nil, "checksum"
   end
-  local decodedOk, zoneKeyOut, records, cells = pcall(decodeZone, raw)
+  local decodedOk, schema, zoneKeyOut, records, cells, zone, heatmap =
+    pcall(decodeZone, raw)
   if not decodedOk or type(records) ~= "table" then return nil, "format" end
   local entry = {
+    schema = schema,
     zoneKey = zoneKeyOut or key,
     records = records,
     cells = type(cells) == "table" and cells or {},
+    zone = zone,
+    heatmap = heatmap,
   }
   self.journeyDecodedBlocks = (self.journeyDecodedBlocks or 0) + 1
   cachePut(self, key, entry)
@@ -475,7 +1047,7 @@ end
 function XPTooltip:GetJourneyBlock(zoneKey)
   local entry, err = self:GetJourneyBlockData(zoneKey)
   if not entry then return nil, err end
-  return entry.records, nil, entry.cells
+  return entry.records, nil, entry.cells, entry.zone
 end
 
 function XPTooltip:GetJourneyBlockMob(zoneKey, mobKey)

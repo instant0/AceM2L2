@@ -34,6 +34,7 @@ db.mobs = {
     kills = 0, sessionKills = 0, lastSeen = 0, xp = { samples = 0 },
   },
 }
+module:SyncModelMobsFromLegacy()
 module:InvalidateMobIndex()
 
 local function snapshot(indexViews, filter, search, sort)
@@ -100,16 +101,18 @@ assert(module.journeyMobIndexBuilds == 1, "repeated refreshes rebuilt the index"
 
 -- A mutation invalidates and the next view rebuilds exactly once.
 db.mobs["npc:101"].kills = 40
+module:SyncModelMobsFromLegacy()
 module:InvalidateMobIndex()
 module:BuildList()
 assert(module.journeyMobIndexBuilds == 2, "mutation did not rebuild once")
 assert(module.currentList[1].key == "npc:101", "rebuilt list is stale")
 
--- Rollback flag returns to legacy scans without building the index.
+-- The retired rollback flag does not select a legacy mob scan.
 db.journey.indexViews = false
 module.journeyMobIndexBuilds = 0
+module:InvalidateJourneyMobIndex()
 module:BuildList()
 module:RefreshOverview()
-assert(module.journeyMobIndexBuilds == 0, "rollback unexpectedly built the index")
+assert(module.journeyMobIndexBuilds == 1, "v2 list did not build the index")
 
 print("Mobs list/Overview index switch passed")

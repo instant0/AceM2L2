@@ -716,49 +716,21 @@ function XPTooltip:PrintStats()
     return
   end
 
-  local mobCount, areaCount, instanceCount, levelCount
-  if self:UseJourneyIndexViews() then
-    mobCount = #self:GetJourneyAllMobRows()
-    areaCount, instanceCount = 0, 0
-    local areaRows = self:GetAreaRows()
-    for index = 1, #areaRows do
-      local row = areaRows[index]
-      if row.kind == "area" then
-        areaCount = areaCount + 1
-      elseif row.kind == "instance" then
-        instanceCount = instanceCount + 1
-      end
-    end
-    levelCount = #self:GetLevelRows()
-  else
-    mobCount = 0
-    for _, mob in pairs(db.mobs or {}) do
-      if type(mob) == "table" then
-        mobCount = mobCount + 1
-      end
-    end
-
-    areaCount = 0
-    for mapKey, kills in pairs(db.areas or {}) do
-      if (not IsAttributableMapID or IsAttributableMapID(mapKey))
-        and (tonumber(kills) or 0) > 0 then
-        areaCount = areaCount + 1
-      end
-    end
-    instanceCount = 0
-    for _, instance in pairs(db.instances or {}) do
-      if type(instance) == "table" and (tonumber(instance.kills) or 0) > 0 then
-        instanceCount = instanceCount + 1
-      end
-    end
-
-    levelCount = 0
-    for _, kills in pairs(db.levels or {}) do
-      if (tonumber(kills) or 0) > 0 then
-        levelCount = levelCount + 1
-      end
+  local mobCount = 0
+  for _ in pairs(type(db.journey) == "table" and db.journey.mobs or {}) do
+    mobCount = mobCount + 1
+  end
+  local areaCount, instanceCount = 0, 0
+  local areaRows = self:GetAreaRows()
+  for index = 1, #areaRows do
+    local row = areaRows[index]
+    if row.kind == "area" then
+      areaCount = areaCount + 1
+    elseif row.kind == "instance" then
+      instanceCount = instanceCount + 1
     end
   end
+  local levelCount = #self:GetLevelRows()
 
   if self:Supports("hasPerMobXP") then
     AceM2L2:SafePrint("  Totals: kills=" .. FormatNumber(db.totals.kills or 0)
@@ -1070,6 +1042,7 @@ function XPTooltip:PrintHelp()
   AceM2L2:SafePrint("/acem2l2 xpt on|off")
   AceM2L2:SafePrint("/acem2l2 xpt status")
   AceM2L2:SafePrint("/acem2l2 xpt probe")
+  AceM2L2:SafePrint("/acem2l2 xpt v2probe")
   AceM2L2:SafePrint("/acem2l2 xpt ui")
   AceM2L2:SafePrint("/acem2l2 xpt data")
   AceM2L2:SafePrint("/acem2l2 xpt kills [name]")
@@ -1121,6 +1094,12 @@ function XPTooltip:HandleCommand(input)
     self:PrintStatus()
   elseif command == "probe" then
     self:PrintProbe()
+  elseif command == "v2probe" then
+    if type(self.PrintV2Probe) == "function" then
+      self:PrintV2Probe()
+    else
+      AceM2L2:SafePrint("Kill Story: V-2 probe is unavailable.")
+    end
   elseif command == "ui" then
     self:OpenUI()
   elseif command == "data" then

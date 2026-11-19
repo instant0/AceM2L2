@@ -155,9 +155,10 @@ function XPTooltip:AddTooltipKillCount(tooltip, mob, playerLevel, settings, hist
 end
 
 local function resolveTooltipMob(self, mobKey, name, npcID)
-  local legacy = self.char and self.char.mobs and self.char.mobs[mobKey]
-  if type(legacy) == "table" then
-    return legacy, false
+  local row = type(self.GetJourneyMobRow) == "function"
+    and self:GetJourneyMobRow(mobKey) or nil
+  if row and type(row.mob) == "table" then
+    return row.mob, false
   end
   local journey = self.char and self.char.journey
   if journey and journey.blockReadFallback == false then

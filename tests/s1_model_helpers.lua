@@ -81,6 +81,13 @@ local function serialize(value, seen)
 end
 
 module:EnsureModelMobs()
+module:EnsureModelZones()
+module:EnsureModelLevels()
+module:EnsureModelInstances()
+module:EnsureModelDeaths()
+module:EnsureModelQuests()
+module:EnsureModelRespawns()
+module:EnsureModelHeatmaps()
 local before = serialize(db)
 
 local mob = module:GetModelMob("npc:5001")
@@ -94,34 +101,34 @@ assert(mob.byInstance["id:1:1"].kills == 2
 assert(mob.npcID == 5001 and mob.classification == "normal", "mob identity")
 
 local zone = module:GetModelZone(12)
-assert(zone and zone.source == "legacy", "zone source")
+assert(zone and zone.source == "v2", "zone source")
 assert(zone.kills == 100, "legacy zone kills")
 assert(zone.timeSource == "journey", "zone time source")
-assert(zone.xp == 525 and zone.engagedSeconds == 50, "zone journey totals")
+assert(zone.xp == 55 and zone.engagedSeconds == 50, "zone journey totals")
 assert(zone.playerLevels["20"].kills == 100, "zone playerLevels")
 
 local level = module:GetModelLevel(20)
-assert(level and level.source == "legacy", "level source")
+assert(level and level.source == "v2", "level source")
 assert(level.kills == 100 and level.xp == 525, "level parity")
 
 local instance = module:GetModelInstance("id:1:1")
-assert(instance and instance.source == "legacy", "instance source")
+assert(instance and instance.source == "v2", "instance source")
 assert(instance.kills == 2 and instance.name == "Dungeon", "instance parity")
 
 local heatmap = module:GetModelHeatmap(12)
-assert(heatmap and heatmap.source == "legacy", "heatmap source")
-assert(heatmap.total == 3 and heatmap.cells[1] == 3, "heatmap parity")
+assert(heatmap and heatmap.source == "v2", "heatmap source")
+assert(heatmap.total == 3 and heatmap.cells[1].kills == 3, "heatmap parity")
 
 local quest = module:GetModelQuest("quest:1")
-assert(quest and quest.source == "legacy", "quest source")
+assert(quest and quest.source == "v2", "quest source")
 assert(quest.id == 1 and quest.xp == 50, "quest parity")
 
 local death = module:GetModelDeath(1)
-assert(death and death.source == "legacy", "death source")
+assert(death and death.source == "v2", "death source")
 assert(death.mapID == 12 and death.x == 0.1 and death.y == 0.2, "death parity")
 
 local respawn = module:GetModelRespawn(5001)
-assert(respawn and respawn.source == "legacy", "respawn source")
+assert(respawn and respawn.source == "v2", "respawn source")
 assert(respawn.samples == 2, "respawn samples")
 
 -- Helpers must not mutate the character table.

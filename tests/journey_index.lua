@@ -15,6 +15,7 @@ db.mobs = {
     kills = 30, sessionKills = 0, lastSeen = 30,
     killsAtLevel = { ["11"] = 4 }, xp = { samples = 0 } },
 }
+module:SyncModelMobsFromLegacy()
 module:InvalidateJourneyMobIndex()
 
 assert(module:GetJourneyMobCount() == 3, "mob index count")
@@ -36,6 +37,7 @@ assert(#search == 1 and search[1].key == "npc:3", "search filter")
 
 -- Kill invalidation rebuilds from the current data.
 db.mobs["npc:2"].kills = 50
+module:SyncModelMobsFromLegacy()
 module:InvalidateJourneyMobIndex()
 local rebuilt = module:GetJourneyMobRow("npc:2")
 assert(rebuilt.kills == 50, "index invalidation")

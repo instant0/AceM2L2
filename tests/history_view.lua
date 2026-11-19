@@ -107,6 +107,8 @@ assert(respawnOutput:find("Gnoll: 1 sample(s), need 3 for an average", 1, true),
 
 -- Empty state is explicit.
 db.deaths, db.respawns = {}, {}
+module:SyncModelDeathsFromLegacy()
+module:SyncModelRespawnsFromLegacy()
 module:SetTab("deaths")
 module:UpdateDetail()
 assert(module.ui.heroName.text == "Death & respawn history", "history empty title")
@@ -143,6 +145,8 @@ for index = 1, 60 do
     lastDeath = now - index - 300,
   }
 end
+module:SyncModelDeathsFromLegacy()
+module:SyncModelRespawnsFromLegacy()
 module:SetTab("deaths")
 module:BuildList()
 assert(#module.currentList == 75, "history displayed row cap")

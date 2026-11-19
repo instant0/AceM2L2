@@ -782,9 +782,20 @@ function XPTooltip:UpdateFooter()
     self.ui.footer:SetText("")
     return
   end
-  local total = tonumber(db.totals.kills) or 0
-  local session = tonumber(db.session.kills) or 0
-  local unique = tonumber(db.totals.uniqueMobs) or 0
+  local journey = type(db.journey) == "table" and db.journey or {}
+  local total, session, unique = 0, 0, 0
+  for _, zone in pairs(journey.zones or {}) do
+    total = total + (type(zone) == "table" and tonumber(zone.kills) or 0)
+  end
+  for _, instance in pairs(journey.instances or {}) do
+    total = total + (type(instance) == "table" and tonumber(instance.kills) or 0)
+  end
+  for _, mob in pairs(journey.mobs or {}) do
+    if type(mob) == "table" then
+      unique = unique + 1
+      session = session + (tonumber(mob.sessionKills) or 0)
+    end
+  end
 
   local topMapKills, _, topAreaLabel = self:GetTopAreaSummary()
   local minLevel, maxLevel = self:GetLevelSummary()

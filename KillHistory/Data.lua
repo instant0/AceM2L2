@@ -776,13 +776,25 @@ function XPTooltip:EnsureDB()
   if type(self.NormalizeDeaths) == "function" then
     self:NormalizeDeaths()
   end
+  if type(self.SyncModelDeathsFromLegacy) == "function" then
+    pcall(self.SyncModelDeathsFromLegacy, self)
+  end
   if type(self.NormalizeRespawns) == "function" then
     self:NormalizeRespawns()
+  end
+  if type(self.SyncModelQuestsFromLegacy) == "function" then
+    pcall(self.SyncModelQuestsFromLegacy, self)
+  end
+  if type(self.SyncModelRespawnsFromLegacy) == "function" then
+    pcall(self.SyncModelRespawnsFromLegacy, self)
   end
   -- Heatmap.lua loads after Data.lua and normalizes the per-zone kill grid once
   -- the active character is assigned.
   if type(self.NormalizeHeatmaps) == "function" then
     self:NormalizeHeatmaps(db)
+  end
+  if type(self.SyncModelHeatmapsFromLegacy) == "function" then
+    pcall(self.SyncModelHeatmapsFromLegacy, self)
   end
   self:ConsolidateNameOnlyMobs()
   local mobCount = 0
@@ -792,6 +804,18 @@ function XPTooltip:EnsureDB()
     end
   end
   db.totals.uniqueMobs = mobCount
+  if type(self.SyncModelMobsFromLegacy) == "function" then
+    pcall(self.SyncModelMobsFromLegacy, self)
+  end
+  if type(self.SyncModelZonesFromLegacy) == "function" then
+    pcall(self.SyncModelZonesFromLegacy, self)
+  end
+  if type(self.SyncModelInstancesFromLegacy) == "function" then
+    pcall(self.SyncModelInstancesFromLegacy, self)
+  end
+  if type(self.ApplyJourneyRetention) == "function" then
+    pcall(self.ApplyJourneyRetention, self)
+  end
   return db
 end
 
@@ -1405,6 +1429,16 @@ function XPTooltip:MergeMobEntries(fromKey, toKey, historical)
       calibration[toKey] = calibration[toKey] or calibration[fromKey]
       calibration[fromKey] = nil
     end
+    if type(self.SyncModelMobFromLegacy) == "function" then
+      pcall(self.SyncModelMobFromLegacy, self, fromKey)
+      pcall(self.SyncModelMobFromLegacy, self, toKey)
+      if type(self.SyncModelZonesFromLegacy) == "function" then
+        pcall(self.SyncModelZonesFromLegacy, self)
+      end
+      if type(self.SyncModelInstancesFromLegacy) == "function" then
+        pcall(self.SyncModelInstancesFromLegacy, self)
+      end
+    end
     return true
   end
 
@@ -1652,6 +1686,13 @@ function XPTooltip:MergeMobEntries(fromKey, toKey, historical)
 
   db.mobs[fromKey] = nil
   db.totals.uniqueMobs = max(0, (tonumber(db.totals.uniqueMobs) or 1) - 1)
+  if type(self.SyncModelMobFromLegacy) == "function" then
+    pcall(self.SyncModelMobFromLegacy, self, fromKey)
+    pcall(self.SyncModelMobFromLegacy, self, toKey)
+    if type(self.SyncModelZonesFromLegacy) == "function" then
+      pcall(self.SyncModelZonesFromLegacy, self)
+    end
+  end
   return true
 end
 
@@ -1811,6 +1852,9 @@ function XPTooltip:RecordQuestXP(questID, questName, xp)
   if self.OnJourneyQuestTurnIn then
     self:OnJourneyQuestTurnIn(questID, questName, value)
   end
+  if type(self.SyncModelQuestsFromLegacy) == "function" then
+    pcall(self.SyncModelQuestsFromLegacy, self)
+  end
 
   if self.ui and self.ui:IsShown() then
     self:RequestUIUpdate()
@@ -1819,10 +1863,12 @@ end
 
 function XPTooltip:GetQuestSummary()
   local count, xp = 0, 0
-  for _, quest in pairs(self.char and self.char.quests or {}) do
+  local quests = type(self.EnsureModelQuests) == "function"
+    and self:EnsureModelQuests() or {}
+  for _, quest in pairs(quests) do
     if type(quest) == "table" then
       count = count + (tonumber(quest.count) or 0)
-      xp = xp + (tonumber(quest.totalXP) or 0)
+      xp = xp + (tonumber(quest.xp) or 0)
     end
   end
   return count, xp
@@ -2068,6 +2114,15 @@ function XPTooltip:RemoveMobEntry(mobKey, deferRefresh)
   self:SubtractMobAccounting(db, mob)
 
   db.mobs[mobKey] = nil
+  if type(self.SyncModelMobFromLegacy) == "function" then
+    pcall(self.SyncModelMobFromLegacy, self, mobKey)
+  end
+  if type(self.SyncModelZonesFromLegacy) == "function" then
+    pcall(self.SyncModelZonesFromLegacy, self)
+  end
+  if type(self.SyncModelInstancesFromLegacy) == "function" then
+    pcall(self.SyncModelInstancesFromLegacy, self)
+  end
   self:InvalidateMobIndex()
   if type(db.calibration) == "table" and type(db.calibration.mobs) == "table" then
     -- Only the mob-specific calibration entry is retracted. Aggregate

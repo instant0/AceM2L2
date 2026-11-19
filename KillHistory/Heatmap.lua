@@ -502,6 +502,10 @@ function XPTooltip:ResetHeatmaps()
   local db = self.char
   if type(db) == "table" then
     db.heatmaps = {}
+    if type(db.journey) == "table"
+      and type(self.SyncModelHeatmapsFromLegacy) == "function" then
+      pcall(self.SyncModelHeatmapsFromLegacy, self)
+    end
     self:InvalidateHeatmapCache()
     return db.heatmaps
   end
@@ -658,6 +662,14 @@ function XPTooltip:RecordHeatmapKill(mapID, x, y)
   if droppedAny and type(self.SyncJourneyHeatmapIndex) == "function" then
     pcall(self.SyncJourneyHeatmapIndex, self)
   end
+  if droppedAny and type(self.SyncModelHeatmapsFromLegacy) == "function" then
+    pcall(self.SyncModelHeatmapsFromLegacy, self)
+  elseif type(self.UpdateModelHeatmapKill) == "function" then
+    pcall(self.UpdateModelHeatmapKill, self, id, cell, entry.cells[cell],
+      entry.total, entry.lastSeen)
+  elseif type(self.SyncModelHeatmapFromLegacy) == "function" then
+    pcall(self.SyncModelHeatmapFromLegacy, self, id)
+  end
   self:InvalidateHeatmapZoneCache()
   if self.MarkJourneyDirty then
     self:MarkJourneyDirty({ mapID = id })
@@ -691,18 +703,21 @@ function XPTooltip:SyncJourneyHeatmapIndex()
       and type(meta) == "table" then
       local mapID = tonumber(zoneKey:sub(5))
       local entry = mapID and db.heatmaps[tostring(mapID)]
-      local retained = type(entry) == "table"
+      local hasHeatmap = type(entry) == "table"
         and ((tonumber(entry.total) or 0) > 0
           or (type(entry.cells) == "table" and next(entry.cells) ~= nil))
-      if not retained then
-        if (tonumber(meta.count) or 0) <= 0 then
+      local hasMobs = (tonumber(meta.count) or 0) > 0
+      local hasZone = meta.hasZone == true or (tonumber(meta.zoneKills) or 0) > 0
+      if not hasHeatmap then
+        if not hasMobs and not hasZone then
           if type(journey.blocks) == "table" then
             journey.blocks[zoneKey] = nil
           end
           index[zoneKey] = nil
         else
           meta.heatmapKills = 0
-          meta.lastSeen = 0
+          meta.cellCount = 0
+          if not hasZone then meta.lastSeen = 0 end
           if type(self.MarkJourneyDirty) == "function" then
             pcall(self.MarkJourneyDirty, self, { mapID = mapID })
           end
@@ -721,6 +736,10 @@ function XPTooltip:ClearHeatmaps()
   local db = type(self.char) == "table" and self.char or nil
   if db then
     db.heatmaps = {}
+  end
+  if db and type(db.journey) == "table"
+    and type(self.SyncModelHeatmapsFromLegacy) == "function" then
+    pcall(self.SyncModelHeatmapsFromLegacy, self)
   end
   if type(self.SyncJourneyHeatmapIndex) == "function" then
     pcall(self.SyncJourneyHeatmapIndex, self)

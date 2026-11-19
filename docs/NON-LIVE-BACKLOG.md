@@ -23,7 +23,19 @@ client. Live-only residuals are in `docs/tasks/V-2-LIVE-VERIFICATION.md`.
 | **DS-17.8** P0 data-model safety | Done 2026-11-18 | `docs/DS-17-08-DATA-MODEL-P0-SAFETY-RESULT.md` |
 | **DS-17.9** S1 data-model scaffolding | Done 2026-11-18 | `docs/DS-17-09-DATA-MODEL-S1-SCAFFOLDING-RESULT.md` |
 | **DS-17.10** S2A mob model migration | Done: kill/backfill + v2-only reads | `docs/DS-17-10-S2A-MOB-MODEL-RESULT.md` |
-| **DS-17.11** S2A mutation parity | Next: merge/delete/prune sync | DS-17.10 |
+| **DS-17.11** S2A mutation parity | Done 2026-11-18 | `docs/DS-17-11-S2A-MUTATION-PARITY-RESULT.md` |
+| **DS-17.12** S2B context shape | Done 2026-11-18 | `docs/DS-17-12-S2B-CONTEXT-SHAPE-RESULT.md` |
+| **DS-17.13** S3 zone/level ownership | Done 2026-11-18 | `docs/DS-17-13-S3-ZONE-LEVEL-OWNERSHIP-RESULT.md` |
+| **DS-17.14** S4A instance ownership | Done 2026-11-18 | `docs/DS-17-14-S4-INSTANCE-OWNERSHIP-RESULT.md` |
+| **DS-17.15** S4B instance time | Done 2026-11-18 | `docs/DS-17-15-S4B-INSTANCE-TIME-RESULT.md` |
+| **DS-17.16** S5 death ownership | Done 2026-11-18 | `docs/DS-17-16-S5-DEATH-OWNERSHIP-RESULT.md` |
+| **DS-17.17** S6 quest/respawn | Done 2026-11-18 | `docs/DS-17-17-S6-QUEST-RESPAWN-OWNERSHIP-RESULT.md` |
+| **DS-17.18** S7 heatmap ownership | Done 2026-11-18 | `docs/DS-17-18-S7-HEATMAP-OWNERSHIP-RESULT.md` |
+| **DS-17.19** S8 block payload | Done 2026-11-18 | `docs/DS-17-19-S8-BLOCK-PAYLOAD-RESULT.md` |
+| **DS-17.20** S9 caps/archive | Done 2026-11-18 | `docs/DS-17-20-S9-CAPS-ARCHIVE-RESULT.md` |
+| **DS-17.21** S10 legacy retirement | S10A/S10B done; S10C pending | `docs/DS-17-21-S10A-QUERY-RETIREMENT-RESULT.md` |
+| **DS-17.22** S10B UI reads | Done 2026-11-18 | `docs/DS-17-22-S10B-UI-READS-RESULT.md` |
+| **DS-17.23** S10C retirement | S10C-1 + V-2A harness done; S10C-2 blocked | `docs/DS-17-23-S10C1-RETIREMENT-READINESS-RESULT.md`, `docs/V-2A-PROBE-HARNESS-RESULT.md` |
 | **DS-17.6B** ALT/account validation | Future only | DS-17.7, DS-17.4D, V-2, MEM-1 |
 | **H64-10** schema/downgrade decision | Decide schema bump policy | Offline |
 
@@ -98,8 +110,20 @@ These are feature tasks, not verification gates.
 23. ~~**DS-17.8** P0 data-model safety fixes.~~ — done.
 24. ~~**DS-17.9** S1 data-model scaffolding.~~ — done.
 25. ~~**DS-17.10** S2A mob model migration.~~ — done.
-26. **DS-17.11** S2A mutation parity. **Next.**
-27. **DS-17.6B** ALT/account validation — future only.
+26. ~~**DS-17.11** S2A mutation parity.~~ — done.
+27. ~~**DS-17.12** S2B context shape.~~ — done.
+28. ~~**DS-17.13** S3 zone/level ownership.~~ — done.
+29. ~~**DS-17.14** S4A instance ownership.~~ — done.
+30. ~~**DS-17.15** S4B instance time.~~ — done.
+31. ~~**DS-17.16** S5 death ownership.~~ — done.
+32. ~~**DS-17.17** S6 quest/respawn ownership.~~ — done.
+33. ~~**DS-17.18** S7 heatmap ownership.~~ — done.
+34. ~~**DS-17.19** S8 block payload v2 completeness.~~ — done.
+35. ~~**DS-17.20** S9 adaptive caps, retention, and archive policy.~~ — done.
+36. **DS-17.21** S10 legacy retirement. S10A/S10B done; S10C pending.
+37. ~~**DS-17.22** S10B UI read retirement.~~ — done.
+38. **DS-17.23** S10C live-gated retirement. S10C-1 + V-2A harness done; S10C-2 blocked.
+39. **DS-17.6B** ALT/account validation — future only.
 
 V-2 should not block these. Run it when a live client is available and keep it
 focused on the live-only table.

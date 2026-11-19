@@ -14,6 +14,8 @@ db.instances = {
 }
 db.levels = { ["10"] = 5, ["11"] = 10, ["12"] = 10 }
 db.totals = { kills = 50, xp = 0, uniqueMobs = 0 }
+module:SyncModelZonesFromLegacy()
+module:SyncModelInstancesFromLegacy()
 
 local originalPrint = AceM2L2.Print
 local function capture(fn)
@@ -73,13 +75,21 @@ assert(areas:find("Second Instance", 1, true), "second instance row missing")
 assert(not areas:find("Azeroth", 1, true), "Azeroth leaked into Areas")
 
 -- Empty states match.
-local savedAreas, savedInstances, savedLevels = db.areas, db.instances, db.levels
+local savedZones = db.journey.zones
+local savedInstances = db.journey.instances
+local savedLevels = db.journey.levels
+local savedAreas, savedLegacyInstances, savedLegacyLevels =
+  db.areas, db.instances, db.levels
+db.journey.zones, db.journey.instances, db.journey.levels = {}, {}, {}
 db.areas, db.instances, db.levels = {}, {}, {}
 compareList("empty areas", "areas")
 compareList("empty levels", "levels")
 compareCommand("empty areas", function(m) m:PrintAreas() end)
 compareCommand("empty levels", function(m) m:PrintLevels() end)
-db.areas, db.instances, db.levels = savedAreas, savedInstances, savedLevels
+db.journey.zones, db.journey.instances, db.journey.levels =
+  savedZones, savedInstances, savedLevels
+db.areas, db.instances, db.levels =
+  savedAreas, savedLegacyInstances, savedLegacyLevels
 
 -- Zone/level Journey stats are separate from legacy counts, not added.
 db.journey.zones = {
@@ -89,8 +99,7 @@ db.journey.zones = {
   },
 }
 local zone = module:GetJourneyZoneStats("12")
-assert(zone.kills == 3, "Journey zone kills were added to legacy")
-assert(zone.legacyKills == 10, "legacy zone kills not reported")
+assert(zone.kills == 3, "Journey zone kills")
 db.journey.levels = {
   ["10"] = {
     kills = 4, killXP = 400, questXP = 0, otherXP = 0, xp = 400,
@@ -99,35 +108,21 @@ db.journey.levels = {
 }
 local level = module:GetJourneyLevelStats(10)
 assert(level.kills == 4, "Journey level kills")
-assert(level.legacyKills == 5, "legacy level kills not reported")
 
--- The flag really selects the shared row path; false never calls it.
-local originalAreaRows = module.GetAreaRows
-local originalLevelRows = module.GetLevelRows
-local areaCalls, levelCalls = 0, 0
-module.GetAreaRows = function(self)
-  areaCalls = areaCalls + 1
-  return originalAreaRows(self)
-end
-module.GetLevelRows = function(self)
-  levelCalls = levelCalls + 1
-  return originalLevelRows(self)
-end
+-- Query rows are v2-only; the legacy rollback flag does not resurrect
+-- legacy aggregate roots.
 db.journey.indexViews = false
-module.tab = "areas"
-module:BuildList()
-module.tab = "levels"
-module:BuildList()
-assert(areaCalls == 0 and levelCalls == 0, "rollback called the shared rows")
-db.journey.indexViews = true
-module.tab = "areas"
-module:BuildList()
-assert(areaCalls == 1, "Areas did not use GetAreaRows")
-module.tab = "levels"
-module:BuildList()
-assert(levelCalls == 1, "Levels did not use GetLevelRows")
-module.GetAreaRows = originalAreaRows
-module.GetLevelRows = originalLevelRows
+assert(#module:GetAreaRows() == 3, "area rows depend on legacy flag")
+assert(#module:GetLevelRows() == 1, "level rows depend on legacy flag")
+
+-- The query rows themselves are v2-only even when legacy roots disappear.
+local queryAreas, queryInstances, queryLevels = db.areas, db.instances, db.levels
+db.areas, db.instances, db.levels = nil, nil, nil
+assert(#module:GetAreaRows() == 3, "area rows read legacy roots")
+assert(module:GetAreaKillCount("12") == 3, "area kill count read legacy")
+assert(#module:GetLevelRows() == 1, "level rows read legacy roots")
+assert(module:GetLevelKillCount("10") == 4, "level kill count read legacy")
+db.areas, db.instances, db.levels = queryAreas, queryInstances, queryLevels
 
 -- Reset clears Journey history and block state as well as legacy history.
 db.journey = { zones = { ["12"] = { kills = 3 } }, blocks = { ["map:12"] = {} } }
